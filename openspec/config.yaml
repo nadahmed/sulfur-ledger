@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Domain: Simple Ledger App
+  Accounting Principles:
+    - Strictly enforce double-entry bookkeeping (sum of debits and credits must equal 0).
+    - Amount is always stored in database as integer (paisa/cents) and formatted as decimal (taka/dollar) when presented to the user.
+    - Journal entries require: date, description, line items (from account, to account, amount).
+  Features:
+    - Journal page for recording transactions.
+    - Filterable reports by date range (from and to date): Trial Balance, Balance Sheet, Income Statement, and charts.
+    - Chart of Accounts: Users create their own accounts, but must assign them to one of the hardcoded categories: asset, liability, equity, income, and expense.
+  Data Scoping & Multi-Tenancy:
+    - Organizations: Multiple users can share a single ledger within an Organization.
+    - Journals and chart of accounts are scoped to the Organization.
+  Integrations:
+    - AI/LLMs can perform actions on behalf of the user using MCP tool integrations (e.g., draft entries, generate reports, summarize financial health, natural language queries).
+  Tech stack: 
+    - Fullstack Framework: Next.js 16
+    - UI Components: shadcn
+    - Auth: Auth0 (authentication & authorization)
+    - Database: DynamoDB
+    - Deployment: Docker image deployed on render.com
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
