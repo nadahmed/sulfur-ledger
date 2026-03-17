@@ -4,10 +4,10 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
-  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+  region: process.env.REGION || "us-east-1",
+  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
     endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
   } : {})
 });
 
@@ -40,7 +40,7 @@ const migrations: Migration[] = [
     name: "Migrate user roles and owner flags",
     up: async (db: any) => {
       const { ScanCommand, PutCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
-      
+
       console.log("Scanning for OrgUser items...");
       const result = await db.send(new ScanCommand({
         TableName: TABLE_NAME,
@@ -61,7 +61,7 @@ const migrations: Migration[] = [
         const org = orgRes.Item;
 
         let needsUpdate = false;
-        
+
         // Ensure role exists
         if (!item.role) {
           item.role = "member";

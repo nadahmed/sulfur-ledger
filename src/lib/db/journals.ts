@@ -72,15 +72,15 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   // Using raw client for transactions as lib-dynamodb sometimes has typing quirks with TransactWrite
   const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
   const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+    region: process.env.REGION || "us-east-1",
+    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
       endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
     } : {})
   });
-  
+
   await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
-  
+
   // Audit Log
   await createAuditLog({
     orgId: entry.orgId,
@@ -125,8 +125,8 @@ export async function getJournalEntries(orgId: string, startDate?: string, endDa
 }
 
 export async function getJournalEntriesWithLines(
-  orgId: string, 
-  limit = 20, 
+  orgId: string,
+  limit = 20,
   cursor?: string,
   date?: string
 ) {
@@ -218,7 +218,7 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
       },
     })
   );
-  
+
   const lines = linesResult.Items || [];
 
   const transactItems: TransactWriteItem[] = [];
@@ -249,13 +249,13 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
 
   const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
   const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+    region: process.env.REGION || "us-east-1",
+    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
       endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
     } : {})
   });
-  
+
   await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
   // Audit Log
@@ -272,16 +272,16 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
 }
 
 export async function updateJournalEntry(
-  orgId: string, 
-  entryId: string, 
+  orgId: string,
+  entryId: string,
   oldDate: string,
-  newEntry: Partial<JournalEntry>, 
+  newEntry: Partial<JournalEntry>,
   newLines: JournalLine[],
   userId: string
 ) {
   // Simplest way is to delete old and create new in a single transaction if date changed,
   // or just update if date is same. To keep it robust, let's treat it as a replacement of lines.
-  
+
   // 1. Get existing lines
   const pk = `ORG#${orgId}#JOURNAL`;
   const oldLinesResult = await db.send(
@@ -352,13 +352,13 @@ export async function updateJournalEntry(
 
   const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
   const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+    region: process.env.REGION || "us-east-1",
+    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
       endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
     } : {})
   });
-  
+
   await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
   // Audit Log
@@ -369,10 +369,10 @@ export async function updateJournalEntry(
     action: "update",
     entityType: "JournalEntry",
     entityId: entryId,
-    details: JSON.stringify({ 
-      oldDate, 
+    details: JSON.stringify({
+      oldDate,
       newDate: newEntry.date,
-      description: newEntry.description 
+      description: newEntry.description
     }),
     timestamp: new Date().toISOString(),
   });

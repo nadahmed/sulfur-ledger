@@ -4,10 +4,10 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
-  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+  region: process.env.REGION || "us-east-1",
+  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
     endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
   } : {})
 });
 
@@ -19,7 +19,7 @@ const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || "SimpleLedger";
 
 async function run() {
   const orgId = "0dac4053-7d2f-4508-8ef4-0a1c94ed19c3";
-  
+
   console.log(`Searching for accounts in org ${orgId}...`);
   const result = await docClient.send(
     new QueryCommand({

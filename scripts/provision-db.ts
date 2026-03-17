@@ -1,7 +1,7 @@
 import { DynamoDBClient, CreateTableCommand, DeleteTableCommand } from "@aws-sdk/client-dynamodb";
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
+  region: process.env.REGION || "us-east-1",
   endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT || "http://localhost:8000"
 });
 

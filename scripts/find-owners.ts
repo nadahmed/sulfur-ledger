@@ -4,10 +4,10 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
-  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { 
+  region: process.env.REGION || "us-east-1",
+  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
     endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
   } : {})
 });
 
@@ -29,7 +29,7 @@ async function run() {
   for (const org of orgs) {
     console.log(`ORG_ID: ${org.id}`);
     console.log(`METADATA_OWNER: ${org.ownerId}`);
-    
+
     const usersRes = await docClient.send(new QueryCommand({
       TableName: TABLE_NAME,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",

@@ -4,10 +4,10 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 const isLocalDb = !!process.env.DYNAMODB_LOCAL_ENDPOINT;
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
-  ...(isLocalDb ? { 
+  region: process.env.REGION || "us-east-1",
+  ...(isLocalDb ? {
     endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: "fake", secretAccessKey: "fake" }
+    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
   } : {})
 });
 
