@@ -1,13 +1,15 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
-const isLocalDb = !!process.env.DYNAMODB_LOCAL_ENDPOINT;
 
 const client = new DynamoDBClient({
   region: process.env.REGION || "us-east-1",
-  ...(isLocalDb ? {
-    endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
+  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT } : {}),
+  ...(process.env.ACCESS_KEY_ID ? {
+    credentials: {
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake"
+    }
   } : {})
 });
 

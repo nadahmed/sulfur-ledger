@@ -5,9 +5,12 @@ config({ path: ".env.local" });
 
 const client = new DynamoDBClient({
   region: process.env.REGION || "us-east-1",
-  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
-    endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
+  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT } : {}),
+  ...(process.env.ACCESS_KEY_ID ? {
+    credentials: {
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake"
+    }
   } : {})
 });
 
