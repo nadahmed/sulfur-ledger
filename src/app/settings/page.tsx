@@ -1,0 +1,772 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUser } from "@auth0/nextjs-auth0/client";
+import { useOrganization } from "@/context/OrganizationContext";
+import { Header } from "@/components/Header";
+import { toast } from "sonner";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { 
+  OrganizationSchema, 
+  OrganizationFormValues, 
+  InvitationSchema, 
+  InvitationFormValues, 
+  EmailSettingsSchema, 
+  EmailSettingsFormValues 
+} from "@/lib/schemas";
+
+export default function SettingsPage() {
+  const { user, isLoading: isUserLoading } = useUser();
+  const { 
+    activeOrganizationId, 
+    organizations, 
+    refreshOrganizations, 
+    setActiveOrganizationId,
+    permissions,
+    isOwner,
+    isLoading: isOrgLoading 
+  } = useOrganization();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [confirmConfig, setConfirmConfig] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: "default" | "destructive";
+  } | null>(null);
+
+  const activeOrg = organizations.find(o => o.id === activeOrganizationId);
+  const canManage = isOwner || permissions.includes("manage:organization");
+  const isLoading = isUserLoading || isOrgLoading;
+
+  // --- Queries ---
+
+  const { data: members = [], isLoading: isLoadingMembers } = useQuery({
+    queryKey: ["members", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/members?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch members");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId,
+  });
+
+  const { data: emailSettings, isLoading: isLoadingEmailSettings } = useQuery<EmailSettingsFormValues>({
+    queryKey: ["email-settings", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/email-settings?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch email settings");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
+  const { data: pendingInvites = [], isLoading: isLoadingInvites } = useQuery({
+    queryKey: ["invitations", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/invitations?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch invitations");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
+  // --- Mutations ---
+
+  const leaveOrgMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations/members?orgId=${activeOrganizationId}&userId=${user?.sub}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to leave");
+    },
+    onSuccess: () => {
+      refreshOrganizations();
+      setActiveOrganizationId(null);
+      toast.success("You have left the organization.");
+      router.push("/onboarding");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const resp = await fetch(`/api/organizations/members?orgId=${activeOrganizationId}&userId=${userId}`, {
+        method: "DELETE",
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json();
+        throw new Error(errorData.error || "Failed to remove member");
+      }
+      return resp.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members", activeOrganizationId] });
+      toast.success("Member removed");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string, role: string }) => {
+      const resp = await fetch(`/api/organizations/members?orgId=${activeOrganizationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role }),
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json();
+        throw new Error(errorData.error || "Failed to update role");
+      }
+      return resp.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members", activeOrganizationId] });
+      toast.success("Role updated");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateOrgMutation = useMutation({
+    mutationFn: async (values: OrganizationFormValues) => {
+      const res = await fetch("/api/organizations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeOrganizationId, name: values.name }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Update failed");
+    },
+    onSuccess: () => {
+      refreshOrganizations();
+      toast.success("Organization name updated!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteOrgMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations?id=${activeOrganizationId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Delete failed");
+    },
+    onSuccess: () => {
+      refreshOrganizations();
+      setActiveOrganizationId(null);
+      toast.success("Organization deleted successfully");
+      router.push("/onboarding");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (values: InvitationFormValues) => {
+      const res = await fetch("/api/organizations/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          ...values,
+          orgId: activeOrganizationId,
+          orgName: activeOrg?.name 
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Invite failed");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      toast.success("Invitation sent successfully!");
+      resetInvite();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveEmailMutation = useMutation({
+    mutationFn: async (values: EmailSettingsFormValues) => {
+      const res = await fetch("/api/organizations/email-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: activeOrganizationId, settings: values }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Update failed");
+    },
+    onSuccess: () => {
+      toast.success("Email settings saved!");
+      queryClient.invalidateQueries({ queryKey: ["email-settings"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async (values: EmailSettingsFormValues) => {
+      const res = await fetch("/api/organizations/email-settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: values }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Test failed");
+    },
+    onSuccess: () => {
+      toast.success("Test email sent! Check your inbox.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // --- Forms ---
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch(`/api/organizations/invitations?orgId=${activeOrganizationId}&email=${email}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Cancellation failed");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      toast.success("Invitation cancelled");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const {
+    register: registerOrg,
+    handleSubmit: handleSubmitOrg,
+    formState: { isDirty: isOrgDirty },
+    setValue: setOrgValue,
+  } = useForm<OrganizationFormValues>({
+    resolver: zodResolver(OrganizationSchema),
+    defaultValues: { name: activeOrg?.name || "" },
+  });
+
+  useEffect(() => {
+    if (activeOrg) setOrgValue("name", activeOrg.name);
+  }, [activeOrg, setOrgValue]);
+
+  const {
+    register: registerInvite,
+    handleSubmit: handleSubmitInvite,
+    control: controlInvite,
+    reset: resetInvite,
+    formState: { errors: inviteErrors },
+  } = useForm<InvitationFormValues>({
+    resolver: zodResolver(InvitationSchema),
+    defaultValues: { email: "", role: "viewer" },
+  });
+
+  const {
+    register: registerEmail,
+    handleSubmit: handleSubmitEmail,
+    control: controlEmail,
+    setValue: setEmailValue,
+    watch: watchEmail,
+  } = useForm<EmailSettingsFormValues>({
+    resolver: zodResolver(EmailSettingsSchema),
+    defaultValues: emailSettings || { provider: "none", senderEmail: "", senderName: "Sulfur Ledger" },
+  });
+
+  const watchProvider = watchEmail("provider");
+
+  useEffect(() => {
+    if (emailSettings) {
+      Object.entries(emailSettings).forEach(([key, value]) => {
+        setEmailValue(key as any, value);
+      });
+    }
+  }, [emailSettings, setEmailValue]);
+
+  if (isLoading) return <div className="p-8 text-center text-neutral-500">Loading settings...</div>;
+
+  if (!activeOrganizationId) {
+    return <div className="p-8 text-center">Redirecting to setup...</div>;
+  }
+
+  return (
+    <main className="max-w-4xl mx-auto p-4 md:p-8">
+      <Header title="Settings" showBack />
+
+      <Tabs defaultValue="general" className="mt-8">
+        <TabsList className="mb-8">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="email">Email Delivery</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-8 mt-6">
+          <Card className="shadow-lg border-neutral-200">
+            <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
+              <CardHeader>
+                <CardTitle>Organization Details</CardTitle>
+                <CardDescription>Manage your organization's general information.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="org-name">Organization Name</Label>
+                  <Input
+                    id="org-name"
+                    {...registerOrg("name")}
+                    disabled={!canManage}
+                  />
+                </div>
+              </CardContent>
+              {canManage && (
+                <CardFooter className="bg-neutral-50 border-t border-neutral-100 rounded-b-lg">
+                  <Button type="submit" disabled={updateOrgMutation.isPending || !isOrgDirty}>
+                    {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2"><Save className="w-4 h-4" /> Save Changes</span>}
+                  </Button>
+                </CardFooter>
+              )}
+            </form>
+          </Card>
+
+          {!isOwner && (
+            <Card className="shadow-lg border-neutral-200">
+              <CardHeader>
+                <CardTitle className="text-amber-600 flex items-center gap-2">Leave Organization</CardTitle>
+                <CardDescription>You will lose access to this organization and all its data.</CardDescription>
+              </CardHeader>
+              <CardFooter className="bg-amber-50 border-t border-amber-100 rounded-b-lg">
+                <Button 
+                  variant="outline" 
+                  className="border-amber-200 text-amber-700 hover:bg-amber-100"
+                  onClick={() => {
+                    setConfirmConfig({
+                      open: true,
+                      title: "Leave Organization",
+                      description: "Are you sure you want to leave this organization? You will lose access to all its data.",
+                      variant: "destructive",
+                      onConfirm: () => leaveOrgMutation.mutate(),
+                    });
+                  }}
+                  disabled={leaveOrgMutation.isPending}
+                >
+                  {leaveOrgMutation.isPending ? "Leaving..." : "Leave Organization"}
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          {isOwner && (
+            <Card className="shadow-lg border-red-200">
+              <CardHeader>
+                <CardTitle className="text-red-600 flex items-center gap-2"><AlertCircle className="w-5 h-5" /> Danger Zone</CardTitle>
+                <CardDescription>Permanently delete this organization and everything in it.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-neutral-600">Please type <strong>"{activeOrg?.name}"</strong> to confirm.</p>
+                <Input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="Type name to confirm"
+                  className="max-w-md border-red-200"
+                />
+              </CardContent>
+              <CardFooter className="bg-red-50 border-t border-red-100 rounded-b-lg">
+                <Button 
+                  variant="destructive" 
+                  disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name} 
+                  onClick={() => deleteOrgMutation.mutate()}
+                >
+                  {deleteOrgMutation.isPending ? "Deleting..." : <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete Organization</span>}
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="members" className="space-y-8 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-1 space-y-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="colleague@example.com" 
+                        {...registerInvite("email")}
+                        disabled={!canManage}
+                        className={inviteErrors.email ? "border-red-500" : ""}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <Controller
+                        name="role"
+                        control={controlInvite}
+                        render={({ field }) => (
+                          <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                            <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="viewer">Viewer</SelectItem>
+                              <SelectItem value="member">Editor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                    <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
+                      {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
+                <CardContent>
+                  {isLoadingInvites ? (
+                    <p className="text-sm text-neutral-500 italic">Loading invitations...</p>
+                  ) : pendingInvites.length === 0 ? (
+                    <p className="text-sm text-neutral-500 italic">No pending invitations.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendingInvites.map((invite: any) => {
+                        const createdAt = new Date(invite.createdAt);
+                        const expiresAt = new Date(createdAt.getTime() + 48 * 60 * 60 * 1000);
+                        const now = new Date();
+                        const diffMs = expiresAt.getTime() - now.getTime();
+                        const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                        const diffMins = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+
+                        return (
+                          <div key={invite.email} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                            <div className="flex-1 min-w-0 pr-4">
+                              <p className="text-sm font-medium truncate">{invite.email}</p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <p className="text-xs text-neutral-500 flex items-center gap-1 capitalize">
+                                  <Shield className="w-3 h-3" /> {invite.role}
+                                </p>
+                                <p className="text-xs text-amber-600 font-medium">
+                                  {diffHours}h left
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {canManage && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-neutral-400 hover:text-red-600"
+                                  onClick={() => cancelInviteMutation.mutate(invite.email)}
+                                  disabled={cancelInviteMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="md:col-span-2">
+              <Card className="h-full shadow-lg">
+                <CardHeader>
+                  <CardTitle>Active Members</CardTitle>
+                  <CardDescription>Manage the people who have access to this organization.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingMembers ? (
+                    <div className="flex items-center justify-center p-8 text-neutral-500 italic">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading members...
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {members.map((m: any) => {
+                        const isSelf = m.userId === user?.sub;
+                        return (
+                          <div key={m.userId} className="flex items-center justify-between p-4 bg-neutral-50 hover:bg-neutral-100/50 rounded-xl border border-neutral-100 transition-colors">
+                            <div className="flex items-center gap-4">
+                              {m.userPicture ? (
+                                <img 
+                                  src={m.userPicture} 
+                                  alt={m.userName || "User"} 
+                                  className="w-10 h-10 rounded-full border border-neutral-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                                  {(m.userName || m.userEmail || "U").charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold text-neutral-800 flex items-center gap-2">
+                                  {m.userName || `User ${m.userId.slice(-6)}`}
+                                  {isSelf && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
+                                </p>
+                                <div className="flex flex-col gap-0.5">
+                                  {m.userEmail && <p className="text-xs text-neutral-500 font-medium">{m.userEmail}</p>}
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Shield className="w-3 h-3 text-neutral-400" />
+                                    {m.isOwner ? (
+                                      <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-blue-500/50">Owner</span>
+                                    ) : (
+                                      <Select
+                                        value={m.role}
+                                        onValueChange={(newRole) => updateRoleMutation.mutate({ userId: m.userId, role: newRole })}
+                                        disabled={!canManage || isSelf || updateRoleMutation.isPending}
+                                      >
+                                        <SelectTrigger className="h-6 w-auto border-none bg-transparent p-0 text-xs font-medium capitalize focus:ring-0">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="admin">Admin</SelectItem>
+                                          <SelectItem value="member">Member</SelectItem>
+                                          <SelectItem value="viewer">Viewer</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                    {updateRoleMutation.isPending && updateRoleMutation.variables?.userId === m.userId && (
+                                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!m.isOwner && !isSelf && canManage && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                  onClick={() => {
+                                    setConfirmConfig({
+                                      open: true,
+                                      title: "Remove Member",
+                                      description: `Are you sure you want to remove ${m.userName || m.userEmail} from the organization?`,
+                                      variant: "destructive",
+                                      onConfirm: () => removeMemberMutation.mutate(m.userId),
+                                    });
+                                  }}
+                                  disabled={removeMemberMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Remove
+                                </Button>
+                              )}
+                              {!m.isOwner && isSelf && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                                  onClick={() => {
+                                    setConfirmConfig({
+                                      open: true,
+                                      title: "Leave Organization",
+                                      description: "Are you sure you want to leave this organization?",
+                                      variant: "destructive",
+                                      onConfirm: () => leaveOrgMutation.mutate(),
+                                    });
+                                  }}
+                                  disabled={leaveOrgMutation.isPending}
+                                >
+                                  Leave
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="email" className="space-y-8 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Delivery</CardTitle>
+              <CardDescription>Configure how this organization sends emails.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingEmailSettings ? (
+                <div className="p-8 text-center text-neutral-500 italic">Loading email settings...</div>
+              ) : (
+                <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="grid w-full items-center gap-1.5">
+                      <Label htmlFor="provider">Email Provider</Label>
+                      <Controller
+                        name="provider"
+                        control={controlEmail}
+                        render={({ field }) => (
+                          <Select 
+                            value={field.value} 
+                            onValueChange={field.onChange}
+                            disabled={!canManage}
+                          >
+                            <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None (Disabled)</SelectItem>
+                              <SelectItem value="brevo">Brevo (API)</SelectItem>
+                              <SelectItem value="smtp">Custom SMTP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="senderName">Sender Name</Label>
+                        <Input 
+                          id="senderName" 
+                          {...registerEmail("senderName")}
+                          disabled={!canManage}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="senderEmail">Sender Email</Label>
+                        <Input 
+                          id="senderEmail" 
+                          type="email"
+                          {...registerEmail("senderEmail")}
+                          disabled={!canManage}
+                        />
+                      </div>
+                    </div>
+
+                    {watchProvider === "brevo" && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="apiKey">Brevo API Key</Label>
+                        <Input 
+                          id="apiKey" 
+                          type="password"
+                          placeholder="xkeysib-..."
+                          {...registerEmail("apiKey")}
+                          disabled={!canManage}
+                        />
+                      </div>
+                    )}
+
+                    {watchProvider === "smtp" && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="col-span-2 space-y-1.5">
+                            <Label htmlFor="smtpHost">SMTP Host</Label>
+                            <Input 
+                              id="smtpHost" 
+                              placeholder="smtp.example.com"
+                              {...registerEmail("smtpHost")}
+                              disabled={!canManage}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="smtpPort">Port</Label>
+                            <Input 
+                              id="smtpPort" 
+                              type="number"
+                              placeholder="587"
+                              {...registerEmail("smtpPort", { valueAsNumber: true })}
+                              disabled={!canManage}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="smtpUser">Username</Label>
+                            <Input 
+                              id="smtpUser" 
+                              {...registerEmail("smtpUser")}
+                              disabled={!canManage}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="smtpPass">Password</Label>
+                            <Input 
+                              id="smtpPass" 
+                              type="password"
+                              {...registerEmail("smtpPass")}
+                              disabled={!canManage}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {canManage && (
+                    <div className="flex gap-4">
+                      <Button type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
+                        {saveEmailMutation.isPending ? "Saving..." : "Save Email Settings"}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
+                        disabled={saveEmailMutation.isPending || testEmailMutation.isPending || watchProvider === "none"}
+                      >
+                        {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                      </Button>
+                    </div>
+                  )}
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {confirmConfig && (
+        <AlertDialog 
+          open={confirmConfig.open} 
+          onOpenChange={(open) => !open && setConfirmConfig(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirmConfig.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                variant={confirmConfig.variant || "default"} 
+                onClick={() => {
+                  confirmConfig.onConfirm();
+                  setConfirmConfig(null);
+                }}
+              >
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </main>
+  );
+}
+

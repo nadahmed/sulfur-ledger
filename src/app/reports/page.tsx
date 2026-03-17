@@ -1,0 +1,291 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { useUser } from "@auth0/nextjs-auth0/client";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
+import Link from "next/link";
+import { Download } from "lucide-react";
+import { Header } from "@/components/Header";
+import { useOrganization } from "@/context/OrganizationContext";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+
+interface AccountBalance {
+  id: string;
+  name: string;
+  category: string;
+  balance: number;
+}
+
+interface ReportData {
+  accounts?: AccountBalance[];
+  totalDebits?: number;
+  totalCredits?: number;
+  assets?: AccountBalance[];
+  liabilities?: AccountBalance[];
+  equity?: AccountBalance[];
+  income?: AccountBalance[];
+  expenses?: AccountBalance[];
+}
+
+export default function ReportsPage() {
+  const { user, isLoading: userLoading } = useUser();
+  const { activeOrganizationId, permissions, isOwner, isLoading: orgLoading } = useOrganization();
+  const router = useRouter();
+
+  const [reportType, setReportType] = useState("trial-balance");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const isLoading = userLoading || orgLoading;
+  const canRead = isOwner || permissions.includes("read:reports");
+
+  useEffect(() => {
+    if (!isLoading && user && !activeOrganizationId) {
+      router.push("/onboarding");
+    }
+  }, [user, activeOrganizationId, isLoading, router]);
+
+  const { data, isLoading: isFetchingReport, isError, error } = useQuery<ReportData>({
+    queryKey: ["reports", activeOrganizationId, reportType, startDate, endDate],
+    queryFn: async () => {
+      let url = `/api/reports?type=${reportType}`;
+      if (startDate) url += `&start=${startDate}`;
+      if (endDate) url += `&end=${endDate}`;
+
+      const res = await fetch(url, {
+        headers: { "x-org-id": activeOrganizationId! }
+      });
+      if (!res.ok) throw new Error("Failed to fetch report");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canRead,
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-BD", {
+      style: "currency",
+      currency: "BDT",
+      minimumFractionDigits: 2,
+    }).format(Math.abs(amount) / 100);
+  };
+
+  const chartData = useMemo(() => {
+    if (!data) return [];
+    if (reportType === "income-statement") {
+      const totalIncome = (data.income || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      const totalExpenses = (data.expenses || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      return [
+        { name: "Income", amount: totalIncome, fill: "#22c55e" },
+        { name: "Expenses", amount: totalExpenses, fill: "#ef4444" },
+      ];
+    }
+    if (reportType === "balance-sheet") {
+      const totalAssets = (data.assets || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      const totalLia = (data.liabilities || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      const totalEq = (data.equity || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      return [
+        { name: "Assets", amount: totalAssets, fill: "#3b82f6" },
+        { name: "Liabilities", amount: totalLia, fill: "#f59e0b" },
+        { name: "Equity", amount: totalEq, fill: "#8b5cf6" },
+      ];
+    }
+    return [];
+  }, [data, reportType]);
+
+  if (isLoading) return <div className="p-8 text-center">Loading...</div>;
+
+  if (!user) {
+    return (
+      <div className="p-8 text-center">
+        <p className="mb-4">Please log in to view this page.</p>
+        <Link href="/auth/login">
+          <Button>Log In</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!activeOrganizationId) {
+    return <div className="p-8 text-center">Redirecting to setup...</div>;
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <Header title="Financial Reports" showBack />
+        <div className="flex items-center gap-2">
+          <div className="grid gap-1">
+            <Label htmlFor="start" className="text-xs">From</Label>
+            <Input 
+              id="start" 
+              type="date" 
+              className="h-9" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="end" className="text-xs">To</Label>
+            <Input 
+              id="end" 
+              type="date" 
+              className="h-9" 
+              value={endDate} 
+              onChange={(e) => setEndDate(e.target.value)} 
+            />
+          </div>
+          <Button variant="ghost" size="icon" className="mt-5" onClick={() => { setStartDate(""); setEndDate(""); }}>
+             Reset
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="trial-balance" onValueChange={setReportType} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+          <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
+          <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
+        </TabsList>
+
+        <div className="grid lg:grid-cols-3 gap-8 mt-8">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="capitalize">{reportType.replace("-", " ")}</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
+                <Download className="h-4 w-4 mr-2" /> Print PDF
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!canRead ? (
+                <div className="py-20 text-center text-red-500">
+                  You do not have permission to view financial reports.
+                </div>
+              ) : isFetchingReport ? (
+                <div className="py-20 text-center text-neutral-500">Generating report...</div>
+              ) : isError ? (
+                <div className="py-20 text-center text-red-500">Error: {(error as Error).message}</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  {reportType === "trial-balance" && data && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.accounts?.map((acc) => (
+                          <TableRow key={acc.id}>
+                            <TableCell>{acc.name}</TableCell>
+                            <TableCell className="text-right">{acc.balance > 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
+                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="font-bold border-t-2">
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-right">{formatCurrency(data.totalDebits || 0)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(data.totalCredits || 0)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {reportType === "balance-sheet" && data && (
+                    <div className="space-y-6">
+                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrency} />
+                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrency} />
+                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrency} />
+                    </div>
+                  )}
+
+                  {reportType === "income-statement" && data && (
+                    <div className="space-y-6">
+                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrency} />
+                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrency} />
+                      <div className="pt-4 border-t-2 flex justify-between font-bold text-lg">
+                        <span>Net Income</span>
+                        <span className={((data.income || []).reduce((s,a) => s + Math.abs(a.balance), 0) - (data.expenses || []).reduce((s,a) => s + Math.abs(a.balance), 0)) >= 0 ? "text-green-600" : "text-red-600"}>
+                          {formatCurrency((data.income || []).reduce((s,a) => s + Math.abs(a.balance), 0) - (data.expenses || []).reduce((s,a) => s + Math.abs(a.balance), 0))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Visualization</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px] w-full">
+                {data && chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value: any) => [`৳${(Number(value) || 0).toFixed(2)}`, "Amount"]}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={(entry as any).fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-neutral-500 text-sm italic">
+                    No data to visualize
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Tabs>
+    </div>
+  );
+}
+
+function ReportSection({ title, accounts, format }: { title: string, accounts: AccountBalance[], format: (v: number) => string }) {
+  const total = useMemo(() => accounts.reduce((sum, acc) => sum + Math.abs(acc.balance), 0), [accounts]);
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold text-lg border-b pb-1">{title}</h3>
+      <Table>
+        <TableBody>
+          {accounts.map(acc => (
+            <TableRow key={acc.id} className="border-none hover:bg-transparent">
+              <TableCell className="py-1">{acc.name}</TableCell>
+              <TableCell className="text-right py-1">{format(acc.balance)}</TableCell>
+            </TableRow>
+          ))}
+          {accounts.length === 0 && (
+            <TableRow className="border-none">
+              <TableCell className="text-neutral-400 italic py-1">No items found</TableCell>
+              <TableCell className="text-right py-1">{format(0)}</TableCell>
+            </TableRow>
+          )}
+          <TableRow className="font-bold">
+            <TableCell>Total {title}</TableCell>
+            <TableCell className="text-right border-t">{format(total)}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

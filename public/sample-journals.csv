@@ -1,0 +1,6 @@
+Date,Description,Amount,From (Source),To (Destination),Notes
+2026-03-01,Initial Deposit,100000,Equity,Cash Wallet,Starting balance
+2026-03-02,Office Rent,20000,Cash Wallet,Rent Expense,March rent
+2026-03-05,Sales Revenue,50000,Service Income,Bank Account,Project Alpha
+2026-03-10,Utility Bills,5000,Bank Account,Utilities Expense,Electricity and Water
+2026-03-15,Consultancy Fee,15000,Service Income,Bkash,Short gig
