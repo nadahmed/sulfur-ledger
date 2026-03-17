@@ -97,7 +97,7 @@ export default function DashboardPage() {
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
 
   if (!user) {
-    router.push("/api/auth/login");
+    router.push("/auth/login");
     return null;
   }
 

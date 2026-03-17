@@ -215,7 +215,7 @@ export function AppSidebar() {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/api/auth/logout")}>
+                <DropdownMenuItem onClick={() => router.push("/auth/logout")}>
                   <LogOut className="mr-2 size-4" />
                   Log out
                 </DropdownMenuItem>
