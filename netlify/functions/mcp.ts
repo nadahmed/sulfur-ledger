@@ -78,6 +78,7 @@ export default async (req: Request, context: Context) => {
         id: e.id,
         date: e.date,
         description: e.description,
+        tags: e.tags,
         lines: (e.lines || []).map((l: any) => ({
           accountId: l.accountId,
           amount: l.amount
@@ -112,12 +113,13 @@ export default async (req: Request, context: Context) => {
     {
       date: z.string().describe("YYYY-MM-DD"),
       description: z.string(),
+      tags: z.array(z.string()).optional(),
       lines: z.array(z.object({
         accountId: z.string(),
         amount: z.number().describe("Amount in cents. Positive for debit, negative for credit.")
       }))
     },
-    async ({ date, description, lines }) => {
+    async ({ date, description, tags, lines }) => {
       try {
         const { randomUUID } = require("crypto");
         const id = randomUUID();
@@ -135,6 +137,7 @@ export default async (req: Request, context: Context) => {
           id,
           date,
           description: `[AI] ${description}`,
+          tags,
           createdAt: new Date().toISOString()
         };
 

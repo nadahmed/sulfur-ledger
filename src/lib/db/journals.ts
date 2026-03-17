@@ -11,6 +11,7 @@ export interface JournalEntry {
   date: string; // YYYY-MM-DD
   description: string;
   notes?: string;
+  tags?: string[];
   createdAt: string;
 }
 

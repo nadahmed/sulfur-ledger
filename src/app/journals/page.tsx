@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { JournalEntrySchema, JournalEntryFormValues } from "@/lib/schemas";
+import { JournalEntrySchema, JournalEntryFormValues, JournalEntryFormInput } from "@/lib/schemas";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check, Pencil, Trash2, MoreVertical, AlertCircle } from "lucide-react";
@@ -36,6 +36,7 @@ interface JournalEntry {
   date: string;
   description: string;
   notes?: string;
+  tags?: string[];
   createdAt: string;
   lines: { accountId: string; amount: number; date: string }[];
 }
@@ -174,7 +175,7 @@ export default function JournalsPage() {
     control,
     reset,
     formState: { errors },
-  } = useForm<JournalEntryFormValues>({
+  } = useForm<JournalEntryFormInput>({
     resolver: zodResolver(JournalEntrySchema),
     defaultValues: {
       date: new Date().toISOString().slice(0, 10),
@@ -183,6 +184,7 @@ export default function JournalsPage() {
       amount: "",
       fromAccountId: "",
       toAccountId: "",
+      tags: "" as any,
     },
   });
 
@@ -228,8 +230,8 @@ export default function JournalsPage() {
     },
   });
 
-  const onSubmit = (values: JournalEntryFormValues) => {
-    postMutation.mutate(values);
+  const onSubmit = (values: any) => {
+    postMutation.mutate(values as JournalEntryFormValues);
   };
 
   const handleDelete = (id: string, date: string) => {
@@ -350,6 +352,17 @@ export default function JournalsPage() {
                 </div>
               </div>
 
+              <div className="flex gap-4">
+                <div className="grid flex-1 items-center gap-1.5">
+                  <Label htmlFor="tags">Tags (Optional, comma-separated)</Label>
+                  <Input 
+                    id="tags" 
+                    {...register("tags")} 
+                    placeholder="e.g. marketing, software, monthly" 
+                  />
+                </div>
+              </div>
+
               <Button type="submit" disabled={postMutation.isPending}>
                 {postMutation.isPending ? "Posting..." : "Post Journal"}
               </Button>
@@ -407,6 +420,7 @@ export default function JournalsPage() {
                     <TableHead>From Account</TableHead>
                     <TableHead>To Account</TableHead>
                     <TableHead>Notes</TableHead>
+                    <TableHead>Tags</TableHead>
                     {(canUpdate || canDelete) && <TableHead className="w-[50px]"></TableHead>}
                   </TableRow>
                 </thead>
@@ -435,6 +449,22 @@ export default function JournalsPage() {
                         <TableCell>{fromAcc}</TableCell>
                         <TableCell>{toAcc}</TableCell>
                         <TableCell className="text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {jnl.tags && jnl.tags.length > 0 ? (
+                              jnl.tags.map((tag: string, idx: number) => (
+                                <span 
+                                  key={idx} 
+                                  className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10"
+                                >
+                                  {tag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-neutral-400">-</span>
+                            )}
+                          </div>
+                        </TableCell>
                         {(canUpdate || canDelete) && (
                           <TableCell>
                             <DropdownMenu>

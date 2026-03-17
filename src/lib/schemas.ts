@@ -16,12 +16,17 @@ export const JournalEntrySchema = z.object({
   fromAccountId: z.string().min(1, "Credit account is required"),
   toAccountId: z.string().min(1, "Debit account is required"),
   notes: z.string().optional(),
+  tags: z.union([z.array(z.string()), z.string()]).optional().transform((val) => {
+    if (typeof val === "string") return val.split(",").map(t => t.trim()).filter(Boolean);
+    return val;
+  }),
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
   message: "From and To accounts cannot be the same",
   path: ["toAccountId"],
 });
 
 export type JournalEntryFormValues = z.infer<typeof JournalEntrySchema>;
+export type JournalEntryFormInput = z.input<typeof JournalEntrySchema>;
 
 export const OrganizationSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(100),
