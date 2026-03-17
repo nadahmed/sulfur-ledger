@@ -70,16 +70,9 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   }
 
   // Using raw client for transactions as lib-dynamodb sometimes has typing quirks with TransactWrite
-  const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-  const client = new DynamoDBClient({
-    region: process.env.REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
-      endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
-    } : {})
-  });
+  const { dynamoDBClient } = require("@/lib/dynamodb");
 
-  await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
+  await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
   // Audit Log
   await createAuditLog({
@@ -247,16 +240,9 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
     });
   }
 
-  const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-  const client = new DynamoDBClient({
-    region: process.env.REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
-      endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
-    } : {})
-  });
+  const { dynamoDBClient } = require("@/lib/dynamodb");
 
-  await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
+  await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
   // Audit Log
   await createAuditLog({
@@ -350,16 +336,9 @@ export async function updateJournalEntry(
     });
   }
 
-  const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-  const client = new DynamoDBClient({
-    region: process.env.REGION || "us-east-1",
-    ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
-      endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-      credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
-    } : {})
-  });
+  const { dynamoDBClient } = require("@/lib/dynamodb");
 
-  await client.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
+  await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
   // Audit Log
   await createAuditLog({

@@ -1,16 +1,12 @@
-import { DynamoDBClient, CreateTableCommand, DeleteTableCommand } from "@aws-sdk/client-dynamodb";
-
-const client = new DynamoDBClient({
-  region: process.env.REGION || "us-east-1",
-  endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT || "http://localhost:8000"
-});
+import { dynamoDBClient } from "@/lib/dynamodb";
+import { CreateTableCommand, DeleteTableCommand } from "@aws-sdk/client-dynamodb";
 
 const TABLE_NAME = "SimpleLedger";
 
 async function provisionDB() {
   try {
     // Attempt to delete it first if it exists (for local dev resets)
-    await client.send(new DeleteTableCommand({ TableName: TABLE_NAME }));
+    await dynamoDBClient.send(new DeleteTableCommand({ TableName: TABLE_NAME }));
     console.log("Deleted existing table");
   } catch (e: any) {
     if (e.name !== "ResourceNotFoundException") {
@@ -19,7 +15,7 @@ async function provisionDB() {
   }
 
   try {
-    const data = await client.send(
+    const data = await dynamoDBClient.send(
       new CreateTableCommand({
         TableName: TABLE_NAME,
         KeySchema: [

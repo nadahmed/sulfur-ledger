@@ -1,17 +1,11 @@
-import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
-import { GetCommand, PutCommand, DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { dynamoDBClient } from "@/lib/dynamodb";
+import { CreateTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-const client = new DynamoDBClient({
-  region: process.env.REGION || "us-east-1",
-  ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? {
-    endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT,
-    credentials: { accessKeyId: process.env.ACCESS_KEY_ID || "fake", secretAccessKey: process.env.SECRET_ACCESS_KEY || "fake" }
-  } : {})
-});
 
-const docClient = DynamoDBDocumentClient.from(client, {
+const docClient = DynamoDBDocumentClient.from(dynamoDBClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
@@ -94,12 +88,12 @@ const migrations: Migration[] = [
 
 async function ensureTableExists() {
   try {
-    await client.send(new DescribeTableCommand({ TableName: TABLE_NAME }));
+    await dynamoDBClient.send(new DescribeTableCommand({ TableName: TABLE_NAME }));
     console.log(`Table "${TABLE_NAME}" already exists.`);
   } catch (e: any) {
     if (e.name === "ResourceNotFoundException") {
       console.log(`Table "${TABLE_NAME}" does not exist. Creating...`);
-      await client.send(
+      await dynamoDBClient.send(
         new CreateTableCommand({
           TableName: TABLE_NAME,
           KeySchema: [
