@@ -16,10 +16,52 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const includeArchived = searchParams.get("includeArchived") === "true";
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "10");
+    const search = searchParams.get("search")?.toLowerCase() || "";
+    const category = searchParams.get("category") || "";
 
-    const accounts = await getAccounts(orgId);
-    const result = includeArchived ? accounts : accounts.filter(a => a.status !== "archived");
-    return NextResponse.json(result);
+    let accounts = await getAccounts(orgId);
+    
+    // Filter by archived status
+    if (!includeArchived) {
+      accounts = accounts.filter(a => a.status !== "archived");
+    }
+
+    // Filter by search term
+    if (search) {
+      accounts = accounts.filter(a => a.name.toLowerCase().includes(search));
+    }
+
+    // Filter by category
+    if (category && category !== "all") {
+      accounts = accounts.filter(a => a.category === category);
+    }
+
+    // Sort by category
+    const categoryOrder = ["asset", "liability", "equity", "income", "expense"];
+    accounts.sort((a, b) => {
+      const orderA = categoryOrder.indexOf(a.category);
+      const orderB = categoryOrder.indexOf(b.category);
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Pagination
+    const total = accounts.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const startIndex = (page - 1) * pageSize;
+    const paginatedAccounts = accounts.slice(startIndex, startIndex + pageSize);
+
+    return NextResponse.json({
+      data: paginatedAccounts,
+      meta: {
+        total,
+        page,
+        pageSize,
+        totalPages
+      }
+    });
   } catch (err: any) {
     console.error("GET Accounts Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

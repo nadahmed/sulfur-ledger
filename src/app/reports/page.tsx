@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
 import Link from "next/link";
 import { Download } from "lucide-react";
-import { Header } from "@/components/Header";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -117,9 +116,9 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+    <div className="max-w-screen-2xl p-4 md:p-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <Header title="Financial Reports" showBack />
+        <h1 className="text-2xl font-bold">Financial Reports</h1>
         <div className="flex items-center gap-2">
           <div className="grid gap-1">
             <Label htmlFor="start" className="text-xs">From</Label>
@@ -154,8 +153,8 @@ export default function ReportsPage() {
           <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
         </TabsList>
 
-        <div className="grid lg:grid-cols-3 gap-8 mt-8">
-          <Card className="lg:col-span-2">
+        <div className="mt-8">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="capitalize">{reportType.replace("-", " ")}</CardTitle>
               <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -178,6 +177,7 @@ export default function ReportsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Account Name</TableHead>
+                          <TableHead>Category</TableHead>
                           <TableHead className="text-right">Debit</TableHead>
                           <TableHead className="text-right">Credit</TableHead>
                         </TableRow>
@@ -186,12 +186,13 @@ export default function ReportsPage() {
                         {data.accounts?.map((acc) => (
                           <TableRow key={acc.id}>
                             <TableCell>{acc.name}</TableCell>
+                            <TableCell className="capitalize text-xs text-muted-foreground">{acc.category}</TableCell>
                             <TableCell className="text-right">{acc.balance > 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
                             <TableCell className="text-right">{acc.balance < 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">
-                          <TableCell>Total</TableCell>
+                          <TableCell colSpan={2}>Total</TableCell>
                           <TableCell className="text-right">{formatCurrency(data.totalDebits || 0)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(data.totalCredits || 0)}</TableCell>
                         </TableRow>
@@ -221,38 +222,6 @@ export default function ReportsPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle>Visualization</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full">
-                {data && chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: any) => [`৳${(Number(value) || 0).toFixed(2)}`, "Amount"]}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={(entry as any).fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-neutral-500 text-sm italic">
-                    No data to visualize
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
         </div>

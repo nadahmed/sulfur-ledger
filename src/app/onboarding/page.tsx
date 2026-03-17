@@ -14,7 +14,9 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Loader2, Building2, Plus, ArrowRight } from "lucide-react";
 
-export default function OnboardingPage() {
+import { Suspense } from "react";
+
+function OnboardingContent() {
   const { organizations, isLoading, refreshOrganizations, setActiveOrganizationId } = useOrganization();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -208,6 +210,19 @@ export default function OnboardingPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-50 p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <h2 className="text-xl font-semibold text-neutral-800">Loading...</h2>
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   );
 }
 

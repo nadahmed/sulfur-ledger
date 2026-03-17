@@ -1,0 +1,6 @@
+[[plugins]]
+package = "@netlify/plugin-nextjs"
+
+[functions."*"]
+  # Increase timeout for AI processing
+  timeout = 26

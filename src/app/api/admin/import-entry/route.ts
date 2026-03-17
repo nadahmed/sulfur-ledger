@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       { orgId, journalId, accountId: fromAccount.id, amount: -amount, date: entryDate }
     ];
 
-    await createJournalEntry(entry, lines);
+    await createJournalEntry(entry, lines, session.user.sub!);
 
     return NextResponse.json({ success: true, journalId });
   } catch (err: any) {

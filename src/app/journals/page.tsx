@@ -16,7 +16,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check, Pencil, Trash2, MoreVertical, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Header } from "@/components/Header";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -131,15 +130,17 @@ export default function JournalsPage() {
   const canUpdate = isOwner || permissions.includes("update:journals");
   const canDelete = isOwner || permissions.includes("delete:journals");
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const { data: accountResponse } = useQuery<{ data: Account[] }>({
     queryKey: ["accounts", activeOrganizationId],
     queryFn: async () => {
-      const res = await fetch("/api/accounts", { headers: { "x-org-id": activeOrganizationId! } });
+      const res = await fetch("/api/accounts?pageSize=1000", { headers: { "x-org-id": activeOrganizationId! } });
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
     },
     enabled: !!activeOrganizationId && canRead,
   });
+
+  const accounts = accountResponse?.data || [];
 
   const {
     data: journalData,
@@ -258,8 +259,10 @@ export default function JournalsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <Header title="Journals" showBack />
+    <div className="w-full max-w-screen-2xl p-4 md:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Journals</h1>
+      </div>
 
       {canCreate && (
         <Card className="mb-8 font-sans">
@@ -435,10 +438,10 @@ export default function JournalsPage() {
                         {(canUpdate || canDelete) && (
                           <TableCell>
                             <DropdownMenu>
-                              <DropdownMenuTrigger>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
+                              <DropdownMenuTrigger 
+                                render={<Button variant="ghost" size="icon" className="h-8 w-8" />}
+                              >
+                                <MoreVertical className="h-4 w-4" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 {canUpdate && (

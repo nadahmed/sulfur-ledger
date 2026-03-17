@@ -48,3 +48,11 @@ export const EmailSettingsSchema = z.object({
 });
 
 export type EmailSettingsFormValues = z.infer<typeof EmailSettingsSchema>;
+
+export const McpSettingsSchema = z.object({
+  mcpApiKey: z.string().optional(),
+  mcpApiKeyExpiresAt: z.string().optional(),
+  ttlDays: z.string().optional(), // "30", "60", "90", "never"
+});
+
+export type McpSettingsFormValues = z.infer<typeof McpSettingsSchema>;

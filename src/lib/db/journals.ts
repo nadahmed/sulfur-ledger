@@ -1,6 +1,7 @@
 import { TransactWriteItemsCommand, TransactWriteItem, DeleteItemCommand } from "@aws-sdk/client-dynamodb";
 import { QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
+import { randomUUID } from "crypto";
 import { db, TABLE_NAME } from "../dynamodb";
 import { createAuditLog } from "./audit";
 
@@ -83,7 +84,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   // Audit Log
   await createAuditLog({
     orgId: entry.orgId,
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     userId,
     action: "create",
     entityType: "JournalEntry",
@@ -98,16 +99,18 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
 export async function getJournalEntries(orgId: string, startDate?: string, endDate?: string): Promise<JournalEntry[]> {
   // If no dates provided, get all (in a heavily used system, you'd always mandate pagination/dates)
   // For Simple Ledger, we query SK begins_with JNL#
-  let skCondition = "begins_with(SK, :skPrefix)";
+  let skCondition = "";
   const expressionAttributeValues: any = {
     ":pk": `ORG#${orgId}#JOURNAL`,
-    ":skPrefix": "JNL#",
   };
 
   if (startDate && endDate) {
     skCondition = "SK BETWEEN :start AND :end";
     expressionAttributeValues[":start"] = `JNL#${startDate}#`;
-    expressionAttributeValues[":end"] = `JNL#${endDate}#zh\uffff`; // using a high unicode char to act as uppercase upperbound
+    expressionAttributeValues[":end"] = `JNL#${endDate}#zh\uffff`;
+  } else {
+    skCondition = "begins_with(SK, :skPrefix)";
+    expressionAttributeValues[":skPrefix"] = "JNL#";
   }
 
   const result = await db.send(
@@ -176,16 +179,18 @@ export async function getJournalEntriesWithLines(
 }
 
 export async function getAccountLines(orgId: string, accountId: string, startDate?: string, endDate?: string): Promise<JournalLine[]> {
-  let skCondition = "begins_with(GSI1SK, :skPrefix)";
+  let skCondition = "";
   const expressionAttributeValues: any = {
     ":pk": `ORG#${orgId}#ACC#${accountId}`,
-    ":skPrefix": "JNL#",
   };
 
   if (startDate && endDate) {
     skCondition = "GSI1SK BETWEEN :start AND :end";
     expressionAttributeValues[":start"] = `JNL#${startDate}#`;
     expressionAttributeValues[":end"] = `JNL#${endDate}#zh\uffff`;
+  } else {
+    skCondition = "begins_with(GSI1SK, :skPrefix)";
+    expressionAttributeValues[":skPrefix"] = "JNL#";
   }
 
   const result = await db.send(

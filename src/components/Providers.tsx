@@ -6,6 +6,7 @@ import { useState } from "react";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -20,7 +21,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <Auth0Provider>
       <QueryClientProvider client={queryClient}>
         <OrganizationProvider>
-          {children}
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
         </OrganizationProvider>
         <Toaster position="top-right" richColors />
         <ReactQueryDevtools initialIsOpen={false} />

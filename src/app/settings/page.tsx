@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
-import { Header } from "@/components/Header";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2 } from "lucide-react";
+import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
@@ -32,8 +31,47 @@ import {
   InvitationSchema, 
   InvitationFormValues, 
   EmailSettingsSchema, 
-  EmailSettingsFormValues 
+  EmailSettingsFormValues,
+  McpSettingsFormValues,
+  McpSettingsSchema
 } from "@/lib/schemas";
+
+const parseCSVLine = (line: string) => {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"' && line[i+1] === '"') {
+          current += '"';
+          i++;
+      } else if (char === '"') {
+          inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+          result.push(current);
+          current = "";
+      } else {
+          current += char;
+      }
+  }
+  result.push(current);
+  return result;
+};
+
+const parseCSV = (csv: string) => {
+  const lines = csv.split(/\r?\n/).filter(line => line.trim() !== "");
+  if (lines.length < 2) return [];
+  
+  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const values = parseCSVLine(line);
+    const obj: any = {};
+    headers.forEach((header, i) => {
+      obj[header] = values[i]?.trim();
+    });
+    return obj;
+  }).filter(row => row["Date"] && row["Amount"] && row["From (Source)"] && row["To (Destination)"]);
+};
 
 export default function SettingsPage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -89,6 +127,16 @@ export default function SettingsPage() {
     queryFn: async () => {
       const res = await fetch(`/api/organizations/invitations?orgId=${activeOrganizationId}`);
       if (!res.ok) throw new Error("Failed to fetch invitations");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
+  const { data: mcpSettings, isLoading: isLoadingMcpSettings } = useQuery<McpSettingsFormValues>({
+    queryKey: ["mcp-settings", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch MCP settings");
       return res.json();
     },
     enabled: !!activeOrganizationId && canManage,
@@ -250,6 +298,37 @@ export default function SettingsPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const generateMcpKeyMutation = useMutation({
+    mutationFn: async (ttlDays: string) => {
+      const res = await fetch("/api/organizations/mcp-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: activeOrganizationId, ttlDays }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to generate key");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("MCP API Key generated!");
+      queryClient.invalidateQueries({ queryKey: ["mcp-settings"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteMcpKeyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to delete key");
+    },
+    onSuccess: () => {
+      toast.success("MCP API Key deleted!");
+      queryClient.invalidateQueries({ queryKey: ["mcp-settings"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const {
     register: registerOrg,
     handleSubmit: handleSubmitOrg,
@@ -286,6 +365,18 @@ export default function SettingsPage() {
     defaultValues: emailSettings || { provider: "none", senderEmail: "", senderName: "Sulfur Ledger" },
   });
 
+  const {
+    handleSubmit: handleSubmitMcp,
+    control: controlMcp,
+    watch: watchMcp,
+  } = useForm<McpSettingsFormValues>({
+    resolver: zodResolver(McpSettingsSchema),
+    defaultValues: { ttlDays: "30" },
+  });
+
+  const watchMcpTtl = watchMcp("ttlDays");
+  const [copied, setCopied] = useState(false);
+
   const watchProvider = watchEmail("provider");
 
   useEffect(() => {
@@ -303,14 +394,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto p-4 md:p-8">
-      <Header title="Settings" showBack />
+    <main className="max-w-screen-2xl p-4 md:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
 
       <Tabs defaultValue="general" className="mt-8">
         <TabsList className="mb-8">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="email">Email Delivery</TabsTrigger>
+          <TabsTrigger value="mcp">MCP Server</TabsTrigger>
+          <TabsTrigger value="data">Data Management</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-8 mt-6">
@@ -737,6 +832,291 @@ export default function SettingsPage() {
                 </form>
               )}
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="mcp" className="space-y-8 mt-6">
+          <Card className="shadow-lg border-neutral-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
+              <CardDescription>
+                Expose your ledger tools to AI agents using the Model Context Protocol (MCP).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {isLoadingMcpSettings ? (
+                <div className="p-8 text-center text-neutral-500 italic">Loading MCP settings...</div>
+              ) : mcpSettings?.mcpApiKey ? (
+                <div className="space-y-6">
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">Your MCP API Key</h3>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        value={mcpSettings.mcpApiKey} 
+                        readOnly 
+                        type="password"
+                        className="bg-white font-mono text-xs"
+                      />
+                      <Button 
+                        size="icon" 
+                        variant="outline" 
+                        className="shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(mcpSettings.mcpApiKey!);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                          toast.success("API Key copied to clipboard");
+                        }}
+                      >
+                        {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    {mcpSettings.mcpApiKeyExpiresAt && (
+                      <p className="text-xs text-blue-700 mt-2">
+                        Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Claude Desktop Configuration</Label>
+                    <div className="relative">
+                      <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
+{`{
+  "mcpServers": {
+    "sulfur-ledger": {
+      "command": "npx",
+      "args": ["-y", "-p", "@thefoot/mcp-stdio-http-bridge", "mcp-bridge", "--url", "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp"],
+      "env": {
+        "x-mcp-key": "${mcpSettings.mcpApiKey}"
+      }
+    }
+  }
+}`}
+                      </pre>
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="absolute top-2 right-2 h-7 text-[10px]"
+                        onClick={() => {
+                          const config = {
+                            mcpServers: {
+                              "sulfur-ledger": {
+                                command: "npx",
+                                args: ["-y", "-p", "@thefoot/mcp-stdio-http-bridge", "mcp-bridge", "--url", `${window.location.origin}/api/mcp`],
+                                env: {
+                                  "x-mcp-key": mcpSettings.mcpApiKey
+                                }
+                              }
+                            }
+                          };
+                          navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+                          toast.success("Configuration copied!");
+                        }}
+                      >
+                        Copy JSON
+                      </Button>
+                    </div>
+                    <p className="text-xs text-neutral-500">
+                      Add this snippet to your <code>claude_desktop_config.json</code> to enable AI access to this organization's data.
+                    </p>
+                  </div>
+
+                  {canManage && (
+                    <div className="pt-4 border-t flex items-center justify-between">
+                      <p className="text-sm text-neutral-600">Need a new key? Regenerating will invalidate the current one.</p>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setConfirmConfig({
+                              open: true,
+                              title: "Revoke MCP Key",
+                              description: "This will immediately disable AI access for this organization. Are you sure?",
+                              variant: "destructive",
+                              onConfirm: () => deleteMcpKeyMutation.mutate(),
+                            });
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" /> Revoke
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" /> Regenerate
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
+                  <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center">
+                    <Key className="w-8 h-8 text-neutral-400" />
+                  </div>
+                  <div className="max-w-md">
+                    <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
+                    <p className="text-neutral-500 text-sm mt-2">
+                      Enable AI tools for this organization. Generate a secure API key to connect Claude or other MCP-compatible agents.
+                    </p>
+                  </div>
+                  {canManage && (
+                    <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                      <div className="w-full text-left space-y-2">
+                        <Label>Key Expiration (TTL)</Label>
+                        <Controller
+                          name="ttlDays"
+                          control={controlMcp}
+                          render={({ field }) => (
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="30">30 Days</SelectItem>
+                                <SelectItem value="60">60 Days</SelectItem>
+                                <SelectItem value="90">90 Days</SelectItem>
+                                <SelectItem value="never">Never Expires</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
+                        disabled={generateMcpKeyMutation.isPending}
+                      >
+                        {generateMcpKeyMutation.isPending ? "Generating..." : "Generate MCP API Key"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="data" className="space-y-8 mt-6">
+          <Card className="shadow-lg border-neutral-200">
+            <CardHeader>
+              <CardTitle>Import & Export</CardTitle>
+              <CardDescription>Import journal entries from a CSV file or download a sample template.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-wrap gap-4">
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="csv-upload"
+                    className="hidden"
+                    accept=".csv"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      const reader = new FileReader();
+                      reader.onload = async (evt) => {
+                        const csvContent = evt.target?.result as string;
+                        try {
+                          const records = parseCSV(csvContent);
+                          if (records.length === 0) {
+                            toast.error("No records found in CSV.");
+                            return;
+                          }
+
+                          toast.info("Importing entries...");
+
+                          const accountNames = Array.from(new Set(records.flatMap((r: any) => [r["From (Source)"], r["To (Destination)"]]).filter(Boolean)));
+                          await fetch("/api/admin/ensure-accounts", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ accountNames })
+                          });
+
+                          for (let i = 0; i < records.length; i++) {
+                            const record = records[i];
+                            const res = await fetch("/api/admin/import-entry", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                date: record["Date"],
+                                description: record["Description"],
+                                amount: record["Amount"],
+                                from: record["From (Source)"],
+                                to: record["To (Destination)"],
+                                notes: record["Notes"]
+                              })
+                            });
+
+                            if (!res.ok) {
+                              const err = await res.json();
+                              throw new Error(err.error || "Failed to import entry");
+                            }
+                          }
+
+                          toast.success("Import complete!");
+                          setTimeout(() => window.location.reload(), 1500);
+
+                        } catch (err: any) {
+                          toast.error(`Import error: ${err.message}`);
+                        }
+                      };
+                      reader.readAsText(file);
+                    }}
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => document.getElementById("csv-upload")?.click()}
+                  >
+                    Import Journals from CSV
+                  </Button>
+                </div>
+
+                <a href="/sample-journals.csv" download>
+                  <Button variant="ghost">
+                    Download Sample CSV
+                  </Button>
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-red-200">
+            <CardHeader>
+              <CardTitle className="text-red-600 flex items-center gap-2 font-semibold">Ledger Reset</CardTitle>
+              <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
+            </CardHeader>
+            <CardFooter className="bg-red-50 border-t border-red-100 rounded-b-lg">
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  setConfirmConfig({
+                    open: true,
+                    title: "Clear All Ledger Data",
+                    description: "This will permanently delete all accounts and journal entries in this organization. This cannot be undone.",
+                    variant: "destructive",
+                    onConfirm: async () => {
+                      try {
+                        const res = await fetch("/api/admin/clear-data", { method: "POST" });
+                        if (res.ok) {
+                          toast.success("Data cleared successfully.");
+                          setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                          const error = await res.json();
+                          toast.error(`Error: ${error.error}`);
+                        }
+                      } catch (err) {
+                        toast.error("An unexpected error occurred.");
+                      }
+                    },
+                  });
+                }}
+              >
+                Clear All Data
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

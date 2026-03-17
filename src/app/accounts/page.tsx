@@ -15,7 +15,6 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AccountSchema, AccountFormValues } from "@/lib/schemas";
-import { Header } from "@/components/Header";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -70,16 +69,37 @@ export default function AccountsPage() {
   const canRead = isOwner || permissions.includes("read:accounts");
   const canManage = isOwner || permissions.includes("manage:accounts");
 
-  const { data: accounts = [], isLoading: isFetchingAccounts } = useQuery<Account[]>({
-    queryKey: ["accounts", activeOrganizationId, showArchived],
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  useEffect(() => {
+    setPage(1);
+  }, [showArchived, search, categoryFilter]);
+
+  const { data: response, isLoading: isFetchingAccounts } = useQuery<{ 
+    data: Account[], 
+    meta: { total: number, page: number, pageSize: number, totalPages: number } 
+  }>({
+    queryKey: ["accounts", activeOrganizationId, showArchived, page, pageSize, search, categoryFilter],
     queryFn: async () => {
-      const url = showArchived ? "/api/accounts?includeArchived=true" : "/api/accounts";
-      const res = await fetch(url);
+      const url = new URL("/api/accounts", window.location.origin);
+      if (showArchived) url.searchParams.set("includeArchived", "true");
+      url.searchParams.set("page", page.toString());
+      url.searchParams.set("pageSize", pageSize.toString());
+      if (search) url.searchParams.set("search", search);
+      if (categoryFilter !== "all") url.searchParams.set("category", categoryFilter);
+      
+      const res = await fetch(url.toString());
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
     },
     enabled: !!activeOrganizationId && !!user && canRead,
   });
+
+  const accounts = response?.data || [];
+  const meta = response?.meta;
 
   const {
     register,
@@ -201,8 +221,10 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <Header title="Chart of Accounts" showBack />
+    <div className="w-full max-w-screen-2xl p-4 md:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Chart of Accounts</h1>
+      </div>
 
       {canManage && (
         <Card className="mb-8 font-sans">
@@ -256,21 +278,46 @@ export default function AccountsPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <CardTitle>Accounts</CardTitle>
-          <div className="flex items-center space-x-2">
-            {mounted ? (
-              <>
-                <Switch 
-                  id="show-archived" 
-                  checked={showArchived}
-                  onCheckedChange={setShowArchived}
-                />
-                <Label htmlFor="show-archived">Show Archived</Label>
-              </>
-            ) : (
-              <div className="w-24 h-6 bg-neutral-100 animate-pulse rounded-full" />
-            )}
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <Input 
+                placeholder="Search accounts..." 
+                className="h-9 w-full sm:w-[200px]"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="w-full sm:w-auto">
+              <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val || "all")}>
+                <SelectTrigger className="h-9 w-full sm:w-[150px]">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="asset">Asset</SelectItem>
+                  <SelectItem value="liability">Liability</SelectItem>
+                  <SelectItem value="equity">Equity</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              {mounted ? (
+                <>
+                  <Switch 
+                    id="show-archived" 
+                    checked={showArchived}
+                    onCheckedChange={setShowArchived}
+                  />
+                  <Label htmlFor="show-archived" className="text-sm">Archived</Label>
+                </>
+              ) : (
+                <div className="w-24 h-6 bg-neutral-100 animate-pulse rounded-full" />
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -324,6 +371,34 @@ export default function AccountsPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+          {meta && meta.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {accounts.length} of {meta.total} accounts
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm font-medium">
+                  Page {page} of {meta.totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                  disabled={page === meta.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
           {!canRead && !isFetchingAccounts && (
             <div className="p-8 text-center text-red-500">

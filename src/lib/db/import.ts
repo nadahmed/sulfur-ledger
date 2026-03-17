@@ -137,7 +137,7 @@ export async function importJournalsFromCsv(orgId: string, csvContent: string) {
       },
     ];
 
-    await createJournalEntry(entry, lines);
+    await createJournalEntry(entry, lines, "system-import");
     count++;
   }
 

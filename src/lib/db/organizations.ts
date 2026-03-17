@@ -17,6 +17,8 @@ export interface Organization {
   name: string;
   ownerId: string; // User who owns this org
   emailSettings?: EmailSettings;
+  mcpApiKey?: string;
+  mcpApiKeyExpiresAt?: string;
   createdAt: string;
 }
 
@@ -240,6 +242,25 @@ export async function updateOrganizationEmailSettings(orgId: string, settings: E
       },
       UpdateExpression: "SET emailSettings = :settings",
       ExpressionAttributeValues: { ":settings": settings },
+    })
+  );
+}
+
+export async function updateOrganizationMcpSettings(orgId: string, settings: { mcpApiKey?: string | null, mcpApiKeyExpiresAt?: string | null }) {
+  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+  
+  await db.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}`,
+        SK: `METADATA`,
+      },
+      UpdateExpression: "SET mcpApiKey = :key, mcpApiKeyExpiresAt = :expires",
+      ExpressionAttributeValues: { 
+        ":key": settings.mcpApiKey || null, 
+        ":expires": settings.mcpApiKeyExpiresAt || null 
+      },
     })
   );
 }

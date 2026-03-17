@@ -150,7 +150,7 @@ async function run() {
     ];
 
     try {
-      await createJournalEntry(entry, lines);
+      await createJournalEntry(entry, lines, "system-seed");
       count++;
       if (count % 50 === 0) console.log(`Inserted ${count} journals...`);
     } catch (e: any) {
