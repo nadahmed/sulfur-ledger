@@ -144,6 +144,16 @@ export default function JournalsPage() {
   });
 
   const accounts = accountResponse?.data || [];
+  
+  const initialFormValues = useMemo(() => ({
+    date: new Date().toISOString().slice(0, 10),
+    description: "",
+    notes: "",
+    amount: "",
+    fromAccountId: "",
+    toAccountId: "",
+    tags: "" as any,
+  }), []);
 
   const {
     data: journalData,
@@ -179,15 +189,7 @@ export default function JournalsPage() {
     formState: { errors },
   } = useForm<JournalEntryFormInput>({
     resolver: zodResolver(JournalEntrySchema),
-    defaultValues: {
-      date: new Date().toISOString().slice(0, 10),
-      description: "",
-      notes: "",
-      amount: "",
-      fromAccountId: "",
-      toAccountId: "",
-      tags: "" as any,
-    },
+    defaultValues: initialFormValues,
   });
 
   const postMutation = useMutation({
@@ -204,7 +206,7 @@ export default function JournalsPage() {
       return res.json();
     },
     onSuccess: () => {
-      reset();
+      reset(initialFormValues);
       queryClient.invalidateQueries({ queryKey: ["journals"] });
       toast.success("Journal entry recorded successfully");
     },
@@ -227,7 +229,7 @@ export default function JournalsPage() {
       return res.json();
     },
     onSuccess: () => {
-      reset();
+      reset(initialFormValues);
       setEditingId(null);
       setOldDate(null);
       queryClient.invalidateQueries({ queryKey: ["journals"] });
@@ -293,15 +295,7 @@ export default function JournalsPage() {
   const cancelEdit = () => {
     setEditingId(null);
     setOldDate(null);
-    reset({
-      date: new Date().toISOString().slice(0, 10),
-      description: "",
-      notes: "",
-      amount: "",
-      fromAccountId: "",
-      toAccountId: "",
-      tags: "" as any,
-    });
+    reset(initialFormValues);
   };
 
   const handleDelete = (id: string, date: string) => {

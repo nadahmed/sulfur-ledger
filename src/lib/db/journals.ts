@@ -23,12 +23,31 @@ export interface JournalLine {
   date: string; // Copied from entry for easy querying in GSI (ISO 8601)
 }
 
+function mergeDuplicateAccountLines(lines: JournalLine[]): JournalLine[] {
+  const merged = new Map<string, JournalLine>();
+  for (const line of lines) {
+    if (merged.has(line.accountId)) {
+      const existing = merged.get(line.accountId)!;
+      existing.amount += line.amount;
+    } else {
+      merged.set(line.accountId, { ...line });
+    }
+  }
+  // Filter out zero-amount lines if they were self-cancelling, 
+  // but keep at least something if it's a valid zero-sum entry? 
+  // Actually, double-entry validation already caught non-zero sums.
+  // If a user transferred 100 from A to A, it should probably just be removed.
+  return Array.from(merged.values()).filter(l => l.amount !== 0);
+}
+
 export async function createJournalEntry(entry: JournalEntry, lines: JournalLine[], userId: string) {
   // Validate double entry (sum of amounts = 0)
   const total = lines.reduce((acc, line) => acc + line.amount, 0);
   if (total !== 0) {
     throw new Error(`Invalid journal entry: debits and credits must sum to zero, but got ${total}`);
   }
+
+  const mergedLines = mergeDuplicateAccountLines(lines);
 
   // Use a transaction to ensure entry and all lines are written atomically
   const transactItems: TransactWriteItem[] = [];
@@ -47,7 +66,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   });
 
   // 2. Add Lines
-  for (const line of lines) {
+  for (const line of mergedLines) {
     transactItems.push({
       Put: {
         TableName: TABLE_NAME,
@@ -71,7 +90,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   }
 
   // Using raw client for transactions as lib-dynamodb sometimes has typing quirks with TransactWrite
-  const { dynamoDBClient } = require("@/lib/dynamodb");
+  const { dynamoDBClient } = require("../dynamodb");
 
   await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
@@ -241,7 +260,7 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
     });
   }
 
-  const { dynamoDBClient } = require("@/lib/dynamodb");
+  const { dynamoDBClient } = require("../dynamodb");
 
   await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
@@ -283,6 +302,10 @@ export async function updateJournalEntry(
   );
   const oldLines = oldLinesResult.Items || [];
 
+  // Deduplicate and merge new lines
+  const mergedNewLines = mergeDuplicateAccountLines(newLines);
+  const newAccountIds = new Set(mergedNewLines.map(l => l.accountId));
+
   const transactItems: TransactWriteItem[] = [];
 
   // If date changed, we must delete old entry record and create a new one because date is in SK
@@ -310,18 +333,22 @@ export async function updateJournalEntry(
     },
   });
 
-  // Delete old lines
+  // 2. Handle Lines: Delete old lines that are NO LONGER in the entry
+  // For lines that persist (even if amount changes), we only need a Put.
+  // DynamoDB transaction fails if an item has both Delete and Put.
   for (const line of oldLines) {
-    transactItems.push({
-      Delete: {
-        TableName: TABLE_NAME,
-        Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
-      },
-    });
+    if (!newAccountIds.has(line.accountId)) {
+      transactItems.push({
+        Delete: {
+          TableName: TABLE_NAME,
+          Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
+        },
+      });
+    }
   }
 
-  // Add new lines
-  for (const line of newLines) {
+  // 3. Add/Update new lines
+  for (const line of mergedNewLines) {
     transactItems.push({
       Put: {
         TableName: TABLE_NAME,
@@ -337,7 +364,7 @@ export async function updateJournalEntry(
     });
   }
 
-  const { dynamoDBClient } = require("@/lib/dynamodb");
+  const { dynamoDBClient } = require("../dynamodb");
 
   await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
 
