@@ -3,11 +3,11 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 
 export const dynamoDBClient = new DynamoDBClient({
-  region: process.env.REGION || process.env.AWS_REGION || "us-east-1",
+  region: process.env.DYNAMODB_REGION || process.env.AWS_REGION || "us-east-1",
   ...(process.env.DYNAMODB_LOCAL_ENDPOINT ? { endpoint: process.env.DYNAMODB_LOCAL_ENDPOINT } : {}),
   ...(process.env.DYNAMODB_ACCESS_KEY_ID ? {
     credentials: {
-      accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID,
+      accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID || "fake",
       secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY || "fake"
     }
   } : {})

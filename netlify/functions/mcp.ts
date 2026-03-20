@@ -135,7 +135,7 @@ export default async (req: Request, context: Context) => {
         tags: e.tags,
         lines: (e.lines || []).map((l: any) => ({
           accountId: l.accountId,
-          amount: l.amount
+          amount: l.amount / 100
         }))
       }));
       return {
@@ -163,7 +163,7 @@ export default async (req: Request, context: Context) => {
         date: e.date,
         description: e.description,
         tags: e.tags,
-        lines: (e.lines || []).map((l: any) => ({ accountId: l.accountId, amount: l.amount }))
+        lines: (e.lines || []).map((l: any) => ({ accountId: l.accountId, amount: l.amount / 100 }))
       }));
       return {
         content: [{ type: "text", text: JSON.stringify(simplified, null, 2) }]
@@ -182,14 +182,15 @@ export default async (req: Request, context: Context) => {
     },
     async ({ accountId, startDate, endDate }) => {
       const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
-      const balance = lines.reduce((sum, line) => sum + line.amount, 0);
+      const balancePaisa = lines.reduce((sum, line) => sum + line.amount, 0);
+      const balance = balancePaisa / 100;
       let periodStr = "";
       if (startDate && endDate) periodStr = ` from ${startDate} to ${endDate}`;
       else if (startDate) periodStr = ` since ${startDate}`;
       else if (endDate) periodStr = ` until ${endDate}`;
       
       return {
-        content: [{ type: "text", text: `Balance for ${accountId}${periodStr} is ${balance} cents.` }]
+        content: [{ type: "text", text: `Balance for ${accountId}${periodStr} is ${balance} Taka.` }]
       };
     }
   );
@@ -234,9 +235,9 @@ export default async (req: Request, context: Context) => {
         content: [{ 
           type: "text", 
           text: `Summary for ${startDate || 'beginning'} to ${endDate || 'now'}:\n` +
-                `- Total Income: ${totalIncome / 100} BDT\n` +
-                `- Total Expenses: ${totalExpenses / 100} BDT\n` +
-                `- Net Profit/Loss: ${(totalIncome - totalExpenses) / 100} BDT`
+                `- Total Income: ${totalIncome / 100} Taka\n` +
+                `- Total Expenses: ${totalExpenses / 100} Taka\n` +
+                `- Net Profit/Loss: ${(totalIncome - totalExpenses) / 100} Taka`
         }]
       };
     }
@@ -253,14 +254,14 @@ export default async (req: Request, context: Context) => {
     },
     async ({ accountId, startDate, endDate }) => {
       const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
-      let runningBalance = 0;
+      let runningBalancePaisa = 0;
       const history = lines.map(l => {
-        runningBalance += l.amount;
+        runningBalancePaisa += l.amount;
         return {
           date: l.date,
           journalId: l.journalId,
-          amount: l.amount,
-          runningBalance
+          amount: l.amount / 100,
+          runningBalance: runningBalancePaisa / 100
         };
       });
       return {
@@ -272,7 +273,7 @@ export default async (req: Request, context: Context) => {
   // Tool: Record Journal Entry
   server.tool(
     "record_journal_entry",
-    "Record a new double-entry journal transaction. MUST balance to zero. Amounts in cents. Supports time for sequencing.",
+    "Record a new double-entry journal transaction. MUST balance to zero. Amounts in Taka. Supports time for sequencing.",
     {
       date: z.string().describe("Date (YYYY-MM-DD or full ISO 8601 string)"),
       time: z.string().optional().describe("Optional time (HH:mm) if date is YYYY-MM-DD"),
@@ -280,7 +281,7 @@ export default async (req: Request, context: Context) => {
       tags: z.array(z.string()).optional(),
       lines: z.array(z.object({
         accountId: z.string(),
-        amount: z.number().describe("Amount in cents. Positive for debit, negative for credit.")
+        amount: z.number().describe("Amount in Taka. Positive for debit, negative for credit.")
       }))
     },
     async ({ date: dateInput, time, description, tags, lines }) => {
@@ -298,7 +299,7 @@ export default async (req: Request, context: Context) => {
           orgId,
           journalId: id,
           accountId: l.accountId,
-          amount: l.amount,
+          amount: Math.round(l.amount * 100),
           date: finalDate
         }));
 
@@ -328,7 +329,7 @@ export default async (req: Request, context: Context) => {
   // Tool: Record Bulk Journal Entries
   server.tool(
     "record_bulk_journal_entries",
-    "Record multiple journal entries in a single call. Each entry must balance to zero.",
+    "Record multiple journal entries in a single call. Each entry must balance to zero. Amounts in Taka.",
     {
       entries: z.array(z.object({
         date: z.string().describe("Date (YYYY-MM-DD or full ISO 8601 string)"),
@@ -337,7 +338,7 @@ export default async (req: Request, context: Context) => {
         tags: z.array(z.string()).optional(),
         lines: z.array(z.object({
           accountId: z.string(),
-          amount: z.number().describe("Amount in cents. Positive for debit, negative for credit.")
+          amount: z.number().describe("Amount in Taka. Positive for debit, negative for credit.")
         }))
       }))
     },
@@ -360,7 +361,7 @@ export default async (req: Request, context: Context) => {
             orgId,
             journalId: id,
             accountId: l.accountId,
-            amount: l.amount,
+            amount: Math.round(l.amount * 100),
             date: finalDate
           }));
 
@@ -405,7 +406,7 @@ export default async (req: Request, context: Context) => {
       tags: z.array(z.string()).optional(),
       lines: z.array(z.object({
         accountId: z.string(),
-        amount: z.number()
+        amount: z.number().describe("Amount in Taka")
       })).optional()
     },
     async ({ id, oldDate, description, notes, tags, lines }) => {
@@ -422,7 +423,7 @@ export default async (req: Request, context: Context) => {
             orgId,
             journalId: id,
             accountId: l.accountId,
-            amount: l.amount,
+            amount: Math.round(l.amount * 100),
             date: oldDate
           }));
         } else {

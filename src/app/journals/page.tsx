@@ -110,6 +110,8 @@ export default function JournalsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filterDate, setFilterDate] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [oldDate, setOldDate] = useState<string | null>(null);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
@@ -211,6 +213,31 @@ export default function JournalsPage() {
     },
   });
 
+  const patchMutation = useMutation({
+    mutationFn: async (values: any) => {
+      const res = await fetch("/api/journals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update journal entry");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      reset();
+      setEditingId(null);
+      setOldDate(null);
+      queryClient.invalidateQueries({ queryKey: ["journals"] });
+      toast.success("Journal entry updated successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async ({ id, date }: { id: string; date: string }) => {
       const res = await fetch(`/api/journals?id=${id}&date=${date}`, {
@@ -231,7 +258,50 @@ export default function JournalsPage() {
   });
 
   const onSubmit = (values: any) => {
-    postMutation.mutate(values as JournalEntryFormValues);
+    if (editingId) {
+      patchMutation.mutate({
+        ...values,
+        id: editingId,
+        oldDate: oldDate,
+      });
+    } else {
+      postMutation.mutate(values as JournalEntryFormValues);
+    }
+  };
+
+  const handleEdit = (jnl: JournalEntry) => {
+    const debitLine = jnl.lines?.find((l: any) => l.amount > 0);
+    const creditLine = jnl.lines?.find((l: any) => l.amount < 0);
+    
+    setEditingId(jnl.id);
+    setOldDate(jnl.date);
+    
+    reset({
+      date: jnl.date.slice(0, 10),
+      description: jnl.description,
+      notes: jnl.notes || "",
+      amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
+      fromAccountId: creditLine?.accountId || "",
+      toAccountId: debitLine?.accountId || "",
+      tags: (jnl.tags || []).join(", "),
+    });
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.info("Editing transaction...");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setOldDate(null);
+    reset({
+      date: new Date().toISOString().slice(0, 10),
+      description: "",
+      notes: "",
+      amount: "",
+      fromAccountId: "",
+      toAccountId: "",
+      tags: "" as any,
+    });
   };
 
   const handleDelete = (id: string, date: string) => {
@@ -267,9 +337,18 @@ export default function JournalsPage() {
       </div>
 
       {canCreate && (
-        <Card className="mb-8 font-sans">
+        <Card className="mb-8 font-sans border-blue-100 shadow-sm">
           <CardHeader>
-            <CardTitle>Record Transaction</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              {editingId ? (
+                <>
+                  <Pencil className="h-5 w-5 text-blue-500" />
+                  Edit Transaction
+                </>
+              ) : (
+                "Record Transaction"
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
@@ -363,9 +442,19 @@ export default function JournalsPage() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={postMutation.isPending}>
-                {postMutation.isPending ? "Posting..." : "Post Journal"}
-              </Button>
+               <div className="flex gap-3">
+                <Button type="submit" className="flex-1" disabled={postMutation.isPending || patchMutation.isPending}>
+                  {editingId 
+                    ? (patchMutation.isPending ? "Updating..." : "Update Journal") 
+                    : (postMutation.isPending ? "Posting..." : "Post Journal")
+                  }
+                </Button>
+                {editingId && (
+                  <Button type="button" variant="outline" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
 
               {Object.keys(errors).length > 0 && (
                  <div className="text-red-500 text-sm flex flex-col gap-1">
@@ -483,7 +572,7 @@ export default function JournalsPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   {canUpdate && (
-                                    <DropdownMenuItem onClick={() => toast.info("Edit feature is coming soon!")}>
+                                    <DropdownMenuItem onClick={() => handleEdit(jnl)}>
                                       <Pencil className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
                                   )}

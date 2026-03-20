@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getJournalEntries, getAccountLines } from "@/lib/db/journals";
 import { getAccounts } from "@/lib/db/accounts";
 import { checkPermission } from "@/lib/auth";
+import { 
+  subWeeks, subMonths, subYears, 
+  startOfWeek, startOfMonth, startOfYear, 
+  format, parseISO,
+  addWeeks, addMonths, addYears
+} from "date-fns";
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -104,6 +111,79 @@ export async function GET(req: NextRequest) {
         assetDistribution,
         incomeStats
       });
+    }
+
+    if (reportType === "trend") {
+      const period = (searchParams.get("period") || "months") as "weeks" | "months" | "years";
+      const count = parseInt(searchParams.get("count") || "6");
+      
+      const now = new Date();
+      let startDate: Date;
+      
+      if (period === "weeks") {
+        startDate = startOfWeek(subWeeks(now, count - 1));
+      } else if (period === "years") {
+        startDate = startOfYear(subYears(now, count - 1));
+      } else {
+        startDate = startOfMonth(subMonths(now, count - 1));
+      }
+
+      const formattedStart = format(startDate, "yyyy-MM-dd");
+      const formattedEnd = format(now, "yyyy-MM-dd");
+
+      const incomeAccounts = accounts.filter(a => a.category === "income");
+      const expenseAccounts = accounts.filter(a => a.category === "expense");
+      const incomeIds = new Set(incomeAccounts.map(a => a.id));
+
+      const trends: Record<string, { income: number; expense: number; label: string; date: Date }> = {};
+      
+      for (let i = 0; i < count; i++) {
+        let bucketDate: Date;
+        let label: string;
+        let key: string;
+
+        if (period === "weeks") {
+          bucketDate = addWeeks(startDate, i);
+          label = `Wk ${format(bucketDate, "MMM d")}`;
+          key = format(bucketDate, "yyyy-MM-dd");
+        } else if (period === "years") {
+          bucketDate = addYears(startDate, i);
+          label = format(bucketDate, "yyyy");
+          key = format(bucketDate, "yyyy");
+        } else {
+          bucketDate = addMonths(startDate, i);
+          label = format(bucketDate, "MMM yyyy");
+          key = format(bucketDate, "yyyy-MM");
+        }
+        
+        trends[key] = { income: 0, expense: 0, label, date: bucketDate };
+      }
+
+      await Promise.all([...incomeAccounts, ...expenseAccounts].map(async (acc) => {
+        const lines = await getAccountLines(orgId, acc.id, formattedStart, formattedEnd);
+        lines.forEach(line => {
+          const lineDate = parseISO(line.date);
+          let key: string;
+          if (period === "weeks") {
+             key = format(startOfWeek(lineDate), "yyyy-MM-dd");
+          } else if (period === "years") {
+             key = format(lineDate, "yyyy");
+          } else {
+             key = format(lineDate, "yyyy-MM");
+          }
+
+          if (trends[key]) {
+            if (incomeIds.has(acc.id)) {
+              trends[key].income += Math.abs(line.amount) / 100;
+            } else {
+              trends[key].expense += Math.abs(line.amount) / 100;
+            }
+          }
+        });
+      }));
+
+      const trendData = Object.values(trends).sort((a, b) => a.date.getTime() - b.date.getTime());
+      return NextResponse.json(trendData);
     }
 
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 });

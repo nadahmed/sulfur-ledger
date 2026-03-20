@@ -24,8 +24,17 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend
+  Legend,
+  LineChart,
+  Line
 } from "recharts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -65,6 +74,8 @@ export default function DashboardPage() {
     to: new Date(),
   });
   const [isMounted, setIsMounted] = useState(false);
+  const [trendPeriod, setTrendPeriod] = useState<"weeks" | "months" | "years">("months");
+  const [trendCount, setTrendCount] = useState(6);
 
   useEffect(() => {
     setIsMounted(true);
@@ -81,6 +92,18 @@ export default function DashboardPage() {
         headers: { "x-org-id": activeOrganizationId! }
       });
       if (!res.ok) throw new Error("Failed to fetch dashboard data");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId,
+  });
+
+  const { data: trendData, isLoading: isTrendLoading } = useQuery({
+    queryKey: ["dashboard-trend", activeOrganizationId, trendPeriod, trendCount],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports?type=trend&period=${trendPeriod}&count=${trendCount}`, {
+        headers: { "x-org-id": activeOrganizationId! }
+      });
+      if (!res.ok) throw new Error("Failed to fetch trend data");
       return res.json();
     },
     enabled: !!activeOrganizationId,
@@ -204,6 +227,98 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm border-neutral-200">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-indigo-500" />
+              Financial Trends
+            </CardTitle>
+            <CardDescription>Income and expense trajectory over time</CardDescription>
+          </div>
+          <div className="flex items-center gap-2 self-end">
+            <Select value={trendPeriod} onValueChange={(v) => v && setTrendPeriod(v as any)}>
+              <SelectTrigger className="w-[110px] h-8 text-xs">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weeks">Weeks</SelectItem>
+                <SelectItem value="months">Months</SelectItem>
+                <SelectItem value="years">Years</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={trendCount.toString()} onValueChange={(v) => v && setTrendCount(parseInt(v))}>
+              <SelectTrigger className="w-[70px] h-8 text-xs">
+                <SelectValue placeholder="Count" />
+              </SelectTrigger>
+              <SelectContent>
+                {[3, 6, 12, 24].map(n => (
+                  <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+           <div className="h-[300px] w-full min-h-0 min-w-0">
+            {isMounted && trendData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.5} />
+                  <XAxis 
+                    dataKey="label" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false}
+                    padding={{ left: 10, right: 10 }}
+                  />
+                  <YAxis 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tickFormatter={(value) => `৳${value}`}
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [formatCurrency(value * 100), ""]}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    align="right"
+                    iconType="circle"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="income" 
+                    stroke="#22c55e" 
+                    strokeWidth={2.5} 
+                    dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    name="Income"
+                    animationDuration={1500}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="expense" 
+                    stroke="#ef4444" 
+                    strokeWidth={2.5} 
+                    dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    name="Expense"
+                    animationDuration={1500}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground animate-pulse bg-muted/20 rounded-lg border-2 border-dashed border-muted">
+                {isMounted ? "Loading trend analysis..." : ""}
+              </div>
+            )}
+           </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4 shadow-sm border-neutral-200">
