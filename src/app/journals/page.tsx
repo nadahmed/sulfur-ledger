@@ -273,8 +273,8 @@ export default function JournalsPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-              <div className="flex gap-4">
-                <div className="grid w-[150px] items-center gap-1.5">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="grid w-full md:w-[150px] items-center gap-1.5">
                   <Label htmlFor="date">Date</Label>
                   <Input 
                     id="date" 
@@ -294,7 +294,7 @@ export default function JournalsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
                 <div className="grid flex-1 items-center gap-1.5">
                   <Label htmlFor="fromAccountId">From Account (Credit)</Label>
                   <Controller
@@ -329,8 +329,8 @@ export default function JournalsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
-                <div className="grid w-[150px] items-center gap-1.5">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="grid w-full md:w-[150px] items-center gap-1.5">
                   <Label htmlFor="amount">Amount</Label>
                   <Input 
                     type="number" 
@@ -411,104 +411,106 @@ export default function JournalsPage() {
             <div className="p-8 text-center">Loading journals...</div>
           ) : (
             <>
-              <Table>
-                <thead>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>From Account</TableHead>
-                    <TableHead>To Account</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead>Tags</TableHead>
-                    {(canUpdate || canDelete) && <TableHead className="w-[50px]"></TableHead>}
-                  </TableRow>
-                </thead>
-                <TableBody>
-                  {journals.map((jnl) => {
-                    const debitLine = jnl.lines?.find((l: any) => l.amount > 0);
-                    const creditLine = jnl.lines?.find((l: any) => l.amount < 0);
-                    const fromAcc = accounts.find(a => a.id === creditLine?.accountId)?.name || "Loading...";
-                    const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
-                    const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
-
-                    const dateObj = new Date(jnl.date);
-                    const displayDate = dateObj.toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    });
-                    const displayTime = dateObj.toLocaleTimeString(undefined, {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
-
-                    return (
-                      <TableRow key={jnl.id}>
-                        <TableCell className="font-medium" suppressHydrationWarning>
-                          <div className="flex flex-col">
-                            <span>{displayDate}</span>
-                            <span className="text-[10px] text-neutral-400 font-mono">{displayTime}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{jnl.description}</TableCell>
-                        <TableCell>৳{amountDisp}</TableCell>
-                        <TableCell>{fromAcc}</TableCell>
-                        <TableCell>{toAcc}</TableCell>
-                        <TableCell className="text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {jnl.tags && jnl.tags.length > 0 ? (
-                              jnl.tags.map((tag: string, idx: number) => (
-                                <span 
-                                  key={idx} 
-                                  className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10"
-                                >
-                                  {tag}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-neutral-400">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        {(canUpdate || canDelete) && (
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger 
-                                render={<Button variant="ghost" size="icon" className="h-8 w-8" />}
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {canUpdate && (
-                                  <DropdownMenuItem onClick={() => toast.info("Edit feature is coming soon!")}>
-                                    <Pencil className="mr-2 h-4 w-4" /> Edit
-                                  </DropdownMenuItem>
-                                )}
-                                {canDelete && (
-                                  <DropdownMenuItem 
-                                    variant="destructive"
-                                    onClick={() => handleDelete(jnl.id, jnl.date)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                  {journals.length === 0 && !isFetchingJournals && (
+              <div className="overflow-x-auto">
+                <Table>
+                  <thead>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4 text-neutral-500">No journals found</TableCell>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>From Account</TableHead>
+                      <TableHead>To Account</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Tags</TableHead>
+                      {(canUpdate || canDelete) && <TableHead className="w-[50px]"></TableHead>}
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              
+                  </thead>
+                  <TableBody>
+                    {journals.map((jnl) => {
+                      const debitLine = jnl.lines?.find((l: any) => l.amount > 0);
+                      const creditLine = jnl.lines?.find((l: any) => l.amount < 0);
+                      const fromAcc = accounts.find(a => a.id === creditLine?.accountId)?.name || "Loading...";
+                      const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
+                      const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
+
+                      const dateObj = new Date(jnl.date);
+                      const displayDate = dateObj.toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      });
+                      const displayTime = dateObj.toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+
+                      return (
+                        <TableRow key={jnl.id}>
+                          <TableCell className="font-medium" suppressHydrationWarning>
+                            <div className="flex flex-col">
+                              <span>{displayDate}</span>
+                              <span className="text-[10px] text-neutral-400 font-mono">{displayTime}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{jnl.description}</TableCell>
+                          <TableCell>৳{amountDisp}</TableCell>
+                          <TableCell>{fromAcc}</TableCell>
+                          <TableCell>{toAcc}</TableCell>
+                          <TableCell className="text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {jnl.tags && jnl.tags.length > 0 ? (
+                                jnl.tags.map((tag: string, idx: number) => (
+                                  <span 
+                                    key={idx} 
+                                    className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-neutral-400">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          {(canUpdate || canDelete) && (
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger 
+                                  render={<Button variant="ghost" size="icon" className="h-8 w-8" />}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {canUpdate && (
+                                    <DropdownMenuItem onClick={() => toast.info("Edit feature is coming soon!")}>
+                                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDelete && (
+                                    <DropdownMenuItem 
+                                      variant="destructive"
+                                      onClick={() => handleDelete(jnl.id, jnl.date)}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                    {journals.length === 0 && !isFetchingJournals && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4 text-neutral-500">No journals found</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+                
               {hasNextPage && (
                 <div className="mt-4 flex justify-center">
                   <Button 

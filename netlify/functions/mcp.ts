@@ -64,6 +64,60 @@ export default async (req: Request, context: Context) => {
     }
   );
 
+  // Tool: Create Account
+  server.tool(
+    "create_account",
+    "Add a new account to the chart of accounts.",
+    {
+      id: z.string().describe("Unique lowercase ID, e.g. 'checking-main'"),
+      name: z.string().describe("Display name, e.g. 'Main Checking Account'"),
+      category: z.enum(["asset", "liability", "equity", "income", "expense"]),
+    },
+    async ({ id, name, category }) => {
+      try {
+        const account = {
+          orgId,
+          id,
+          name,
+          category,
+          status: "active" as const,
+          createdAt: new Date().toISOString()
+        };
+        await accountsDb.createAccount(account);
+        return {
+          content: [{ type: "text", text: `Account '${name}' (${id}) created successfully.` }]
+        };
+      } catch (e: any) {
+        return {
+          content: [{ type: "text", text: `Error creating account: ${e.message}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Tool: Archive Account
+  server.tool(
+    "archive_account",
+    "Archive an account to prevent new transactions.",
+    {
+      accountId: z.string()
+    },
+    async ({ accountId }) => {
+      try {
+        await accountsDb.archiveAccount(orgId, accountId);
+        return {
+          content: [{ type: "text", text: `Account ${accountId} archived successfully.` }]
+        };
+      } catch (e: any) {
+        return {
+          content: [{ type: "text", text: `Error archiving account: ${e.message}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
   // Tool: Query Journal Entries
   server.tool(
     "get_journals",
@@ -90,6 +144,33 @@ export default async (req: Request, context: Context) => {
     }
   );
 
+  // Tool: Search Journals by Tag
+  server.tool(
+    "search_journals_by_tag",
+    "Filter journal entries by specific tags.",
+    {
+      tags: z.array(z.string()).describe("Tags to filter by"),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD")
+    },
+    async ({ tags, startDate, endDate }) => {
+      const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate);
+      const filtered = entries.filter(e => 
+        e.tags && tags.some(t => e.tags!.includes(t))
+      );
+      const simplified = filtered.map((e: any) => ({
+        id: e.id,
+        date: e.date,
+        description: e.description,
+        tags: e.tags,
+        lines: (e.lines || []).map((l: any) => ({ accountId: l.accountId, amount: l.amount }))
+      }));
+      return {
+        content: [{ type: "text", text: JSON.stringify(simplified, null, 2) }]
+      };
+    }
+  );
+
   // Tool: Query Account Balance
   server.tool(
     "get_account_balance",
@@ -109,6 +190,81 @@ export default async (req: Request, context: Context) => {
       
       return {
         content: [{ type: "text", text: `Balance for ${accountId}${periodStr} is ${balance} cents.` }]
+      };
+    }
+  );
+
+  // Tool: Get Financial Summary
+  server.tool(
+    "get_financial_summary",
+    "Get a high-level summary of total Income vs Expenses for a period.",
+    {
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD")
+    },
+    async ({ startDate, endDate }) => {
+      const [accs, entries] = await Promise.all([
+        accountsDb.getAccounts(orgId),
+        journalsDb.getJournalEntries(orgId, startDate, endDate)
+      ]);
+
+      const catMap = new Map(accs.map(a => [a.id, a.category]));
+      
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      for (const entry of entries) {
+        // Fetch lines for this entry using getAccountLines or getting them all as usual
+        // Actually getJournalEntriesWithLines is better if we want to fetch batches
+        const { data } = await journalsDb.getJournalEntriesWithLines(orgId, 1, undefined, entry.date.slice(0, 10));
+        const detailedEntry = data.find(d => d.id === entry.id);
+        if (!detailedEntry) continue;
+
+        for (const line of detailedEntry.lines) {
+          const cat = catMap.get(line.accountId);
+          if (cat === "income") {
+            totalIncome -= line.amount;
+          } else if (cat === "expense") {
+            totalExpenses += line.amount;
+          }
+        }
+      }
+
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Summary for ${startDate || 'beginning'} to ${endDate || 'now'}:\n` +
+                `- Total Income: ${totalIncome / 100} BDT\n` +
+                `- Total Expenses: ${totalExpenses / 100} BDT\n` +
+                `- Net Profit/Loss: ${(totalIncome - totalExpenses) / 100} BDT`
+        }]
+      };
+    }
+  );
+
+  // Tool: Get Account History
+  server.tool(
+    "get_account_history",
+    "Fetch transaction history and running balance for a specific account.",
+    {
+      accountId: z.string(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD")
+    },
+    async ({ accountId, startDate, endDate }) => {
+      const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
+      let runningBalance = 0;
+      const history = lines.map(l => {
+        runningBalance += l.amount;
+        return {
+          date: l.date,
+          journalId: l.journalId,
+          amount: l.amount,
+          runningBalance
+        };
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(history, null, 2) }]
       };
     }
   );
@@ -234,6 +390,78 @@ export default async (req: Request, context: Context) => {
         content: [{ type: "text", text: summary }],
         isError: errors.length > 0 && results.length === 0
       };
+    }
+  );
+
+  // Tool: Update Journal Entry
+  server.tool(
+    "update_journal_entry",
+    "Modify an existing journal entry. Caution: replacing all lines with provided ones.",
+    {
+      id: z.string().describe("Entry ID"),
+      oldDate: z.string().describe("Current date of the entry for lookup (ISO string)"),
+      description: z.string().optional(),
+      notes: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+      lines: z.array(z.object({
+        accountId: z.string(),
+        amount: z.number()
+      })).optional()
+    },
+    async ({ id, oldDate, description, notes, tags, lines }) => {
+      try {
+        const updates: any = {};
+        if (description) updates.description = `[AI-Edit] ${description}`;
+        if (notes) updates.notes = notes;
+        if (tags) updates.tags = tags;
+        if (oldDate) updates.date = oldDate; // Default to old if not changing
+
+        let finalLines: any[] = [];
+        if (lines) {
+          finalLines = lines.map(l => ({
+            orgId,
+            journalId: id,
+            accountId: l.accountId,
+            amount: l.amount,
+            date: oldDate
+          }));
+        } else {
+           return { content: [{ type: "text", text: "Error: lines must be provided for full replacement." }], isError: true };
+        }
+
+        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines, "mcp-user");
+        return {
+          content: [{ type: "text", text: `Journal entry ${id} updated successfully.` }]
+        };
+      } catch (e: any) {
+        return {
+          content: [{ type: "text", text: `Error updating entry: ${e.message}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Tool: Delete Journal Entry
+  server.tool(
+    "delete_journal_entry",
+    "Permanently remove a journal entry.",
+    {
+      id: z.string(),
+      date: z.string().describe("Date of entry for lookup")
+    },
+    async ({ id, date }) => {
+      try {
+        await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user");
+        return {
+          content: [{ type: "text", text: `Journal entry ${id} deleted.` }]
+        };
+      } catch (e: any) {
+        return {
+          content: [{ type: "text", text: `Error deleting entry: ${e.message}` }],
+          isError: true
+        };
+      }
     }
   );
 

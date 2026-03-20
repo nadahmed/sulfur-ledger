@@ -232,8 +232,8 @@ export default function AccountsPage() {
             <CardTitle>Create Account</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="flex gap-4 items-end flex-wrap">
-              <div className="grid w-full max-w-xs items-center gap-1.5">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-4 items-end flex-wrap">
+              <div className="grid w-full sm:max-w-xs items-center gap-1.5">
                 <Label htmlFor="name">Account Name</Label>
                 <Input 
                   id="name" 
@@ -242,7 +242,7 @@ export default function AccountsPage() {
                   className={errors.name ? "border-red-500" : ""}
                 />
               </div>
-              <div className="grid w-full max-w-xs items-center gap-1.5">
+              <div className="grid w-full sm:max-w-xs items-center gap-1.5">
                 <Label htmlFor="category">Category</Label>
                 <Controller
                   name="category"
@@ -263,7 +263,7 @@ export default function AccountsPage() {
                   )}
                 />
               </div>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create"}
               </Button>
             </form>
@@ -324,7 +324,8 @@ export default function AccountsPage() {
           {isFetchingAccounts ? (
             <div className="text-center py-4">Loading accounts...</div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -371,6 +372,7 @@ export default function AccountsPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
           )}
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">

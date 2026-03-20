@@ -491,11 +491,49 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="members" className="space-y-8 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="bg-neutral-50/50">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Owner</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                    {members?.find((m: any) => m.role === "owner")?.name?.[0] || "O"}
+                  </div>
+                  <div>
+                    <p className="font-medium">{members?.find((m: any) => m.role === "owner")?.name || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground">{members?.find((m: any) => m.role === "owner")?.email || ""}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-neutral-50/50">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Organization ID</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <code className="text-xs break-all text-neutral-500">{activeOrganizationId}</code>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-neutral-50/50 md:col-span-2 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Created On</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-neutral-600">
+                  {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-1 space-y-8">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
+                <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
@@ -735,8 +773,8 @@ export default function SettingsPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid gap-1.5">
                         <Label htmlFor="senderName">Sender Name</Label>
                         <Input 
                           id="senderName" 
@@ -744,7 +782,7 @@ export default function SettingsPage() {
                           disabled={!canManage}
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="grid gap-1.5">
                         <Label htmlFor="senderEmail">Sender Email</Label>
                         <Input 
                           id="senderEmail" 
@@ -770,44 +808,24 @@ export default function SettingsPage() {
 
                     {watchProvider === "smtp" && (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="col-span-2 space-y-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid gap-1.5">
                             <Label htmlFor="smtpHost">SMTP Host</Label>
-                            <Input 
-                              id="smtpHost" 
-                              placeholder="smtp.example.com"
-                              {...registerEmail("smtpHost")}
-                              disabled={!canManage}
-                            />
+                            <Input id="smtpHost" {...registerEmail("smtpHost")} placeholder="smtp.example.com" />
                           </div>
-                          <div className="space-y-1.5">
+                          <div className="grid gap-1.5">
                             <Label htmlFor="smtpPort">Port</Label>
-                            <Input 
-                              id="smtpPort" 
-                              type="number"
-                              placeholder="587"
-                              {...registerEmail("smtpPort", { valueAsNumber: true })}
-                              disabled={!canManage}
-                            />
+                            <Input id="smtpPort" type="number" {...registerEmail("smtpPort", { valueAsNumber: true })} placeholder="587" />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid gap-1.5">
                             <Label htmlFor="smtpUser">Username</Label>
-                            <Input 
-                              id="smtpUser" 
-                              {...registerEmail("smtpUser")}
-                              disabled={!canManage}
-                            />
+                            <Input id="smtpUser" {...registerEmail("smtpUser")} disabled={!canManage} />
                           </div>
-                          <div className="space-y-1.5">
+                          <div className="grid gap-1.5">
                             <Label htmlFor="smtpPass">Password</Label>
-                            <Input 
-                              id="smtpPass" 
-                              type="password"
-                              {...registerEmail("smtpPass")}
-                              disabled={!canManage}
-                            />
+                            <Input id="smtpPass" type="password" {...registerEmail("smtpPass")} disabled={!canManage} />
                           </div>
                         </div>
                       </div>
