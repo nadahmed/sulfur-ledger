@@ -93,15 +93,22 @@ export default async (req: Request, context: Context) => {
   // Tool: Query Account Balance
   server.tool(
     "get_account_balance",
-    "Fetch the balance of a specific account using its ID",
+    "Fetch the balance of a specific account using its ID, with optional date filtering.",
     {
-      accountId: z.string()
+      accountId: z.string(),
+      startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+      endDate: z.string().optional().describe("End date (YYYY-MM-DD)")
     },
-    async ({ accountId }) => {
-      const lines = await journalsDb.getAccountLines(orgId, accountId);
+    async ({ accountId, startDate, endDate }) => {
+      const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
       const balance = lines.reduce((sum, line) => sum + line.amount, 0);
+      let periodStr = "";
+      if (startDate && endDate) periodStr = ` from ${startDate} to ${endDate}`;
+      else if (startDate) periodStr = ` since ${startDate}`;
+      else if (endDate) periodStr = ` until ${endDate}`;
+      
       return {
-        content: [{ type: "text", text: `Balance for ${accountId} is ${balance} cents.` }]
+        content: [{ type: "text", text: `Balance for ${accountId}${periodStr} is ${balance} cents.` }]
       };
     }
   );
@@ -109,9 +116,10 @@ export default async (req: Request, context: Context) => {
   // Tool: Record Journal Entry
   server.tool(
     "record_journal_entry",
-    "Record a new double-entry journal transaction. MUST balance to zero. Amounts in cents.",
+    "Record a new double-entry journal transaction. MUST balance to zero. Amounts in cents. Supports time for sequencing.",
     {
-      date: z.string().describe("YYYY-MM-DD"),
+      date: z.string().describe("Date (YYYY-MM-DD or full ISO 8601 string)"),
+      time: z.string().optional().describe("Optional time (HH:mm) if date is YYYY-MM-DD"),
       description: z.string(),
       tags: z.array(z.string()).optional(),
       lines: z.array(z.object({
@@ -119,8 +127,14 @@ export default async (req: Request, context: Context) => {
         amount: z.number().describe("Amount in cents. Positive for debit, negative for credit.")
       }))
     },
-    async ({ date, description, tags, lines }) => {
+    async ({ date: dateInput, time, description, tags, lines }) => {
       try {
+        let finalDate = dateInput;
+        if (dateInput.length === 10) { // YYYY-MM-DD
+          const timePart = time || new Date().toISOString().slice(11, 19); // Use provided time or current time
+          finalDate = `${dateInput}T${timePart}Z`;
+        }
+
         const { randomUUID } = require("crypto");
         const id = randomUUID();
         
@@ -129,13 +143,13 @@ export default async (req: Request, context: Context) => {
           journalId: id,
           accountId: l.accountId,
           amount: l.amount,
-          date
+          date: finalDate
         }));
 
         const entry = {
           orgId,
           id,
-          date,
+          date: finalDate,
           description: `[AI] ${description}`,
           tags,
           createdAt: new Date().toISOString()
@@ -152,6 +166,74 @@ export default async (req: Request, context: Context) => {
           isError: true
         };
       }
+    }
+  );
+
+  // Tool: Record Bulk Journal Entries
+  server.tool(
+    "record_bulk_journal_entries",
+    "Record multiple journal entries in a single call. Each entry must balance to zero.",
+    {
+      entries: z.array(z.object({
+        date: z.string().describe("Date (YYYY-MM-DD or full ISO 8601 string)"),
+        time: z.string().optional().describe("Optional time (HH:mm)"),
+        description: z.string(),
+        tags: z.array(z.string()).optional(),
+        lines: z.array(z.object({
+          accountId: z.string(),
+          amount: z.number().describe("Amount in cents. Positive for debit, negative for credit.")
+        }))
+      }))
+    },
+    async ({ entries }) => {
+      const results: string[] = [];
+      const errors: string[] = [];
+      
+      for (const entryInput of entries) {
+        try {
+          let finalDate = entryInput.date;
+          if (entryInput.date.length === 10) {
+             const timePart = entryInput.time || new Date().toISOString().slice(11, 19);
+             finalDate = `${entryInput.date}T${timePart}Z`;
+          }
+
+          const { randomUUID } = require("crypto");
+          const id = randomUUID();
+          
+          const parsedLines = entryInput.lines.map((l: any) => ({
+            orgId,
+            journalId: id,
+            accountId: l.accountId,
+            amount: l.amount,
+            date: finalDate
+          }));
+
+          const entry = {
+            orgId,
+            id,
+            date: finalDate,
+            description: `[AI-Bulk] ${entryInput.description}`,
+            tags: entryInput.tags,
+            createdAt: new Date().toISOString()
+          };
+
+          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user");
+          results.push(`Success: ${entryInput.description} (${id})`);
+        } catch (e: any) {
+          errors.push(`Error in "${entryInput.description}": ${e.message}`);
+        }
+      }
+
+      const summary = [
+        `Processed ${entries.length} entries.`,
+        ...results,
+        ...(errors.length > 0 ? ["Errors:", ...errors] : [])
+      ].join("\n");
+
+      return {
+        content: [{ type: "text", text: summary }],
+        isError: errors.length > 0 && results.length === 0
+      };
     }
   );
 

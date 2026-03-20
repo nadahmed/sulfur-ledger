@@ -8,7 +8,7 @@ export const AccountSchema = z.object({
 export type AccountFormValues = z.infer<typeof AccountSchema>;
 
 export const JournalEntrySchema = z.object({
-  date: z.string().min(1, "Date is required"),
+  date: z.string().min(1, "Date or ISO string is required"),
   description: z.string().min(1, "Description is required").max(200),
   amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Amount must be a positive number",

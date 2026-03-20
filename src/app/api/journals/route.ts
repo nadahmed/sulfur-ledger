@@ -52,13 +52,19 @@ export async function POST(req: NextRequest) {
     const journalId = crypto.randomUUID();
     const parsedAmount = Math.round(parseFloat(amount) * 100);
 
+    // If date is YYYY-MM-DD, append current time for sequencing
+    let finalDate = date;
+    if (date.length === 10) {
+      finalDate = `${date}T${new Date().toISOString().slice(11)}`;
+    }
+
     const parsedLines = [
-      { orgId, journalId, accountId: toAccountId, amount: parsedAmount, date },
-      { orgId, journalId, accountId: fromAccountId, amount: -parsedAmount, date }
+      { orgId, journalId, accountId: toAccountId, amount: parsedAmount, date: finalDate },
+      { orgId, journalId, accountId: fromAccountId, amount: -parsedAmount, date: finalDate }
     ];
 
     const result = await createJournalEntry({
-      orgId, id: journalId, date, description, notes, tags, createdAt: new Date().toISOString()
+      orgId, id: journalId, date: finalDate, description, notes, tags, createdAt: new Date().toISOString()
     }, parsedLines, user!.sub);
 
     return NextResponse.json(result, { status: 201 });
@@ -84,12 +90,19 @@ export async function PATCH(req: NextRequest) {
     }
 
     const parsedAmount = Math.round(parseFloat(amount) * 100);
+
+    // If new date is YYYY-MM-DD, append current time for sequencing
+    let finalDate = date;
+    if (date.length === 10) {
+      finalDate = `${date}T${new Date().toISOString().slice(11)}`;
+    }
+
     const parsedLines = [
-      { orgId, journalId: id, accountId: toAccountId, amount: parsedAmount, date },
-      { orgId, journalId: id, accountId: fromAccountId, amount: -parsedAmount, date }
+      { orgId, journalId: id, accountId: toAccountId, amount: parsedAmount, date: finalDate },
+      { orgId, journalId: id, accountId: fromAccountId, amount: -parsedAmount, date: finalDate }
     ];
 
-    await updateJournalEntry(orgId, id, oldDate, { date, description, notes, tags }, parsedLines, user!.sub);
+    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, notes, tags }, parsedLines, user!.sub);
     return NextResponse.json({ message: "Journal updated" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

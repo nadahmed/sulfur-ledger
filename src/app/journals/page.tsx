@@ -432,17 +432,24 @@ export default function JournalsPage() {
                     const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
                     const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
 
-                    const [year, month, day] = jnl.date.split('-').map(Number);
-                    const displayDate = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+                    const dateObj = new Date(jnl.date);
+                    const displayDate = dateObj.toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
+                    });
+                    const displayTime = dateObj.toLocaleTimeString(undefined, {
+                      hour: '2-digit',
+                      minute: '2-digit'
                     });
 
                     return (
                       <TableRow key={jnl.id}>
                         <TableCell className="font-medium" suppressHydrationWarning>
-                          {displayDate}
+                          <div className="flex flex-col">
+                            <span>{displayDate}</span>
+                            <span className="text-[10px] text-neutral-400 font-mono">{displayTime}</span>
+                          </div>
                         </TableCell>
                         <TableCell>{jnl.description}</TableCell>
                         <TableCell>৳{amountDisp}</TableCell>

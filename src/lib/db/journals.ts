@@ -8,7 +8,7 @@ import { createAuditLog } from "./audit";
 export interface JournalEntry {
   orgId: string;
   id: string; // UUID
-  date: string; // YYYY-MM-DD
+  date: string; // ISO 8601 (e.g., YYYY-MM-DDTHH:mm:ss.sssZ) for sequencing
   description: string;
   notes?: string;
   tags?: string[];
@@ -20,7 +20,7 @@ export interface JournalLine {
   journalId: string;
   accountId: string;
   amount: number; // in cents/paisa. Positive = Debit, Negative = Credit
-  date: string; // Copied from entry for easy querying in GSI
+  date: string; // Copied from entry for easy querying in GSI (ISO 8601)
 }
 
 export async function createJournalEntry(entry: JournalEntry, lines: JournalLine[], userId: string) {
