@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { uuidv7 } from "uuidv7";
 import { 
   createJournalEntry, 
   getJournalEntriesWithLines, 
@@ -49,17 +50,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const journalId = crypto.randomUUID();
+    const journalId = uuidv7();
     const parsedAmount = Math.round(parseFloat(amount) * 100);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json({ error: "Amount must be a positive number greater than zero." }, { status: 400 });
     }
 
-    // If date is YYYY-MM-DD, append current time for sequencing
-    let finalDate = date;
-    if (date.length === 10) {
-      finalDate = `${date}T${new Date().toISOString().slice(11)}`;
-    }
+    // date is stored as plain YYYY-MM-DD; uuidv7 provides time-ordering within a date
+    const finalDate = date.slice(0, 10);
 
     const parsedLines = [
       { orgId, journalId, accountId: toAccountId, amount: parsedAmount, date: finalDate },
@@ -97,11 +95,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Amount must be a positive number greater than zero." }, { status: 400 });
     }
 
-    // If new date is YYYY-MM-DD, append current time for sequencing
-    let finalDate = date;
-    if (date.length === 10) {
-      finalDate = `${date}T${new Date().toISOString().slice(11)}`;
-    }
+    // date is stored as plain YYYY-MM-DD; uuidv7 ID provides time-ordering
+    const finalDate = date.slice(0, 10);
 
     const parsedLines = [
       { orgId, journalId: id, accountId: toAccountId, amount: parsedAmount, date: finalDate },

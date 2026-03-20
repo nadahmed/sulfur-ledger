@@ -1,7 +1,7 @@
-import { TransactWriteItemsCommand, TransactWriteItem, DeleteItemCommand } from "@aws-sdk/client-dynamodb";
-import { QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
-import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-import { randomUUID } from "crypto";
+import { TransactWriteItemsCommand, TransactWriteItem } from "@aws-sdk/client-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { marshall } from "@aws-sdk/util-dynamodb";
+import { uuidv7 } from "uuidv7";
 import { db, TABLE_NAME } from "../dynamodb";
 import { createAuditLog } from "./audit";
 
@@ -97,7 +97,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   // Audit Log
   await createAuditLog({
     orgId: entry.orgId,
-    id: randomUUID(),
+    id: uuidv7(),
     userId,
     action: "create",
     entityType: "JournalEntry",
@@ -267,7 +267,7 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
   // Audit Log
   await createAuditLog({
     orgId,
-    id: crypto.randomUUID(),
+    id: uuidv7(),
     userId,
     action: "delete",
     entityType: "JournalEntry",
@@ -371,7 +371,7 @@ export async function updateJournalEntry(
   // Audit Log
   await createAuditLog({
     orgId,
-    id: crypto.randomUUID(),
+    id: uuidv7(),
     userId,
     action: "update",
     entityType: "JournalEntry",

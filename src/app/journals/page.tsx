@@ -145,8 +145,16 @@ export default function JournalsPage() {
 
   const accounts = accountResponse?.data || [];
   
+  const todayLocal = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, []);
+
   const initialFormValues = useMemo(() => ({
-    date: new Date().toISOString().slice(0, 10),
+    date: todayLocal,
     description: "",
     notes: "",
     amount: "",
@@ -516,7 +524,11 @@ export default function JournalsPage() {
                       const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
                       const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
 
-                      const dateObj = new Date(jnl.date);
+                      // jnl.date is stored as a full UTC ISO string (e.g. "2026-03-21T22:58:37.000Z").
+                      // Slicing to YYYY-MM-DD and appending T00:00:00 forces local-midnight parsing,
+                      // so the displayed date always matches what the user selected.
+                      const datePart = jnl.date.slice(0, 10);
+                      const dateObj = new Date(`${datePart}T00:00:00`);
                       const displayDate = dateObj.toLocaleDateString(undefined, {
                         year: 'numeric',
                         month: 'short',
@@ -535,12 +547,12 @@ export default function JournalsPage() {
                               <span className="text-[10px] text-neutral-400 font-mono">{displayTime}</span>
                             </div>
                           </TableCell>
-                          <TableCell>{jnl.description}</TableCell>
+                          <TableCell className="max-w-[200px] break-words whitespace-normal">{jnl.description}</TableCell>
                           <TableCell>৳{amountDisp}</TableCell>
                           <TableCell>{fromAcc}</TableCell>
                           <TableCell>{toAcc}</TableCell>
-                          <TableCell className="text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
-                          <TableCell>
+                          <TableCell className="max-w-[180px] break-words whitespace-normal text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
+                          <TableCell className="max-w-[180px]">
                             <div className="flex flex-wrap gap-1">
                               {jnl.tags && jnl.tags.length > 0 ? (
                                 jnl.tags.map((tag: string, idx: number) => (
