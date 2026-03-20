@@ -51,6 +51,9 @@ export async function POST(req: NextRequest) {
 
     const journalId = crypto.randomUUID();
     const parsedAmount = Math.round(parseFloat(amount) * 100);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return NextResponse.json({ error: "Amount must be a positive number greater than zero." }, { status: 400 });
+    }
 
     // If date is YYYY-MM-DD, append current time for sequencing
     let finalDate = date;
@@ -90,6 +93,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     const parsedAmount = Math.round(parseFloat(amount) * 100);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return NextResponse.json({ error: "Amount must be a positive number greater than zero." }, { status: 400 });
+    }
 
     // If new date is YYYY-MM-DD, append current time for sequencing
     let finalDate = date;
