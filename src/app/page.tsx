@@ -54,6 +54,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
+import { useLocalStorage } from "@/hooks/use-local-storage";
+
 interface DashboardSummary {
   totalAssets: number;
   netIncome: number;
@@ -69,13 +71,35 @@ export default function DashboardPage() {
   const { activeOrganizationId, isLoading: isOrgLoading } = useOrganization();
   const router = useRouter();
   
-  const [date, setDate] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
-  });
+  const [persistedDate, setPersistedDate] = useLocalStorage<{ from: string | undefined; to: string | undefined }>(
+    activeOrganizationId ? `dash-filters-date-${activeOrganizationId}` : "dash-filters-date-default",
+    {
+      from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+      to: new Date().toISOString(),
+    }
+  );
+
+  const date = useMemo(() => ({
+    from: persistedDate.from ? new Date(persistedDate.from) : undefined,
+    to: persistedDate.to ? new Date(persistedDate.to) : undefined,
+  }), [persistedDate]);
+
+  const setDate = (range: any) => {
+    setPersistedDate({
+      from: range?.from?.toISOString(),
+      to: range?.to?.toISOString(),
+    });
+  };
+
   const [isMounted, setIsMounted] = useState(false);
-  const [trendPeriod, setTrendPeriod] = useState<"weeks" | "months" | "years">("months");
-  const [trendCount, setTrendCount] = useState(6);
+  const [trendPeriod, setTrendPeriod] = useLocalStorage<"weeks" | "months" | "years">(
+    activeOrganizationId ? `dash-filters-trend-period-${activeOrganizationId}` : "dash-filters-trend-period-default", 
+    "weeks"
+  );
+  const [trendCount, setTrendCount] = useLocalStorage<number>(
+    activeOrganizationId ? `dash-filters-trend-count-${activeOrganizationId}` : "dash-filters-trend-count-default",
+    6
+  );
 
   useEffect(() => {
     setIsMounted(true);

@@ -15,6 +15,8 @@ import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
+import { useLocalStorage } from "@/hooks/use-local-storage";
+
 interface AccountBalance {
   id: string;
   name: string;
@@ -38,9 +40,18 @@ export default function ReportsPage() {
   const { activeOrganizationId, permissions, isOwner, isLoading: orgLoading } = useOrganization();
   const router = useRouter();
 
-  const [reportType, setReportType] = useState("trial-balance");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [reportType, setReportType] = useLocalStorage(
+    activeOrganizationId ? `reports-filters-type-${activeOrganizationId}` : "reports-filters-type-default", 
+    "trial-balance"
+  );
+  const [startDate, setStartDate] = useLocalStorage(
+    activeOrganizationId ? `reports-filters-start-${activeOrganizationId}` : "reports-filters-start-default", 
+    ""
+  );
+  const [endDate, setEndDate] = useLocalStorage(
+    activeOrganizationId ? `reports-filters-end-${activeOrganizationId}` : "reports-filters-end-default", 
+    ""
+  );
 
   const isLoading = userLoading || orgLoading;
   const canRead = isOwner || permissions.includes("read:reports");
