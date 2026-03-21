@@ -40,7 +40,7 @@ function mergeDuplicateAccountLines(lines: JournalLine[]): JournalLine[] {
   return Array.from(merged.values()).filter(l => l.amount !== 0);
 }
 
-export async function createJournalEntry(entry: JournalEntry, lines: JournalLine[], userId: string) {
+export async function createJournalEntry(entry: JournalEntry, lines: JournalLine[], userId: string, userName?: string) {
   // Validate double entry (sum of amounts = 0)
   const total = lines.reduce((acc, line) => acc + line.amount, 0);
   if (total !== 0) {
@@ -99,6 +99,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
     orgId: entry.orgId,
     id: uuidv7(),
     userId,
+    userName,
     action: "create",
     entityType: "JournalEntry",
     entityId: entry.id,
@@ -218,7 +219,7 @@ export async function getAccountLines(orgId: string, accountId: string, startDat
   return (result.Items as unknown as JournalLine[]) || [];
 }
 
-export async function deleteJournalEntry(orgId: string, entryId: string, date: string, userId: string) {
+export async function deleteJournalEntry(orgId: string, entryId: string, date: string, userId: string, userName?: string) {
   // 1. Get lines to delete (PK=ORG#ID#JOURNAL, SK=LINE#ID#)
   const pk = `ORG#${orgId}#JOURNAL`;
   const linesResult = await db.send(
@@ -269,6 +270,7 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
     orgId,
     id: uuidv7(),
     userId,
+    userName,
     action: "delete",
     entityType: "JournalEntry",
     entityId: entryId,
@@ -283,7 +285,8 @@ export async function updateJournalEntry(
   oldDate: string,
   newEntry: Partial<JournalEntry>,
   newLines: JournalLine[],
-  userId: string
+  userId: string,
+  userName?: string
 ) {
   // Simplest way is to delete old and create new in a single transaction if date changed,
   // or just update if date is same. To keep it robust, let's treat it as a replacement of lines.
@@ -373,6 +376,7 @@ export async function updateJournalEntry(
     orgId,
     id: uuidv7(),
     userId,
+    userName,
     action: "update",
     entityType: "JournalEntry",
     entityId: entryId,

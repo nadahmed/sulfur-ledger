@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Plus,
   Building2,
+  History,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -62,11 +63,17 @@ const navItems = [
     icon: PieChart,
   },
   {
+    title: "Activity",
+    url: "/activity",
+    icon: History,
+  },
+  {
     title: "Settings",
     url: "/settings",
     icon: Settings,
   },
 ];
+
 
 export function AppSidebar() {
   const { user } = useUser();

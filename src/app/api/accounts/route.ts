@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       category: category as AccountCategory,
       status: "active",
       createdAt: new Date().toISOString(),
-    });
+    }, user!.sub, user!.name);
 
     return NextResponse.json(account, { status: 201 });
   } catch (err: any) {
@@ -138,11 +138,11 @@ export async function DELETE(req: NextRequest) {
     
     if (lines && lines.length > 0) {
       // Soft delete: archive
-      await archiveAccount(orgId, accountId);
+      await archiveAccount(orgId, accountId, user!.sub, user!.name);
       return NextResponse.json({ message: "Account archived successfully because it contains transactions." });
     } else {
       // Hard delete
-      await deleteAccount(orgId, accountId);
+      await deleteAccount(orgId, accountId, user!.sub, user!.name);
       return NextResponse.json({ message: "Account deleted permanently." });
     }
 
@@ -152,7 +152,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { isOwner, error, status } = await checkPermission("manage:accounts", req);
+  const { user, isOwner, error, status } = await checkPermission("manage:accounts", req);
   if (error) return NextResponse.json({ error }, { status });
 
   const orgId = req.cookies.get("activeOrgId")?.value;
@@ -171,7 +171,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === "unarchive") {
       const { unarchiveAccount } = require("@/lib/db/accounts");
-      await unarchiveAccount(orgId, accountId);
+      await unarchiveAccount(orgId, accountId, user!.sub, user!.name);
       return NextResponse.json({ message: "Account unarchived successfully." });
     }
 

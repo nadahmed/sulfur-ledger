@@ -1,5 +1,7 @@
 import { PutCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { db, TABLE_NAME } from "../dynamodb";
+import { createAuditLog } from "./audit";
+import { uuidv7 } from "uuidv7";
 
 export type AccountCategory = "asset" | "liability" | "equity" | "income" | "expense";
 
@@ -12,7 +14,7 @@ export interface Account {
   createdAt: string;
 }
 
-export async function createAccount(account: Account) {
+export async function createAccount(account: Account, userId?: string, userName?: string) {
   await db.send(
     new PutCommand({
       TableName: TABLE_NAME,
@@ -26,6 +28,21 @@ export async function createAccount(account: Account) {
       ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId: account.orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "create",
+      entityType: "Account",
+      entityId: account.id,
+      details: JSON.stringify({ name: account.name, category: account.category }),
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   return account;
 }
 
@@ -56,7 +73,7 @@ export async function getAccount(orgId: string, accountId: string): Promise<Acco
   return (result.Item as Account) || null;
 }
 
-export async function deleteAccount(orgId: string, accountId: string) {
+export async function deleteAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
   const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
   await db.send(
     new DeleteCommand({
@@ -67,9 +84,24 @@ export async function deleteAccount(orgId: string, accountId: string) {
       },
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "delete",
+      entityType: "Account",
+      entityId: accountId,
+      details: "Deleted account",
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
-export async function archiveAccount(orgId: string, accountId: string) {
+
+export async function archiveAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   await db.send(
     new UpdateCommand({
@@ -87,9 +119,23 @@ export async function archiveAccount(orgId: string, accountId: string) {
       },
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "update",
+      entityType: "Account",
+      entityId: accountId,
+      details: "Archived account",
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
-export async function unarchiveAccount(orgId: string, accountId: string) {
+export async function unarchiveAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   await db.send(
     new UpdateCommand({
@@ -107,4 +153,19 @@ export async function unarchiveAccount(orgId: string, accountId: string) {
       },
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "update",
+      entityType: "Account",
+      entityId: accountId,
+      details: "Unarchived account",
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
+

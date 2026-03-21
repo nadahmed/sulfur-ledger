@@ -4,7 +4,9 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as journalsDb from "../../src/lib/db/journals";
 import * as accountsDb from "../../src/lib/db/accounts";
 import { getOrganization } from "../../src/lib/db/organizations";
+import { createMcpActivityLog } from "../../src/lib/db/audit";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 export default async (req: Request, context: Context) => {
   // 1. Authorization Logic (from headers)
@@ -32,6 +34,25 @@ export default async (req: Request, context: Context) => {
     return new Response("Unauthorized: API Key expired", { status: 401 });
   }
 
+  // 1.5 Logging Helper
+  const logActivity = async (toolName: string, input: any, result: any, error?: string) => {
+    try {
+      const now = new Date();
+      await createMcpActivityLog({
+        orgId,
+        id: randomUUID(),
+        toolName,
+        input: JSON.stringify(input),
+        status: error ? "error" : "success",
+        error,
+        timestamp: now.toISOString(),
+      });
+    } catch (e) {
+
+      console.error("Failed to log MCP activity:", e);
+    }
+  };
+
   // 2. Initialize MCP Transport and Server
   const transport = new WebStandardStreamableHTTPServerTransport();
   
@@ -42,7 +63,27 @@ export default async (req: Request, context: Context) => {
     capabilities: { tools: {}, resources: {} }
   });
 
+  // 2.5 Intercept registerTool to add automatic logging
+  const originalRegisterTool = server.registerTool.bind(server);
+  server.registerTool = (name: string, schema: any, handler: any) => {
+    return originalRegisterTool(
+      name,
+      schema,
+      async (args: any) => {
+        try {
+          const result = await handler(args);
+          await logActivity(name, args, result);
+          return result;
+        } catch (e: any) {
+          await logActivity(name, args, null, e.message);
+          throw e;
+        }
+      }
+    );
+  };
+
   // ─── ACCOUNTS ────────────────────────────────────────────────────────────────
+
 
   // Tool: List Accounts
   server.registerTool(
@@ -139,7 +180,7 @@ DON'Ts:
           status: "active" as const,
           createdAt: new Date().toISOString()
         };
-        await accountsDb.createAccount(account);
+        await accountsDb.createAccount(account, "mcp-user", "MCP/AI");
         return {
           content: [{ type: "text", text: `Account '${name}' (id: ${id}, category: ${category}) created successfully.` }]
         };
@@ -176,7 +217,7 @@ DON'Ts:
     },
     async ({ accountId }) => {
       try {
-        await accountsDb.archiveAccount(orgId, accountId);
+        await accountsDb.archiveAccount(orgId, accountId, "mcp-user", "MCP/AI");
         return {
           content: [{ type: "text", text: `Account '${accountId}' has been archived. It will no longer accept new transactions.` }]
         };
@@ -224,7 +265,7 @@ DON'Ts:
       const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate);
       const simplifiedEntries = entries.map((e: any) => ({
         id: e.id,
-        date: e.date,
+        date: e.date.slice(0, 10),
         description: e.description,
         tags: e.tags,
         lines: (e.lines || []).map((l: any) => ({
@@ -268,7 +309,7 @@ DON'Ts:
       );
       const simplified = filtered.map((e: any) => ({
         id: e.id,
-        date: e.date,
+        date: e.date.slice(0, 10),
         description: e.description,
         tags: e.tags,
         lines: (e.lines || []).map((l: any) => ({ accountId: l.accountId, amount: l.amount / 100 }))
@@ -416,7 +457,7 @@ DOs:
       const history = lines.map(l => {
         runningBalancePaisa += l.amount;
         return {
-          date: l.date,
+          date: l.date.slice(0, 10),
           journalId: l.journalId,
           amount: l.amount / 100,
           runningBalance: runningBalancePaisa / 100
@@ -456,8 +497,7 @@ DON'Ts:
 - Never record entries without confirming the accounts with the user first
 - Do not record duplicate entries — check get_journals if unsure`,
       inputSchema: {
-        date: z.string().describe("Transaction date: YYYY-MM-DD or full ISO 8601 string"),
-        time: z.string().optional().describe("Optional time HH:mm if date is YYYY-MM-DD (used for ordering same-day entries)"),
+        date: z.string().describe("Transaction date in YYYY-MM-DD format"),
         description: z.string().describe("Clear description of the transaction (shown in reports and journal list)"),
         amount: z.number().positive().describe("Transaction amount in Taka — must be greater than 0. e.g. 500.00"),
         fromAccountId: z.string().describe("Source account ID (money comes FROM here — will be credited). Get IDs from get_accounts."),
@@ -466,7 +506,7 @@ DON'Ts:
         tags: z.array(z.string()).optional().describe("Optional tags for grouping (e.g. ['payroll', 'monthly'])")
       }
     },
-    async ({ date: dateInput, time, description, amount, fromAccountId, toAccountId, notes, tags }) => {
+    async ({ date: dateInput, description, amount, fromAccountId, toAccountId, notes, tags }) => {
       try {
         // Validate accounts exist and are active
         const accs = await accountsDb.getAccounts(orgId);
@@ -496,11 +536,7 @@ DON'Ts:
           return { content: [{ type: "text", text: `Error: amount must be greater than 0.` }], isError: true };
         }
 
-        let finalDate = dateInput;
-        if (dateInput.length === 10) {
-          const timePart = time || new Date().toISOString().slice(11, 19);
-          finalDate = `${dateInput}T${timePart}Z`;
-        }
+        const finalDate = dateInput.slice(0, 10);
 
         const { randomUUID } = require("crypto");
         const id = randomUUID();
@@ -520,7 +556,7 @@ DON'Ts:
           createdAt: new Date().toISOString()
         };
 
-        await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user");
+        await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "MCP/AI");
 
         return {
           content: [{ 
@@ -567,8 +603,7 @@ DON'Ts:
 Returns a summary of successes and any errors per entry.`,
       inputSchema: {
         entries: z.array(z.object({
-          date: z.string().describe("YYYY-MM-DD or ISO 8601 datetime"),
-          time: z.string().optional().describe("Optional HH:mm time for same-day ordering"),
+          date: z.string().describe("YYYY-MM-DD format"),
           description: z.string().describe("Transaction description"),
           amount: z.number().positive().describe("Amount in Taka, must be > 0"),
           fromAccountId: z.string().describe("Source/credit account ID"),
@@ -600,11 +635,7 @@ Returns a summary of successes and any errors per entry.`,
           const amountPaisa = Math.round(entryInput.amount * 100);
           if (amountPaisa <= 0) throw new Error(`amount must be > 0`);
 
-          let finalDate = entryInput.date;
-          if (entryInput.date.length === 10) {
-            const timePart = entryInput.time || new Date().toISOString().slice(11, 19);
-            finalDate = `${entryInput.date}T${timePart}Z`;
-          }
+          const finalDate = entryInput.date.slice(0, 10);
 
           const { randomUUID } = require("crypto");
           const id = randomUUID();
@@ -624,7 +655,7 @@ Returns a summary of successes and any errors per entry.`,
             createdAt: new Date().toISOString()
           };
 
-          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user");
+          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "MCP/AI");
           results.push(`✅ ${entryInput.description} → ${entryInput.amount.toFixed(2)} Taka (${id})`);
         } catch (e: any) {
           errors.push(`❌ "${entryInput.description}": ${e.message}`);
@@ -666,7 +697,7 @@ DON'Ts:
 - Do not set amount to 0 or negative`,
       inputSchema: {
         id: z.string().describe("Journal entry ID (get from get_journals)"),
-        oldDate: z.string().describe("The current date of the entry — required to locate it in the database (ISO string)"),
+        oldDate: z.string().describe("The current date of the entry in YYYY-MM-DD format"),
         description: z.string().optional().describe("New description (replaces existing)"),
         notes: z.string().optional().describe("New notes (replaces existing)"),
         tags: z.array(z.string()).optional().describe("New tags array (replaces existing)"),
@@ -719,7 +750,7 @@ DON'Ts:
           };
         }
 
-        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines, "mcp-user");
+        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines, "mcp-user", "MCP/AI");
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} updated successfully.` }]
         };
@@ -749,12 +780,12 @@ DON'Ts:
 - Never guess the entry ID — always retrieve it from get_journals first`,
       inputSchema: {
         id: z.string().describe("Journal entry ID to delete (get from get_journals)"),
-        date: z.string().describe("The date of the entry (ISO string) — required to locate it in the database")
+        date: z.string().describe("The date of the entry (YYYY-MM-DD)")
       }
     },
     async ({ id, date }) => {
       try {
-        await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user");
+        await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user", "MCP/AI");
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} has been permanently deleted. An audit log has been created.` }]
         };

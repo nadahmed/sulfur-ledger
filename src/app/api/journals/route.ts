@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     const result = await createJournalEntry({
       orgId, id: journalId, date: finalDate, description, notes, tags, createdAt: new Date().toISOString()
-    }, parsedLines, user!.sub);
+    }, parsedLines, user!.sub, user!.name);
 
     return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
@@ -103,7 +103,7 @@ export async function PATCH(req: NextRequest) {
       { orgId, journalId: id, accountId: fromAccountId, amount: -parsedAmount, date: finalDate }
     ];
 
-    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, notes, tags }, parsedLines, user!.sub);
+    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, notes, tags }, parsedLines, user!.sub, user!.name);
     return NextResponse.json({ message: "Journal updated" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -127,7 +127,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    await deleteJournalEntry(orgId, id, date, user!.sub);
+    await deleteJournalEntry(orgId, id, date, user!.sub, user!.name);
     return NextResponse.json({ message: "Journal deleted" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

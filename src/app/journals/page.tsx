@@ -534,18 +534,11 @@ export default function JournalsPage() {
                         month: 'short',
                         day: 'numeric'
                       });
-                      const displayTime = dateObj.toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
 
                       return (
                         <TableRow key={jnl.id}>
                           <TableCell className="font-medium" suppressHydrationWarning>
-                            <div className="flex flex-col">
-                              <span>{displayDate}</span>
-                              <span className="text-[10px] text-neutral-400 font-mono">{displayTime}</span>
-                            </div>
+                            {displayDate}
                           </TableCell>
                           <TableCell className="max-w-[200px] break-words whitespace-normal">{jnl.description}</TableCell>
                           <TableCell>৳{amountDisp}</TableCell>

@@ -82,6 +82,60 @@ const migrations: Migration[] = [
         }
       }
     }
+  },
+  {
+    id: 3,
+    name: "Normalize journal dates to YYYY-MM-DD",
+    up: async (db: any) => {
+      const { ScanCommand, PutCommand, DeleteCommand } = require("@aws-sdk/lib-dynamodb");
+
+      console.log("Scanning for JournalEntry and JournalLine items...");
+      const result = await db.send(new ScanCommand({
+        TableName: TABLE_NAME,
+        FilterExpression: "#type IN (:t1, :t2)",
+        ExpressionAttributeNames: { "#type": "Type" },
+        ExpressionAttributeValues: { ":t1": "JournalEntry", ":t2": "JournalLine" }
+      }));
+
+      const items = result.Items || [];
+      console.log(`Found ${items.length} journal items to check.`);
+
+      for (const item of items) {
+        if (!item.date || item.date.length <= 10) continue;
+
+        const oldDate = item.date;
+        const newDate = oldDate.slice(0, 10);
+        const oldSk = item.SK;
+        let newSk = oldSk;
+
+        if (item.Type === "JournalEntry") {
+          newSk = `JNL#${newDate}#${item.id}`;
+        } else if (item.Type === "JournalLine") {
+          // SK for LINE is LINE#journalId#accountId, which DOES NOT contain the date.
+          // However, GSI1SK for LINE contains the date.
+          if (item.GSI1SK) {
+            item.GSI1SK = `JNL#${newDate}#${item.journalId}`;
+          }
+        }
+
+        item.date = newDate;
+
+        // For JournalEntry, the SK changed, so we must Delete old and Put new.
+        if (item.Type === "JournalEntry" && newSk !== oldSk) {
+          await db.send(new DeleteCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: item.PK, SK: oldSk }
+          }));
+          item.SK = newSk;
+        }
+
+        await db.send(new PutCommand({
+          TableName: TABLE_NAME,
+          Item: item
+        }));
+        console.log(`- Normalized ${item.Type} ${item.id || item.journalId} from ${oldDate} to ${newDate}`);
+      }
+    }
   }
 ];
 
