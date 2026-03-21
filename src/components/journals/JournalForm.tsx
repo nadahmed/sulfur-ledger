@@ -195,14 +195,6 @@ export function JournalForm({
             className={errors.amount ? "border-red-500" : ""}
           />
         </div>
-        <div className="grid flex-1 items-center gap-1.5">
-          <Label htmlFor="notes">Notes (Optional)</Label>
-          <Input 
-            id="notes" 
-            {...register("notes")} 
-            placeholder="Additional details..." 
-          />
-        </div>
       </div>
 
       <div className="flex gap-4">

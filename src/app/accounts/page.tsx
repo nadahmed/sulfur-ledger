@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, ArchiveRestore, AlertCircle } from "lucide-react";
+import { Trash2, ArchiveRestore, AlertCircle, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,6 +53,9 @@ export default function AccountsPage() {
     actionLabel?: string;
     variant?: "default" | "destructive";
   } | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   const isLoading = isUserLoading || isOrgLoading;
 
@@ -171,6 +174,29 @@ export default function AccountsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       toast.success("Account unarchived successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const updateNameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await fetch(`/api/accounts?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update account name");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success("Account name updated successfully");
     },
     onError: (error) => {
       toast.error(error.message);
@@ -337,7 +363,55 @@ export default function AccountsPage() {
               <TableBody>
                 {accounts.map((acc) => (
                   <TableRow key={acc.id} className={acc.status === "archived" ? "opacity-50 line-through" : ""}>
-                    <TableCell className="font-medium">{acc.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {editingId === acc.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input 
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="h-8 py-1"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") updateNameMutation.mutate({ id: acc.id, name: editName });
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            autoFocus
+                          />
+                          <Button 
+                            size="sm" 
+                            className="h-7 px-2" 
+                            onClick={() => updateNameMutation.mutate({ id: acc.id, name: editName })}
+                            disabled={updateNameMutation.isPending}
+                          >
+                            Save
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 px-2" 
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="group flex items-center gap-2">
+                          <span>{acc.name}</span>
+                          {canManage && acc.status === "active" && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                setEditingId(acc.id);
+                                setEditName(acc.name);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="capitalize">{acc.category}</TableCell>
                     <TableCell>{new Date(acc.createdAt).toLocaleDateString()}</TableCell>
                     {canManage && (

@@ -10,7 +10,6 @@ export interface JournalEntry {
   id: string; // UUID
   date: string; // ISO 8601 (e.g., YYYY-MM-DDTHH:mm:ss.sssZ) for sequencing
   description: string;
-  notes?: string;
   tags?: string[];
   createdAt: string;
 }

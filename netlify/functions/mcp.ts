@@ -502,11 +502,10 @@ DON'Ts:
         amount: z.number().positive().describe("Transaction amount in Taka — must be greater than 0. e.g. 500.00"),
         fromAccountId: z.string().describe("Source account ID (money comes FROM here — will be credited). Get IDs from get_accounts."),
         toAccountId: z.string().describe("Destination account ID (money goes TO here — will be debited). Get IDs from get_accounts."),
-        notes: z.string().optional().describe("Optional internal notes or reference numbers"),
         tags: z.array(z.string()).optional().describe("Optional tags for grouping (e.g. ['payroll', 'monthly'])")
       }
     },
-    async ({ date: dateInput, description, amount, fromAccountId, toAccountId, notes, tags }) => {
+    async ({ date: dateInput, description, amount, fromAccountId, toAccountId, tags }) => {
       try {
         // Validate accounts exist and are active
         const accs = await accountsDb.getAccounts(orgId);
@@ -551,7 +550,6 @@ DON'Ts:
           id,
           date: finalDate,
           description: `[AI] ${description}`,
-          notes,
           tags,
           createdAt: new Date().toISOString()
         };
@@ -608,7 +606,6 @@ Returns a summary of successes and any errors per entry.`,
           amount: z.number().positive().describe("Amount in Taka, must be > 0"),
           fromAccountId: z.string().describe("Source/credit account ID"),
           toAccountId: z.string().describe("Destination/debit account ID"),
-          notes: z.string().optional(),
           tags: z.array(z.string()).optional()
         }))
       }
@@ -650,7 +647,6 @@ Returns a summary of successes and any errors per entry.`,
             id,
             date: finalDate,
             description: `[AI-Bulk] ${entryInput.description}`,
-            notes: entryInput.notes,
             tags: entryInput.tags,
             createdAt: new Date().toISOString()
           };
@@ -699,18 +695,16 @@ DON'Ts:
         id: z.string().describe("Journal entry ID (get from get_journals)"),
         oldDate: z.string().describe("The current date of the entry in YYYY-MM-DD format"),
         description: z.string().optional().describe("New description (replaces existing)"),
-        notes: z.string().optional().describe("New notes (replaces existing)"),
         tags: z.array(z.string()).optional().describe("New tags array (replaces existing)"),
         amount: z.number().positive().optional().describe("New amount in Taka (must be > 0). Requires fromAccountId and toAccountId too."),
         fromAccountId: z.string().optional().describe("New source/credit account ID"),
         toAccountId: z.string().optional().describe("New destination/debit account ID"),
       }
     },
-    async ({ id, oldDate, description, notes, tags, amount, fromAccountId, toAccountId }) => {
+    async ({ id, oldDate, description, tags, amount, fromAccountId, toAccountId }) => {
       try {
         const updates: any = {};
         if (description) updates.description = `[AI-Edit] ${description}`;
-        if (notes !== undefined) updates.notes = notes;
         if (tags) updates.tags = tags;
         updates.date = oldDate;
 
@@ -745,7 +739,7 @@ DON'Ts:
           ];
         } else {
           return { 
-            content: [{ type: "text", text: "Error: You must provide at least one of: description, notes, tags, or the full amount+fromAccountId+toAccountId set." }], 
+            content: [{ type: "text", text: "Error: You must provide at least one of: description, tags, or the full amount+fromAccountId+toAccountId set." }], 
             isError: true 
           };
         }

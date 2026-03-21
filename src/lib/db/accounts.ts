@@ -169,3 +169,37 @@ export async function unarchiveAccount(orgId: string, accountId: string, userId?
   }
 }
 
+export async function updateAccountName(orgId: string, accountId: string, name: string, userId?: string, userName?: string) {
+  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+  await db.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}#ACCOUNT`,
+        SK: `ACC#${accountId}`,
+      },
+      UpdateExpression: "SET #name = :name",
+      ExpressionAttributeNames: {
+        "#name": "name",
+      },
+      ExpressionAttributeValues: {
+        ":name": name,
+      },
+    })
+  );
+
+  if (userId) {
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "update",
+      entityType: "Account",
+      entityId: accountId,
+      details: JSON.stringify({ newName: name }),
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+

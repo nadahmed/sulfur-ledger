@@ -116,7 +116,6 @@ export async function importJournalsFromCsv(orgId: string, csvContent: string) {
       id: journalId,
       date,
       description: desc,
-      notes: notes || undefined,
       createdAt: new Date().toISOString(),
     };
 

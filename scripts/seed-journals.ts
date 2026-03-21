@@ -128,7 +128,6 @@ async function run() {
       id: journalId,
       date,
       description: desc,
-      notes: notes || undefined,
       createdAt: new Date().toISOString(),
     };
 

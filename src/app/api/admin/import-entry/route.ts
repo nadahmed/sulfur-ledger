@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { date, description, amount: amountStr, from, to, notes } = await req.json();
+    const { date, description, amount: amountStr, from, to } = await req.json();
 
     if (!date || !amountStr || !from || !to) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
       id: journalId,
       date: entryDate,
       description: description || "Imported Entry",
-      notes: notes || undefined,
       createdAt: new Date().toISOString(),
     };
 

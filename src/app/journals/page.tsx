@@ -37,7 +37,6 @@ interface JournalEntry {
   id: string;
   date: string;
   description: string;
-  notes?: string;
   tags?: string[];
   createdAt: string;
   lines: { accountId: string; amount: number; date: string }[];
@@ -102,7 +101,6 @@ export default function JournalsPage() {
   const initialFormValues = useMemo(() => ({
     date: todayLocal,
     description: "",
-    notes: "",
     amount: "",
     fromAccountId: "",
     toAccountId: "",
@@ -222,7 +220,6 @@ export default function JournalsPage() {
     return {
       date: editingEntry.date.slice(0, 10),
       description: editingEntry.description,
-      notes: editingEntry.notes || "",
       amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
       fromAccountId: creditLine?.accountId || "",
       toAccountId: debitLine?.accountId || "",
@@ -314,7 +311,6 @@ export default function JournalsPage() {
                       <TableHead>Amount</TableHead>
                       <TableHead>From Account</TableHead>
                       <TableHead>To Account</TableHead>
-                      <TableHead>Notes</TableHead>
                       <TableHead>Tags</TableHead>
                       {(canUpdate || canDelete) && <TableHead className="w-[50px]"></TableHead>}
                     </TableRow>
@@ -344,7 +340,6 @@ export default function JournalsPage() {
                           <TableCell>৳{amountDisp}</TableCell>
                           <TableCell>{fromAcc}</TableCell>
                           <TableCell>{toAcc}</TableCell>
-                          <TableCell className="max-w-[180px] break-words whitespace-normal text-xs text-neutral-500">{jnl.notes || "-"}</TableCell>
                           <TableCell className="max-w-[180px]">
                             <div className="flex flex-wrap gap-1">
                               {jnl.tags && jnl.tags.length > 0 ? (
@@ -390,7 +385,7 @@ export default function JournalsPage() {
                     })}
                     {journals.length === 0 && !isFetchingJournals && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-4 text-neutral-500">No journals found</TableCell>
+                        <TableCell colSpan={7} className="text-center py-4 text-neutral-500">No journals found</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

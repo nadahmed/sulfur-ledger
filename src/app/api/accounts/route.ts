@@ -175,7 +175,21 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ message: "Account unarchived successfully." });
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    const { name } = await req.json();
+    if (name) {
+      const { updateAccountName, getAccounts } = require("@/lib/db/accounts");
+      
+      // Check for duplicate names
+      const existingAccounts = await getAccounts(orgId);
+      if (existingAccounts.some((a: any) => a.id !== accountId && a.name.toLowerCase() === name.toLowerCase())) {
+        return NextResponse.json({ error: "An account with this name already exists" }, { status: 400 });
+      }
+
+      await updateAccountName(orgId, accountId, name, user!.sub, user!.name);
+      return NextResponse.json({ message: "Account name updated successfully." });
+    }
+
+    return NextResponse.json({ error: "Invalid action or missing name" }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
