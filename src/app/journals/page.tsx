@@ -8,14 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { JournalEntrySchema, JournalEntryFormValues, JournalEntryFormInput } from "@/lib/schemas";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ChevronsUpDown, Check, Pencil, Trash2, MoreVertical, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { JournalEntryFormValues } from "@/lib/schemas";
+import { Pencil, Trash2, MoreVertical } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -30,6 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { JournalForm } from "@/components/journals/JournalForm";
 
 interface JournalEntry {
   id: string;
@@ -46,72 +48,16 @@ interface Account {
   name: string;
 }
 
-interface SearchableSelectProps {
-  options: { id: string; name: string }[];
-  value: string;
-  onValueChange: (value: string) => void;
-  placeholder: string;
-  error?: boolean;
-}
-
-function SearchableSelect({ options, value, onValueChange, placeholder, error }: SearchableSelectProps) {
-  const [open, setOpen] = useState(false);
-  const selectedOption = options.find((opt) => opt.id === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        role="combobox"
-        aria-expanded={open}
-        className={cn(
-          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-          !selectedOption && "text-neutral-500",
-          error && "border-red-500"
-        )}
-      >
-        {selectedOption ? selectedOption.name : placeholder}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
-          <CommandList>
-            <CommandEmpty>No account found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={option.name}
-                  onSelect={() => {
-                    onValueChange(option.id === value ? "" : option.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export default function JournalsPage() {
   const { user, isLoading: isUserLoading } = useUser();
   const { activeOrganizationId, permissions, isOwner, isLoading: isOrgLoading } = useOrganization();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filterDate, setFilterDate] = useState<string>("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [oldDate, setOldDate] = useState<string | null>(null);
+  
+  // Edit Dialog State
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
@@ -161,7 +107,7 @@ export default function JournalsPage() {
     fromAccountId: "",
     toAccountId: "",
     tags: "" as any,
-  }), []);
+  }), [todayLocal]);
 
   const {
     data: journalData,
@@ -189,17 +135,6 @@ export default function JournalsPage() {
     return journalData?.pages.flatMap((page) => page.data) || [];
   }, [journalData]);
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    formState: { errors },
-  } = useForm<JournalEntryFormInput>({
-    resolver: zodResolver(JournalEntrySchema),
-    defaultValues: initialFormValues,
-  });
-
   const postMutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
       const res = await fetch("/api/journals", {
@@ -214,7 +149,6 @@ export default function JournalsPage() {
       return res.json();
     },
     onSuccess: () => {
-      reset(initialFormValues);
       queryClient.invalidateQueries({ queryKey: ["journals"] });
       toast.success("Journal entry recorded successfully");
     },
@@ -237,9 +171,8 @@ export default function JournalsPage() {
       return res.json();
     },
     onSuccess: () => {
-      reset(initialFormValues);
-      setEditingId(null);
-      setOldDate(null);
+      setEditingEntry(null);
+      setIsEditDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["journals"] });
       toast.success("Journal entry updated successfully");
     },
@@ -267,43 +200,9 @@ export default function JournalsPage() {
     },
   });
 
-  const onSubmit = (values: any) => {
-    if (editingId) {
-      patchMutation.mutate({
-        ...values,
-        id: editingId,
-        oldDate: oldDate,
-      });
-    } else {
-      postMutation.mutate(values as JournalEntryFormValues);
-    }
-  };
-
   const handleEdit = (jnl: JournalEntry) => {
-    const debitLine = jnl.lines?.find((l: any) => l.amount > 0);
-    const creditLine = jnl.lines?.find((l: any) => l.amount < 0);
-    
-    setEditingId(jnl.id);
-    setOldDate(jnl.date);
-    
-    reset({
-      date: jnl.date.slice(0, 10),
-      description: jnl.description,
-      notes: jnl.notes || "",
-      amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
-      fromAccountId: creditLine?.accountId || "",
-      toAccountId: debitLine?.accountId || "",
-      tags: (jnl.tags || []).join(", "),
-    });
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    toast.info("Editing transaction...");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setOldDate(null);
-    reset(initialFormValues);
+    setEditingEntry(jnl);
+    setIsEditDialogOpen(true);
   };
 
   const handleDelete = (id: string, date: string) => {
@@ -314,6 +213,22 @@ export default function JournalsPage() {
       onConfirm: () => deleteMutation.mutate({ id, date }),
     });
   };
+
+  const editingInitialValues = useMemo(() => {
+    if (!editingEntry) return null;
+    const debitLine = editingEntry.lines?.find((l: any) => l.amount > 0);
+    const creditLine = editingEntry.lines?.find((l: any) => l.amount < 0);
+    
+    return {
+      date: editingEntry.date.slice(0, 10),
+      description: editingEntry.description,
+      notes: editingEntry.notes || "",
+      amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
+      fromAccountId: creditLine?.accountId || "",
+      toAccountId: debitLine?.accountId || "",
+      tags: (editingEntry.tags || []).join(", "),
+    };
+  }, [editingEntry]);
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -342,130 +257,18 @@ export default function JournalsPage() {
         <Card className="mb-8 font-sans border-blue-100 shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
-              {editingId ? (
-                <>
-                  <Pencil className="h-5 w-5 text-blue-500" />
-                  Edit Transaction
-                </>
-              ) : (
-                "Record Transaction"
-              )}
+              Record Transaction
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="grid w-full md:w-[150px] items-center gap-1.5">
-                  <Label htmlFor="date">Date</Label>
-                  <Input 
-                    id="date" 
-                    type="date" 
-                    {...register("date")} 
-                    className={errors.date ? "border-red-500" : ""}
-                  />
-                </div>
-                <div className="grid flex-1 items-center gap-1.5">
-                  <Label htmlFor="description">Description</Label>
-                  <Input 
-                    id="description" 
-                    {...register("description")} 
-                    placeholder="Transaction description..." 
-                    className={errors.description ? "border-red-500" : ""}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="grid flex-1 items-center gap-1.5">
-                  <Label htmlFor="fromAccountId">From Account (Credit)</Label>
-                  <Controller
-                    name="fromAccountId"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchableSelect
-                        options={accounts}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select Credit Account"
-                        error={!!errors.fromAccountId}
-                      />
-                    )}
-                  />
-                </div>
-                <div className="grid flex-1 items-center gap-1.5">
-                  <Label htmlFor="toAccountId">To Account (Debit)</Label>
-                  <Controller
-                    name="toAccountId"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchableSelect
-                        options={accounts}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Select Debit Account"
-                        error={!!errors.toAccountId}
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="grid w-full md:w-[150px] items-center gap-1.5">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01" 
-                    min="0.01" 
-                    id="amount" 
-                    {...register("amount")} 
-                    placeholder="0.00" 
-                    className={errors.amount ? "border-red-500" : ""}
-                  />
-                </div>
-                <div className="grid flex-1 items-center gap-1.5">
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Input 
-                    id="notes" 
-                    {...register("notes")} 
-                    placeholder="Additional details..." 
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="grid flex-1 items-center gap-1.5">
-                  <Label htmlFor="tags">Tags (Optional, comma-separated)</Label>
-                  <Input 
-                    id="tags" 
-                    {...register("tags")} 
-                    placeholder="e.g. marketing, software, monthly" 
-                  />
-                </div>
-              </div>
-
-               <div className="flex gap-3">
-                <Button type="submit" className="flex-1" disabled={postMutation.isPending || patchMutation.isPending}>
-                  {editingId 
-                    ? (patchMutation.isPending ? "Updating..." : "Update Journal") 
-                    : (postMutation.isPending ? "Posting..." : "Post Journal")
-                  }
-                </Button>
-                {editingId && (
-                  <Button type="button" variant="outline" onClick={cancelEdit}>
-                    Cancel
-                  </Button>
-                )}
-              </div>
-
-              {Object.keys(errors).length > 0 && (
-                 <div className="text-red-500 text-sm flex flex-col gap-1">
-                    {Object.values(errors).map((err, i) => (
-                      <p key={i}>{typeof err?.message === 'string' ? err.message : 'Invalid input'}</p>
-                    ))}
-                 </div>
-              )}
-            </form>
+            <JournalForm
+              key="create-form"
+              accounts={accounts}
+              initialValues={initialFormValues}
+              onSubmit={(values) => postMutation.mutate(values as JournalEntryFormValues)}
+              isPending={postMutation.isPending}
+              submitLabel="Post Journal"
+            />
           </CardContent>
         </Card>
       )}
@@ -524,9 +327,6 @@ export default function JournalsPage() {
                       const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
                       const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
 
-                      // jnl.date is stored as a full UTC ISO string (e.g. "2026-03-21T22:58:37.000Z").
-                      // Slicing to YYYY-MM-DD and appending T00:00:00 forces local-midnight parsing,
-                      // so the displayed date always matches what the user selected.
                       const datePart = jnl.date.slice(0, 10);
                       const dateObj = new Date(`${datePart}T00:00:00`);
                       const displayDate = dateObj.toLocaleDateString(undefined, {
@@ -564,9 +364,7 @@ export default function JournalsPage() {
                           {(canUpdate || canDelete) && (
                             <TableCell>
                               <DropdownMenu>
-                                <DropdownMenuTrigger 
-                                  render={<Button variant="ghost" size="icon" className="h-8 w-8" />}
-                                >
+                                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
                                   <MoreVertical className="h-4 w-4" />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -592,7 +390,7 @@ export default function JournalsPage() {
                     })}
                     {journals.length === 0 && !isFetchingJournals && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-neutral-500">No journals found</TableCell>
+                        <TableCell colSpan={8} className="text-center py-4 text-neutral-500">No journals found</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -615,6 +413,30 @@ export default function JournalsPage() {
         </CardContent>
       </Card>
 
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {editingInitialValues && (
+            <JournalForm
+              key={`edit-form-${editingEntry?.id}`}
+              accounts={accounts}
+              initialValues={editingInitialValues}
+              onSubmit={(values) => patchMutation.mutate({
+                ...values,
+                id: editingEntry?.id,
+                oldDate: editingEntry?.date,
+              })}
+              onCancel={() => setIsEditDialogOpen(false)}
+              isPending={patchMutation.isPending}
+              submitLabel="Update Journal"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {confirmConfig && (
         <AlertDialog 
           open={confirmConfig.open} 
@@ -628,11 +450,11 @@ export default function JournalsPage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction 
-                variant="destructive" 
                 onClick={() => {
                   confirmConfig.onConfirm();
                   setConfirmConfig(null);
                 }}
+                className="bg-red-600 hover:bg-red-700"
               >
                 Delete
               </AlertDialogAction>
