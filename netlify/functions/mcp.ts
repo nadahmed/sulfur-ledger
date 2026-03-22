@@ -263,7 +263,14 @@ DON'Ts:
     },
     async ({ startDate, endDate }) => {
       const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate);
-      const simplifiedEntries = entries.map((e: any) => ({
+      
+      // Fetch lines for all entries in parallel
+      const enrichedEntries = await Promise.all(entries.map(async (e) => {
+        const lines = await journalsDb.getJournalLinesForJournal(orgId, e.id);
+        return { ...e, lines };
+      }));
+
+      const simplifiedEntries = enrichedEntries.map((e: any) => ({
         id: e.id,
         date: e.date.slice(0, 10),
         description: e.description,
@@ -307,7 +314,14 @@ DON'Ts:
       const filtered = entries.filter(e => 
         e.tags && tags.some(t => e.tags!.includes(t))
       );
-      const simplified = filtered.map((e: any) => ({
+
+      // Fetch lines for filtered entries
+      const enriched = await Promise.all(filtered.map(async (e) => {
+        const lines = await journalsDb.getJournalLinesForJournal(orgId, e.id);
+        return { ...e, lines };
+      }));
+
+      const simplified = enriched.map((e: any) => ({
         id: e.id,
         date: e.date.slice(0, 10),
         description: e.description,
@@ -396,11 +410,9 @@ DON'Ts:
       let totalExpenses = 0;
 
       for (const entry of entries) {
-        const { data } = await journalsDb.getJournalEntriesWithLines(orgId, 1, undefined, entry.date.slice(0, 10));
-        const detailedEntry = data.find(d => d.id === entry.id);
-        if (!detailedEntry) continue;
+        const lines = await journalsDb.getJournalLinesForJournal(orgId, entry.id);
 
-        for (const line of detailedEntry.lines) {
+        for (const line of lines) {
           const cat = catMap.get(line.accountId);
           if (cat === "income") {
             totalIncome -= line.amount;
@@ -737,14 +749,9 @@ DON'Ts:
             { orgId, journalId: id, accountId: toAccountId, amount: amountPaisa, date: oldDate },
             { orgId, journalId: id, accountId: fromAccountId, amount: -amountPaisa, date: oldDate }
           ];
-        } else {
-          return { 
-            content: [{ type: "text", text: "Error: You must provide at least one of: description, tags, or the full amount+fromAccountId+toAccountId set." }], 
-            isError: true 
-          };
         }
 
-        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines, "mcp-user", "MCP/AI");
+        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines.length > 0 ? finalLines : undefined, "mcp-user", "MCP/AI");
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} updated successfully.` }]
         };

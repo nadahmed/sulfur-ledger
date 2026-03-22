@@ -218,6 +218,20 @@ export async function getAccountLines(orgId: string, accountId: string, startDat
   return (result.Items as unknown as JournalLine[]) || [];
 }
 
+export async function getJournalLinesForJournal(orgId: string, journalId: string): Promise<JournalLine[]> {
+  const result = await db.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+      ExpressionAttributeValues: {
+        ":pk": `ORG#${orgId}#JOURNAL`,
+        ":skPrefix": `LINE#${journalId}#`,
+      },
+    })
+  );
+  return (result.Items as unknown as JournalLine[]) || [];
+}
+
 export async function deleteJournalEntry(orgId: string, entryId: string, date: string, userId: string, userName?: string) {
   // 1. Get lines to delete (PK=ORG#ID#JOURNAL, SK=LINE#ID#)
   const pk = `ORG#${orgId}#JOURNAL`;
@@ -283,29 +297,19 @@ export async function updateJournalEntry(
   entryId: string,
   oldDate: string,
   newEntry: Partial<JournalEntry>,
-  newLines: JournalLine[],
+  newLines: JournalLine[] = [],
   userId: string,
   userName?: string
 ) {
   // Simplest way is to delete old and create new in a single transaction if date changed,
   // or just update if date is same. To keep it robust, let's treat it as a replacement of lines.
 
-  // 1. Get existing lines
+  // 1. Get existing lines (only if we are updating lines or if we need them for deletion logic)
+  // Actually, we always need them if we are replacing the line set.
   const pk = `ORG#${orgId}#JOURNAL`;
-  const oldLinesResult = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": pk,
-        ":skPrefix": `LINE#${entryId}#`,
-      },
-    })
-  );
-  const oldLines = oldLinesResult.Items || [];
 
   // Deduplicate and merge new lines
-  const mergedNewLines = mergeDuplicateAccountLines(newLines);
+  const mergedNewLines = newLines.length > 0 ? mergeDuplicateAccountLines(newLines) : [];
   const newAccountIds = new Set(mergedNewLines.map(l => l.accountId));
 
   const transactItems: TransactWriteItem[] = [];
@@ -338,32 +342,46 @@ export async function updateJournalEntry(
   // 2. Handle Lines: Delete old lines that are NO LONGER in the entry
   // For lines that persist (even if amount changes), we only need a Put.
   // DynamoDB transaction fails if an item has both Delete and Put.
-  for (const line of oldLines) {
-    if (!newAccountIds.has(line.accountId)) {
+  if (newLines.length > 0) {
+    const oldLinesResult = await db.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+        ExpressionAttributeValues: {
+          ":pk": pk,
+          ":skPrefix": `LINE#${entryId}#`,
+        },
+      })
+    );
+    const oldLines = oldLinesResult.Items || [];
+
+    for (const line of oldLines) {
+      if (!newAccountIds.has(line.accountId)) {
+        transactItems.push({
+          Delete: {
+            TableName: TABLE_NAME,
+            Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
+          },
+        });
+      }
+    }
+
+    // 3. Add/Update new lines
+    for (const line of mergedNewLines) {
       transactItems.push({
-        Delete: {
+        Put: {
           TableName: TABLE_NAME,
-          Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
+          Item: marshall({
+            PK: pk,
+            SK: `LINE#${entryId}#${line.accountId}`,
+            Type: "JournalLine",
+            GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
+            GSI1SK: `JNL#${line.date}#${line.journalId}`,
+            ...line,
+          }, { removeUndefinedValues: true }),
         },
       });
     }
-  }
-
-  // 3. Add/Update new lines
-  for (const line of mergedNewLines) {
-    transactItems.push({
-      Put: {
-        TableName: TABLE_NAME,
-        Item: marshall({
-          PK: pk,
-          SK: `LINE#${entryId}#${line.accountId}`,
-          Type: "JournalLine",
-          GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
-          GSI1SK: `JNL#${line.date}#${line.journalId}`,
-          ...line,
-        }, { removeUndefinedValues: true }),
-      },
-    });
   }
 
   const { dynamoDBClient } = require("../dynamodb");
