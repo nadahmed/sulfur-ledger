@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useOrganization } from "@/context/OrganizationContext";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw } from "lucide-react";
+import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
@@ -74,7 +74,7 @@ const parseCSV = (csv: string) => {
 };
 
 export default function SettingsPage() {
-  const { user, isLoading: isUserLoading } = useUser();
+  const { user, isLoading: isUserLoading } = useAuthGuard();
   const { 
     activeOrganizationId, 
     organizations, 
@@ -376,6 +376,10 @@ export default function SettingsPage() {
 
   const watchMcpTtl = watchMcp("ttlDays");
   const [copied, setCopied] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isExportingJson, setIsExportingJson] = useState(false);
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [isImportingJson, setIsImportingJson] = useState(false);
 
   const watchProvider = watchEmail("provider");
 
@@ -897,15 +901,15 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label>Claude Desktop Configuration</Label>
+                    <Label>MCP Server Configuration</Label>
                     <div className="relative">
                       <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
 {`{
   "mcpServers": {
-    "sulfur-ledger": {
-      "command": "npx",
-      "args": ["-y", "-p", "@thefoot/mcp-stdio-http-bridge", "mcp-bridge", "--url", "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp"],
-      "env": {
+    "${activeOrg?.name || "sulfur"}-ledger": {
+      "url": "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp",
+      "transport": "http",
+      "headers": {
         "x-mcp-key": "${mcpSettings.mcpApiKey}"
       }
     }
@@ -919,10 +923,10 @@ export default function SettingsPage() {
                         onClick={() => {
                           const config = {
                             mcpServers: {
-                              "sulfur-ledger": {
-                                command: "npx",
-                                args: ["-y", "-p", "@thefoot/mcp-stdio-http-bridge", "mcp-bridge", "--url", `${window.location.origin}/api/mcp`],
-                                env: {
+                              [`${activeOrg?.name || "sulfur"}-ledger`]: {
+                                url: `${window.location.origin}/api/mcp`,
+                                transport: "http",
+                                headers: {
                                   "x-mcp-key": mcpSettings.mcpApiKey
                                 }
                               }
@@ -936,7 +940,7 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                     <p className="text-xs text-neutral-500">
-                      Add this snippet to your <code>claude_desktop_config.json</code> to enable AI access to this organization's data.
+                      Add this snippet to your MCP client configuration (e.g. <code>mcp_config.json</code>) to enable AI access to this organization's data.
                     </p>
                   </div>
 
@@ -978,7 +982,7 @@ export default function SettingsPage() {
                   <div className="max-w-md">
                     <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
                     <p className="text-neutral-500 text-sm mt-2">
-                      Enable AI tools for this organization. Generate a secure API key to connect Claude or other MCP-compatible agents.
+                      Enable AI tools for this organization. Generate a secure API key to connect your MCP-compatible agents.
                     </p>
                   </div>
                   {canManage && (
@@ -1017,99 +1021,259 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="data" className="space-y-8 mt-6">
-          <Card className="shadow-lg border-neutral-200">
-            <CardHeader>
-              <CardTitle>Import & Export</CardTitle>
-              <CardDescription>Import journal entries from a CSV file or download a sample template.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-wrap gap-4">
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="csv-upload"
-                    className="hidden"
-                    accept=".csv"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      const reader = new FileReader();
-                      reader.onload = async (evt) => {
-                        const csvContent = evt.target?.result as string;
-                        try {
-                          const records = parseCSV(csvContent);
-                          if (records.length === 0) {
-                            toast.error("No records found in CSV.");
-                            return;
-                          }
-
-                          toast.info("Importing entries...");
-
-                          const accountNames = Array.from(new Set(records.flatMap((r: any) => [r["From (Source)"], r["To (Destination)"]]).filter(Boolean)));
-                          await fetch("/api/admin/ensure-accounts", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ accountNames })
-                          });
-
-                          for (let i = 0; i < records.length; i++) {
-                            const record = records[i];
-                            const res = await fetch("/api/admin/import-entry", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                date: record["Date"],
-                                description: record["Description"],
-                                amount: record["Amount"],
-                                from: record["From (Source)"],
-                                to: record["To (Destination)"],
-                                notes: record["Notes"]
-                              })
-                            });
-
-                            if (!res.ok) {
-                              const err = await res.json();
-                              throw new Error(err.error || "Failed to import entry");
-                            }
-                          }
-
-                          toast.success("Import complete!");
-                          setTimeout(() => window.location.reload(), 1500);
-
-                        } catch (err: any) {
-                          toast.error(`Import error: ${err.message}`);
-                        }
-                      };
-                      reader.readAsText(file);
-                    }}
-                  />
-                  <Button 
-                    variant="outline" 
-                    onClick={() => document.getElementById("csv-upload")?.click()}
-                  >
-                    Import Journals from CSV
-                  </Button>
+          <div className="grid gap-8">
+            <Card className="shadow-lg border-neutral-200">
+              <CardHeader>
+                <div className="flex items-center gap-2 text-blue-600 mb-1">
+                  <FileSpreadsheet className="w-5 h-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Spreadsheet Interoperability</span>
                 </div>
+                <CardTitle>CSV Data Management</CardTitle>
+                <CardDescription>
+                  Best for viewing, editing in Excel/Google Sheets, or importing data from other ledger tools.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                    <div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-neutral-400" />
+                        Import from CSV
+                      </h4>
+                      <p className="text-xs text-neutral-500 mt-1">Upload your ledger entries from a formatted CSV file.</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="file"
+                        id="csv-upload"
+                        className="hidden"
+                        accept=".csv"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsImportingCsv(true);
+                          const reader = new FileReader();
+                          reader.onload = async (evt) => {
+                            const csvContent = evt.target?.result as string;
+                            try {
+                              const records = parseCSV(csvContent);
+                              if (records.length === 0) {
+                                toast.error("No records found in CSV.");
+                                return;
+                              }
+                              toast.info(`Parsing ${records.length} records...`);
+                              const accountNames = Array.from(new Set(records.flatMap((r: any) => [r["From (Source)"], r["To (Destination)"]]).filter(Boolean)));
+                              await fetch("/api/admin/ensure-accounts", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ accountNames })
+                              });
+                              for (let i = 0; i < records.length; i++) {
+                                await fetch("/api/admin/import-entry", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    date: records[i]["Date"],
+                                    description: records[i]["Description"],
+                                    amount: records[i]["Amount"],
+                                    from: records[i]["From (Source)"],
+                                    to: records[i]["To (Destination)"],
+                                    notes: records[i]["Notes"]
+                                  })
+                                });
+                              }
+                              toast.success("CSV Import complete!");
+                              setTimeout(() => window.location.reload(), 1000);
+                            } catch (err: any) {
+                              toast.error(`Import error: ${err.message}`);
+                            } finally {
+                              setIsImportingCsv(false);
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start h-12"
+                        disabled={isImportingCsv}
+                        onClick={() => document.getElementById("csv-upload")?.click()}
+                      >
+                        {isImportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                        {isImportingCsv ? "Importing..." : "Choose CSV File"}
+                      </Button>
+                      <a href="/sample-journals.csv" download className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-medium pl-1">
+                        <Download className="w-3 h-3" /> Download Sample Template
+                      </a>
+                    </div>
+                  </div>
 
-                <a href="/sample-journals.csv" download>
-                  <Button variant="ghost">
-                    Download Sample CSV
-                  </Button>
-                </a>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                    <div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <Download className="w-4 h-4 text-neutral-400" />
+                        Export to CSV
+                      </h4>
+                      <p className="text-xs text-neutral-500 mt-1">Download entries in a spreadsheet-compatible format.</p>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      className="w-full justify-start h-12"
+                      disabled={isExportingCsv}
+                      onClick={async () => {
+                        try {
+                          setIsExportingCsv(true);
+                          const res = await fetch("/api/admin/export?format=csv", {
+                            headers: { "x-org-id": activeOrganizationId! }
+                          });
+                          if (!res.ok) throw new Error("Export failed");
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `ledger-export-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.csv`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          toast.success("CSV Downloaded!");
+                        } catch (err: any) {
+                          toast.error(`Export failed: ${err.message}`);
+                        } finally {
+                          setIsExportingCsv(false);
+                        }
+                      }}
+                    >
+                      {isExportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+                      {isExportingCsv ? "Generating..." : "Download CSV Spreadsheet"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-lg border-red-200">
-            <CardHeader>
-              <CardTitle className="text-red-600 flex items-center gap-2 font-semibold">Ledger Reset</CardTitle>
-              <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
-            </CardHeader>
-            <CardFooter className="bg-red-50 border-t border-red-100 rounded-b-lg">
-              <Button 
-                variant="destructive" 
-                onClick={() => {
+            <Card className="shadow-lg border-neutral-200">
+              <CardHeader>
+                <div className="flex items-center gap-2 text-purple-600 mb-1">
+                  <FileJson className="w-5 h-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">System Backups & Migration</span>
+                </div>
+                <CardTitle>JSON Data Management</CardTitle>
+                <CardDescription>
+                  Lossless backups. Use this to transfer your entire organization's state to another account or for long-term secure archival.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                    <div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
+                        <RotateCcw className="w-4 h-4 text-purple-400" />
+                        Restore JSON Backup
+                      </h4>
+                      <p className="text-xs text-purple-700 mt-1">Reconstruct your accounts and history from a JSON file.</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="json-import"
+                      className="hidden"
+                      accept=".json"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsImportingJson(true);
+                        const reader = new FileReader();
+                        reader.onload = async (evt) => {
+                          try {
+                            const data = JSON.parse(evt.target?.result as string);
+                            const res = await fetch("/api/admin/import", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", "x-org-id": activeOrganizationId! },
+                              body: JSON.stringify(data)
+                            });
+                            if (!res.ok) throw new Error("Restore failed");
+                            const result = await res.json();
+                            toast.success(result.message);
+                            setTimeout(() => window.location.reload(), 1000);
+                          } catch (err: any) {
+                            toast.error(`Restore failed: ${err.message}`);
+                          } finally {
+                            setIsImportingJson(false);
+                          }
+                        };
+                        reader.readAsText(file);
+                      }}
+                    />
+                    <Button 
+                      variant="secondary" 
+                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
+                      disabled={isImportingJson}
+                      onClick={() => document.getElementById("json-import")?.click()}
+                    >
+                      {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2 text-purple-400" />}
+                      {isImportingJson ? "Restoring..." : "Restore from JSON File"}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                    <div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
+                        <Download className="w-4 h-4 text-purple-400" />
+                        Generate JSON Backup
+                      </h4>
+                      <p className="text-xs text-purple-700 mt-1">Export a complete, structured snapshot of your ledger.</p>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
+                      disabled={isExportingJson}
+                      onClick={async () => {
+                        try {
+                          setIsExportingJson(true);
+                          const res = await fetch("/api/admin/export?format=json", {
+                            headers: { "x-org-id": activeOrganizationId! }
+                          });
+                          const data = await res.json();
+                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `ledger-backup-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          toast.success("Full Backup Generated!");
+                        } catch (err: any) {
+                          toast.error(`Backup failed: ${err.message}`);
+                        } finally {
+                          setIsExportingJson(false);
+                        }
+                      }}
+                    >
+                      {isExportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <FileJson className="w-4 h-4 mr-2 text-purple-400" />}
+                      {isExportingJson ? "Generating..." : "Download Complete Backup"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-red-200">
+              <CardHeader>
+                <div className="flex items-center gap-2 text-red-600 mb-1">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Danger Zone</span>
+                </div>
+                <CardTitle>Ledger Erasure</CardTitle>
+                <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
+              </CardHeader>
+              <CardFooter className="bg-red-50/50 border-t border-red-100 rounded-b-lg p-6">
+                <Button 
+                  variant="destructive" 
+                  className="h-12 px-8"
+                  onClick={() => {
                   setConfirmConfig({
                     open: true,
                     title: "Clear All Ledger Data",
@@ -1136,7 +1300,8 @@ export default function SettingsPage() {
               </Button>
             </CardFooter>
           </Card>
-        </TabsContent>
+        </div>
+      </TabsContent>
       </Tabs>
 
       {confirmConfig && (

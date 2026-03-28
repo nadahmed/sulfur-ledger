@@ -1,9 +1,9 @@
 "use client";
 
-import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
@@ -67,7 +67,7 @@ interface DashboardSummary {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading: isUserLoading } = useUser();
+  const { user, isLoading: isUserLoading } = useAuthGuard();
   const { activeOrganizationId, isLoading: isOrgLoading } = useOrganization();
   const router = useRouter();
   

@@ -101,7 +101,8 @@ export async function importJournalsFromCsv(orgId: string, csvContent: string) {
     const amountStr = record["Amount"]?.trim();
     const fromName = record["From (Source)"]?.trim();
     const toName = record["To (Destination)"]?.trim();
-    const notes = record["Notes"]?.trim();
+    const tagsStr = record["Tags"]?.trim();
+    const notes = record["Notes"]?.trim() || "";
 
     if (!dateStr || !amountStr || !fromName || !toName) continue;
 
@@ -116,6 +117,8 @@ export async function importJournalsFromCsv(orgId: string, csvContent: string) {
       id: journalId,
       date,
       description: desc,
+      tags: tagsStr ? tagsStr.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
+      notes,
       createdAt: new Date().toISOString(),
     };
 

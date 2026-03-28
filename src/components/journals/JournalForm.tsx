@@ -78,10 +78,11 @@ function SearchableSelect({ options, value, onValueChange, placeholder, error }:
 interface JournalFormProps {
   accounts: Account[];
   initialValues: JournalEntryFormInput;
-  onSubmit: (values: any) => void;
+  onSubmit: (values: any) => Promise<void> | void;
   onCancel?: () => void;
   isPending: boolean;
   submitLabel: string;
+  onSuccess?: () => void;
 }
 
 export function JournalForm({
@@ -91,6 +92,7 @@ export function JournalForm({
   onCancel,
   isPending,
   submitLabel,
+  onSuccess,
 }: JournalFormProps) {
   const {
     register,
@@ -98,6 +100,7 @@ export function JournalForm({
     control,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<JournalEntryFormInput>({
     resolver: zodResolver(JournalEntrySchema),
@@ -112,8 +115,18 @@ export function JournalForm({
     setValue("toAccountId", fromAccountId);
   };
 
+  const onSubmitWithReset = async (values: JournalEntryFormInput) => {
+    try {
+      await onSubmit(values);
+      reset(initialValues);
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      // Error handled by parent
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+    <form onSubmit={handleSubmit(onSubmitWithReset)} className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row gap-4">
         <div className="grid w-full md:w-[150px] items-center gap-1.5">
           <Label htmlFor="date">Date</Label>

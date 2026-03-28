@@ -73,17 +73,17 @@ export async function GET(req: NextRequest) {
     }
 
     if (reportType === "summary") {
-      const totalAssets = balances.filter(b => b.category === "asset").reduce((sum, b) => sum + Math.abs(b.balance), 0);
-      const totalIncome = balances.filter(b => b.category === "income").reduce((sum, b) => sum + Math.abs(b.balance), 0);
-      const totalExpenses = balances.filter(b => b.category === "expense").reduce((sum, b) => sum + Math.abs(b.balance), 0);
+      const totalAssets = balances.filter(b => b.category === "asset").reduce((sum, b) => sum + b.balance, 0);
+      const totalIncome = balances.filter(b => b.category === "income").reduce((sum, b) => sum - b.balance, 0);
+      const totalExpenses = balances.filter(b => b.category === "expense").reduce((sum, b) => sum + b.balance, 0);
       const netIncome = totalIncome - totalExpenses;
       return NextResponse.json({ totalAssets, netIncome });
     }
 
     if (reportType === "dashboard") {
-      const totalAssets = balances.filter(b => b.category === "asset").reduce((sum, b) => sum + Math.abs(b.balance), 0);
-      const totalIncome = balances.filter(b => b.category === "income").reduce((sum, b) => sum + Math.abs(b.balance), 0);
-      const totalExpenses = balances.filter(b => b.category === "expense").reduce((sum, b) => sum + Math.abs(b.balance), 0);
+      const totalAssets = balances.filter(b => b.category === "asset").reduce((sum, b) => sum + b.balance, 0);
+      const totalIncome = balances.filter(b => b.category === "income").reduce((sum, b) => sum - b.balance, 0);
+      const totalExpenses = balances.filter(b => b.category === "expense").reduce((sum, b) => sum + b.balance, 0);
       const netIncome = totalIncome - totalExpenses;
       
       const cashAccounts = balances.filter(b => (b.category === "asset") && (b.name?.toLowerCase().includes("cash") || b.name?.toLowerCase().includes("bank")));
@@ -174,9 +174,11 @@ export async function GET(req: NextRequest) {
 
           if (trends[key]) {
             if (incomeIds.has(acc.id)) {
-              trends[key].income += Math.abs(line.amount) / 100;
+              // Income is normally credit (negative), so subtract to make positive
+              trends[key].income -= line.amount / 100;
             } else {
-              trends[key].expense += Math.abs(line.amount) / 100;
+              // Expense is normally debit (positive)
+              trends[key].expense += line.amount / 100;
             }
           }
         });

@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Link from "next/link";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { JournalEntryFormValues } from "@/lib/schemas";
-import { Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, Search, X } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
+import { useDebounce } from "@/hooks/use-debounce";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -53,6 +54,8 @@ export default function JournalsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filterDate, setFilterDate] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   
   // Edit Dialog State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -114,11 +117,12 @@ export default function JournalsPage() {
     isFetchingNextPage,
     isLoading: isFetchingJournals,
   } = useInfiniteQuery({
-    queryKey: ["journals", activeOrganizationId, filterDate],
+    queryKey: ["journals", activeOrganizationId, filterDate, debouncedSearchQuery],
     queryFn: async ({ pageParam }) => {
       let url = "/api/journals?limit=10";
       if (pageParam) url += `&cursor=${encodeURIComponent(pageParam)}`;
       if (filterDate) url += `&date=${encodeURIComponent(filterDate)}`;
+      if (debouncedSearchQuery) url += `&search=${encodeURIComponent(debouncedSearchQuery)}`;
 
       const res = await fetch(url, { headers: { "x-org-id": activeOrganizationId! } });
       if (!res.ok) throw new Error("Failed to fetch journals");
@@ -262,7 +266,7 @@ export default function JournalsPage() {
               key="create-form"
               accounts={accounts}
               initialValues={initialFormValues}
-              onSubmit={(values) => postMutation.mutate(values as JournalEntryFormValues)}
+              onSubmit={(values) => postMutation.mutateAsync(values as JournalEntryFormValues)}
               isPending={postMutation.isPending}
               submitLabel="Post Journal"
             />
@@ -273,24 +277,46 @@ export default function JournalsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
           <CardTitle>Recent Journals</CardTitle>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="filter-date" className="text-sm font-medium">Filter by Date:</Label>
-            <Input 
-              id="filter-date" 
-              type="date" 
-              className="w-40 h-9" 
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-            />
-            {filterDate && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setFilterDate("")}
-              >
-                Clear
-              </Button>
-            )}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+              <Input 
+                placeholder="Search description, amount, accounts, or tags..." 
+                className="pl-9 pr-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-neutral-400"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Label htmlFor="filter-date" className="text-sm font-medium whitespace-nowrap">Filter by Date:</Label>
+              <Input 
+                id="filter-date" 
+                type="date" 
+                className="w-40 h-9" 
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+              />
+              {filterDate && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setFilterDate("")}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -316,7 +342,7 @@ export default function JournalsPage() {
                     </TableRow>
                   </thead>
                   <TableBody>
-                    {journals.map((jnl) => {
+                    {journals.map((jnl: any) => {
                       const debitLine = jnl.lines?.find((l: any) => l.amount > 0);
                       const creditLine = jnl.lines?.find((l: any) => l.amount < 0);
                       const fromAcc = accounts.find(a => a.id === creditLine?.accountId)?.name || "Loading...";

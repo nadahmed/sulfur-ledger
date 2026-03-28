@@ -9,10 +9,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api/auth (auth server routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     * - public files (like sample-journals.csv)
      */
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|sample-journals.csv).*)",
   ],
 };

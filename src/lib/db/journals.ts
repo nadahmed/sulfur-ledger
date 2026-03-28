@@ -1,5 +1,5 @@
 import { TransactWriteItemsCommand, TransactWriteItem } from "@aws-sdk/client-dynamodb";
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { marshall } from "@aws-sdk/util-dynamodb";
 import { uuidv7 } from "uuidv7";
 import { db, TABLE_NAME } from "../dynamodb";
@@ -11,6 +11,7 @@ export interface JournalEntry {
   date: string; // ISO 8601 (e.g., YYYY-MM-DDTHH:mm:ss.sssZ) for sequencing
   description: string;
   tags?: string[];
+  notes?: string;
   createdAt: string;
 }
 
@@ -141,20 +142,135 @@ export async function getJournalEntriesWithLines(
   orgId: string,
   limit = 20,
   cursor?: string,
-  date?: string
+  date?: string,
+  search?: string,
+  matchingAccountIds?: string[]
 ) {
   const pk = `ORG#${orgId}#JOURNAL`;
   const skPrefix = date ? `JNL#${date}` : "JNL#";
 
+  const useScan = !!search;
+
+  if (useScan) {
+    const lowerSearch = search.toLowerCase();
+    const capSearch = search.charAt(0).toUpperCase() + search.slice(1);
+
+    // --- 1. Scan for description/tags matches ---
+    const descTagFilterExpr = `PK = :pk AND begins_with(SK, :skPrefix) AND (contains(description, :search) OR contains(tags, :search) OR contains(description, :lowerSearch) OR contains(tags, :lowerSearch) OR contains(description, :capSearch))`;
+    const descTagExprValues: Record<string, any> = {
+      ":pk": pk,
+      ":skPrefix": "JNL#",
+      ":search": search,
+      ":lowerSearch": lowerSearch,
+      ":capSearch": capSearch,
+    };
+    if (date) {
+      descTagExprValues[":dateSk"] = `JNL#${date}`;
+    }
+
+    const descTagMatched: JournalEntry[] = [];
+    let lastKey: Record<string, any> | undefined = undefined;
+    do {
+      const scanParams: any = {
+        TableName: TABLE_NAME,
+        FilterExpression: descTagFilterExpr,
+        ExpressionAttributeValues: descTagExprValues,
+      };
+      if (lastKey) scanParams.ExclusiveStartKey = lastKey;
+      const scanResult = await db.send(new ScanCommand(scanParams));
+      descTagMatched.push(...((scanResult.Items as unknown as JournalEntry[]) || []));
+      lastKey = scanResult.LastEvaluatedKey as Record<string, any> | undefined;
+    } while (lastKey);
+
+    // --- 2. Scan LINE items for matching account IDs to find journal entries ---
+    const accountMatchedJournalIds = new Set<string>();
+    if (matchingAccountIds && matchingAccountIds.length > 0) {
+      for (const accountId of matchingAccountIds) {
+        let lineLastKey: Record<string, any> | undefined = undefined;
+        do {
+          const lineScanParams: any = {
+            TableName: TABLE_NAME,
+            FilterExpression: `PK = :pk AND begins_with(SK, :linePrefix) AND accountId = :accountId`,
+            ExpressionAttributeValues: {
+              ":pk": pk,
+              ":linePrefix": "LINE#",
+              ":accountId": accountId,
+            },
+          };
+          if (lineLastKey) lineScanParams.ExclusiveStartKey = lineLastKey;
+          const lineResult = await db.send(new ScanCommand(lineScanParams));
+          for (const item of lineResult.Items || []) {
+            // SK is LINE#journalId#accountId — extract journalId
+            const sk: string = (item as any).SK || "";
+            const parts = sk.split("#");
+            if (parts.length >= 2) accountMatchedJournalIds.add(parts[1]);
+          }
+          lineLastKey = lineResult.LastEvaluatedKey as Record<string, any> | undefined;
+        } while (lineLastKey);
+      }
+    }
+
+    // --- 3. Fetch full journal entries for account-matched IDs not already in descTagMatched ---
+    const descTagIds = new Set(descTagMatched.map((e: any) => e.id));
+    const extraJournalIds = [...accountMatchedJournalIds].filter(id => !descTagIds.has(id));
+
+    const extraEntries: JournalEntry[] = [];
+    for (const journalId of extraJournalIds) {
+      // Find the JNL# SK by scanning for this specific journal id
+      const entryResult = await db.send(new ScanCommand({
+        TableName: TABLE_NAME,
+        FilterExpression: `PK = :pk AND begins_with(SK, :jnlPrefix) AND id = :journalId`,
+        ExpressionAttributeValues: {
+          ":pk": pk,
+          ":jnlPrefix": "JNL#",
+          ":journalId": journalId,
+        },
+      }));
+      extraEntries.push(...((entryResult.Items as unknown as JournalEntry[]) || []));
+    }
+
+    // --- 4. Merge, sort, slice ---
+    const allMatched = [...descTagMatched, ...extraEntries];
+    allMatched.sort((a: any, b: any) => {
+      const skA = `JNL#${a.date}#${a.id}`;
+      const skB = `JNL#${b.date}#${b.id}`;
+      return skB.localeCompare(skA);
+    });
+
+    const sliced = allMatched.slice(0, limit);
+
+    const entriesWithLines = await Promise.all(
+      sliced.map(async (entry) => {
+        const linesResult = await db.send(
+          new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: `PK = :pk AND begins_with(SK, :skPrefix)`,
+            ExpressionAttributeValues: {
+              ":pk": pk,
+              ":skPrefix": `LINE#${entry.id}#`,
+            },
+          })
+        );
+        return {
+          ...entry,
+          lines: (linesResult.Items as unknown as JournalLine[]) || [],
+        };
+      })
+    );
+
+    return { data: entriesWithLines, nextCursor: null };
+  }
+
+  // Standard Query path (no search)
   const params: any = {
     TableName: TABLE_NAME,
+    Limit: limit,
     KeyConditionExpression: `PK = :pk AND begins_with(SK, :skPrefix)`,
     ExpressionAttributeValues: {
       ":pk": pk,
       ":skPrefix": skPrefix,
     },
-    ScanIndexForward: false, // latest on top
-    Limit: limit,
+    ScanIndexForward: false,
   };
 
   if (cursor) {
@@ -189,6 +305,44 @@ export async function getJournalEntriesWithLines(
     : null;
 
   return { data: entriesWithLines, nextCursor };
+}
+
+export async function getAllJournalEntriesWithLines(orgId: string) {
+  const pk = `ORG#${orgId}#JOURNAL`;
+  const skPrefix = "JNL#";
+
+  const result = await db.send(new QueryCommand({
+    TableName: TABLE_NAME,
+    KeyConditionExpression: `PK = :pk AND begins_with(SK, :skPrefix)`,
+    ExpressionAttributeValues: {
+      ":pk": pk,
+      ":skPrefix": skPrefix,
+    },
+    ScanIndexForward: false,
+  }));
+
+  const entries = (result.Items as unknown as JournalEntry[]) || [];
+
+  const entriesWithLines = await Promise.all(
+    entries.map(async (entry) => {
+      const linesResult = await db.send(
+        new QueryCommand({
+          TableName: TABLE_NAME,
+          KeyConditionExpression: `PK = :pk AND begins_with(SK, :skPrefix)`,
+          ExpressionAttributeValues: {
+            ":pk": pk,
+            ":skPrefix": `LINE#${entry.id}#`,
+          },
+        })
+      );
+      return {
+        ...entry,
+        lines: (linesResult.Items as unknown as JournalLine[]) || [],
+      };
+    })
+  );
+
+  return entriesWithLines;
 }
 
 export async function getAccountLines(orgId: string, accountId: string, startDate?: string, endDate?: string): Promise<JournalLine[]> {

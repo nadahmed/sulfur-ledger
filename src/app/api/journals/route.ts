@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const auth = await checkPermission("read:journals", req);
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const orgId = req.cookies.get("activeOrgId")?.value;
+  const orgId = req.cookies.get("activeOrgId")?.value || req.headers.get("x-org-id");
   if (!orgId) {
     return NextResponse.json({ error: "No active organization" }, { status: 400 });
   }
@@ -24,10 +24,22 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20", 10);
     const cursor = searchParams.get("cursor") || undefined;
     const date = searchParams.get("date") || undefined;
+    const search = searchParams.get("search") || undefined;
 
-    const result = await getJournalEntriesWithLines(orgId, limit, cursor, date);
+    // Resolve account name matches so the DB layer can also search by from/to account
+    let matchingAccountIds: string[] = [];
+    if (search) {
+      const { getAccounts } = require("@/lib/db/accounts");
+      const accounts = await getAccounts(orgId);
+      matchingAccountIds = accounts
+        .filter((a: any) => a.name.toLowerCase().includes(search.toLowerCase()))
+        .map((a: any) => a.id);
+    }
+
+    const result = await getJournalEntriesWithLines(orgId, limit, cursor, date, search, matchingAccountIds);
     return NextResponse.json(result);
   } catch (err: any) {
+    console.error("GET Journals Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
