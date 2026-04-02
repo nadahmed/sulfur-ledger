@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { Suspense } from "react";
 
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
@@ -36,9 +37,21 @@ interface ReportData {
 }
 
 export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading reports...</div>}>
+      <ReportsInner />
+    </Suspense>
+  );
+}
+
+function ReportsInner() {
   const { user, isLoading: userLoading } = useUser();
   const { activeOrganizationId, permissions, isOwner, isLoading: orgLoading } = useOrganization();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  const urlType = searchParams.get("type");
 
   const [reportType, setReportType] = useLocalStorage(
     activeOrganizationId ? `reports-filters-type-${activeOrganizationId}` : "reports-filters-type-default", 
@@ -61,6 +74,33 @@ export default function ReportsPage() {
       router.push("/onboarding");
     }
   }, [user, activeOrganizationId, isLoading, router]);
+
+  useEffect(() => {
+    if (urlType && ["trial-balance", "balance-sheet", "income-statement"].includes(urlType)) {
+      if (reportType !== urlType) {
+        setReportType(urlType);
+      }
+    } else if (reportType && !urlType) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("type", reportType);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [urlType, reportType, searchParams, pathname, router, setReportType]);
+
+  const handleTabChange = (value: string | null) => {
+    if (!value) return;
+    setReportType(value);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("type", value);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handlePdfDownload = () => {
+    let url = `/api/reports/pdf?type=${reportType}`;
+    if (startDate) url += `&start=${startDate}`;
+    if (endDate) url += `&end=${endDate}`;
+    window.open(url, '_blank');
+  };
 
   const { data, isLoading: isFetchingReport, isError, error } = useQuery<ReportData>({
     queryKey: ["reports", activeOrganizationId, reportType, startDate, endDate],
@@ -130,45 +170,55 @@ export default function ReportsPage() {
     <div className="max-w-screen-2xl p-4 md:p-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Financial Reports</h1>
-        <div className="flex items-center gap-2">
-          <div className="grid gap-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 sm:gap-2 w-full sm:w-auto">
+          <div className="grid gap-1 w-full sm:w-auto">
             <Label htmlFor="start" className="text-xs">From</Label>
             <Input 
               id="start" 
               type="date" 
-              className="h-9" 
+              className="h-9 w-full" 
               value={startDate} 
               onChange={(e) => setStartDate(e.target.value)} 
             />
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1 w-full sm:w-auto">
             <Label htmlFor="end" className="text-xs">To</Label>
             <Input 
               id="end" 
               type="date" 
-              className="h-9" 
+              className="h-9 w-full" 
               value={endDate} 
               onChange={(e) => setEndDate(e.target.value)} 
             />
           </div>
-          <Button variant="ghost" size="icon" className="mt-5" onClick={() => { setStartDate(""); setEndDate(""); }}>
-             Reset
+          <Button variant="ghost" className="sm:mb-[2px] h-9 w-full sm:w-auto" onClick={() => { setStartDate(""); setEndDate(""); }}>
+             <RotateCcw className="mr-2 h-4 w-4" /> Reset
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="trial-balance" onValueChange={setReportType} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-          <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
-          <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
-          <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
-        </TabsList>
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { id: "trial-balance", label: "Trial Balance" },
+          { id: "balance-sheet", label: "Balance Sheet" },
+          { id: "income-statement", label: "Income Statement" }
+        ].map((type) => (
+          <Button
+            key={type.id}
+            variant={reportType === type.id ? "default" : "outline"}
+            className="rounded-full shadow-none"
+            onClick={() => handleTabChange(type.id)}
+          >
+            {type.label}
+          </Button>
+        ))}
+      </div>
 
-        <div className="mt-8">
-          <Card>
+      <div className="mt-4">
+        <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="capitalize">{reportType.replace("-", " ")}</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Button variant="outline" size="sm" onClick={handlePdfDownload}>
                 <Download className="h-4 w-4 mr-2" /> Print PDF
               </Button>
             </CardHeader>
@@ -236,7 +286,6 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
         </div>
-      </Tabs>
     </div>
   );
 }

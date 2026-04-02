@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useOrganization } from "@/context/OrganizationContext";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -74,6 +74,14 @@ const parseCSV = (csv: string) => {
 };
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-neutral-500">Loading settings...</div>}>
+      <SettingsInner />
+    </Suspense>
+  );
+}
+
+function SettingsInner() {
   const { user, isLoading: isUserLoading } = useAuthGuard();
   const { 
     activeOrganizationId, 
@@ -85,7 +93,18 @@ export default function SettingsPage() {
     isLoading: isOrgLoading 
   } = useOrganization();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
+
+  const urlTab = searchParams.get("tab");
+  const activeTab = urlTab && ["general", "members", "email", "mcp", "data"].includes(urlTab) ? urlTab : "general";
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", value);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -403,16 +422,28 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold">Settings</h1>
       </div>
 
-      <Tabs defaultValue="general" className="mt-8">
-        <TabsList className="mb-8">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="email">Email Delivery</TabsTrigger>
-          <TabsTrigger value="mcp">MCP Server</TabsTrigger>
-          <TabsTrigger value="data">Data Management</TabsTrigger>
-        </TabsList>
+      <div className="mt-8 mb-8 flex flex-wrap items-center gap-2">
+        {[
+          { id: "general", label: "General" },
+          { id: "members", label: "Members" },
+          { id: "email", label: "Email Delivery" },
+          { id: "mcp", label: "MCP Server" },
+          { id: "data", label: "Data Management" }
+        ].map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? "default" : "outline"}
+            className="rounded-full shadow-none"
+            onClick={() => handleTabChange(tab.id)}
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </div>
 
-        <TabsContent value="general" className="space-y-8 mt-6">
+      <div className="mt-6">
+        {activeTab === "general" && (
+          <div className="space-y-8">
           <Card className="shadow-lg border-neutral-200">
             <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
               <CardHeader>
@@ -492,9 +523,11 @@ export default function SettingsPage() {
               </CardFooter>
             </Card>
           )}
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="members" className="space-y-8 mt-6">
+        {activeTab === "members" && (
+          <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card className="bg-neutral-50/50">
               <CardHeader>
@@ -741,9 +774,11 @@ export default function SettingsPage() {
               </Card>
             </div>
           </div>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="email" className="space-y-8 mt-6">
+        {activeTab === "email" && (
+          <div className="space-y-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Delivery</CardTitle>
@@ -855,9 +890,11 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="mcp" className="space-y-8 mt-6">
+        {activeTab === "mcp" && (
+          <div className="space-y-8">
           <Card className="shadow-lg border-neutral-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
@@ -1018,9 +1055,11 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="data" className="space-y-8 mt-6">
+        {activeTab === "data" && (
+          <div className="space-y-8">
           <div className="grid gap-8">
             <Card className="shadow-lg border-neutral-200">
               <CardHeader>
@@ -1318,8 +1357,9 @@ export default function SettingsPage() {
             </CardFooter>
           </Card>
         </div>
-      </TabsContent>
-      </Tabs>
+          </div>
+        )}
+      </div>
 
       {confirmConfig && (
         <AlertDialog 

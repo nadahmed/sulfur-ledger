@@ -6,8 +6,8 @@ export interface AuditLog {
   id: string; // UUID
   userId: string;
   userName?: string;
-  action: "create" | "update" | "delete";
-  entityType: "JournalEntry" | "Account" | "Organization";
+  action: "create" | "update" | "delete" | "export";
+  entityType: "JournalEntry" | "Account" | "Organization" | "Report";
   entityId: string;
   details: string; // JSON string or description
   timestamp: string;
