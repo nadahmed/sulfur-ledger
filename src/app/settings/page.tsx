@@ -528,34 +528,20 @@ function SettingsInner() {
 
         {activeTab === "members" && (
           <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card className="bg-neutral-50/50">
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Owner</CardTitle>
+                <CardTitle className="text-sm font-medium">Organization</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-                    {members?.find((m: any) => m.role === "owner")?.name?.[0] || "O"}
-                  </div>
-                  <div>
-                    <p className="font-medium">{members?.find((m: any) => m.role === "owner")?.name || "N/A"}</p>
-                    <p className="text-xs text-muted-foreground">{members?.find((m: any) => m.role === "owner")?.email || ""}</p>
-                  </div>
+                <div>
+                  <p className="font-medium">{activeOrg?.name || "Current Organization"}</p>
+                  <code className="text-xs break-all text-neutral-500 mt-1 block">{activeOrganizationId}</code>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-neutral-50/50">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Organization ID</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <code className="text-xs break-all text-neutral-500">{activeOrganizationId}</code>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-neutral-50/50 md:col-span-2 lg:col-span-1">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">Created On</CardTitle>
               </CardHeader>
@@ -574,6 +560,26 @@ function SettingsInner() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
+                    {emailSettings?.provider === "none" && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="font-medium">Email not configured</p>
+                            <p className="text-xs opacity-90 mt-0.5">
+                              Invitations won't be sent. Please{" "}
+                              <button
+                                type="button"
+                                className="font-semibold underline hover:text-amber-900"
+                                onClick={() => handleTabChange("email")}
+                              >
+                                configure email delivery
+                              </button>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="email">Email Address</Label>
                       <Input 

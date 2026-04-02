@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useOrganization } from "@/context/OrganizationContext";
 import {
   Table,
@@ -13,8 +13,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { History, CheckCircle2, XCircle, ChevronDown, ChevronUp, User, Bot, Activity } from "lucide-react";
+import { History, CheckCircle2, XCircle, ChevronDown, ChevronUp, User, Bot, Activity, Search, FilterX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ActivityLog {
   id: string;
@@ -37,6 +40,18 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
+  // Filters
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterAction, setFilterAction] = useState<string>("all");
+  const [filterUser, setFilterUser] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   useEffect(() => {
     if (activeOrganizationId) {
       fetch(`/api/activity?orgId=${activeOrganizationId}`)
@@ -55,6 +70,70 @@ export default function ActivityPage() {
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
+
+  const uniqueUsers = useMemo(() => {
+    const users = new Set<string>();
+    logs.forEach(l => {
+      if (l.userName) users.add(l.userName);
+    });
+    return Array.from(users).sort();
+  }, [logs]);
+
+  const uniqueActions = useMemo(() => {
+    const actions = new Set<string>();
+    logs.forEach(l => {
+      if (l.type === "ui" && l.action) actions.add(l.action);
+      if (l.type === "mcp" && l.toolName) actions.add(l.toolName);
+    });
+    return Array.from(actions).sort();
+  }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      if (search) {
+        const query = search.toLowerCase();
+        const details = log.details ? log.details.toLowerCase() : "";
+        const inputStr = log.input ? log.input.toLowerCase() : "";
+        const entity = log.entityType ? log.entityType.toLowerCase() : "";
+        if (!details.includes(query) && !inputStr.includes(query) && !entity.includes(query)) {
+          return false;
+        }
+      }
+      
+      if (filterType !== "all" && log.type !== filterType) {
+        return false;
+      }
+      
+      if (filterAction !== "all") {
+        if (log.type === "ui" && log.action !== filterAction) return false;
+        if (log.type === "mcp" && log.toolName !== filterAction) return false;
+      }
+      
+      if (filterUser !== "all" && log.userName !== filterUser) {
+        return false;
+      }
+      
+      if (dateFrom) {
+        const dFrom = new Date(dateFrom).getTime();
+        // compare to date component of timestamp 
+        if (new Date(log.timestamp.split('T')[0]).getTime() < dFrom) return false;
+      }
+      if (dateTo) {
+        const dTo = new Date(dateTo).getTime();
+        if (new Date(log.timestamp.split('T')[0]).getTime() > dTo) return false;
+      }
+      
+      return true;
+    });
+  }, [logs, search, filterType, filterAction, filterUser, dateFrom, dateTo]);
+
+  const totalPages = Math.ceil(filteredLogs.length / pageSize);
+  const paginatedLogs = filteredLogs.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+    setExpandedRow(null);
+  }, [search, filterType, filterAction, filterUser, dateFrom, dateTo, pageSize]);
 
   const renderStatus = (log: ActivityLog) => {
     if (log.type === "mcp") {
@@ -144,7 +223,75 @@ export default function ActivityPage() {
               <span className="text-muted-foreground">No recent activity found.</span>
             </div>
           ) : (
-            <Table>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-lg border">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Search logs..." 
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-9 h-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Action</Label>
+                    <Select value={filterAction} onValueChange={v => setFilterAction(v || "all")}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="All Actions" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Actions</SelectItem>
+                        {uniqueActions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">User</Label>
+                    <Select value={filterUser} onValueChange={v => setFilterUser(v || "all")}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="All Users" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Users</SelectItem>
+                        {uniqueUsers.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Log Type</Label>
+                    <Select value={filterType} onValueChange={v => setFilterType(v || "all")}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="All Types" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="ui">User Interface</SelectItem>
+                        <SelectItem value="mcp">AI Agent (MCP)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">From</Label>
+                    <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-auto h-9 text-sm" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">To</Label>
+                    <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-auto h-9 text-sm" />
+                  </div>
+                  <div className="flex-1"></div>
+                  <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={() => {
+                    setSearch(""); setFilterAction("all"); setFilterUser("all"); setFilterType("all"); setDateFrom(""); setDateTo("");
+                  }}>
+                    <FilterX className="size-4" />
+                    Reset Filters
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[180px]">Timestamp</TableHead>
@@ -155,9 +302,16 @@ export default function ActivityPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.map((log) => (
-                  <React.Fragment key={log.id}>
-                    <TableRow 
+                {paginatedLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      No results match your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedLogs.map((log) => (
+                    <React.Fragment key={log.id}>
+                      <TableRow 
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => toggleRow(log.id)}
                     >
@@ -212,9 +366,37 @@ export default function ActivityPage() {
                       </TableRow>
                     )}
                   </React.Fragment>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
+            </div>
+            
+            {filteredLogs.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+                <div className="text-sm text-muted-foreground">
+                  Showing <span className="font-medium">{(page - 1) * pageSize + 1}</span> to <span className="font-medium">{Math.min(page * pageSize, filteredLogs.length)}</span> of <span className="font-medium">{filteredLogs.length}</span> results
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mr-4">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</Label>
+                    <Select value={pageSize.toString()} onValueChange={v => setPageSize(Number(v || 20))}>
+                      <SelectTrigger className="w-[70px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-8" disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</Button>
+                  <div className="text-sm font-medium px-2">Page {page} of {Math.max(1, totalPages)}</div>
+                  <Button variant="outline" size="sm" className="h-8" disabled={page === Math.max(1, totalPages)} onClick={() => setPage(page + 1)}>Next</Button>
+                </div>
+              </div>
+            )}
+            </div>
           )}
         </CardContent>
       </Card>

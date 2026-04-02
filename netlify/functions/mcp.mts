@@ -798,6 +798,142 @@ DON'Ts:
       }
     }
   );
+  // ─── SKILLS / WORKFLOWS (PROMPTS) ──────────────────────────────────────────────────
+
+  // Skill: Reconcile Account
+  server.registerPrompt(
+    "reconcile_account",
+    {
+      description: "Perform a step-by-step account reconciliation workflow against a provided statement or balance.",
+      argsSchema: {
+        accountId: z.string().describe("The ID of the account to reconcile"),
+        targetBalance: z.string().describe("The expected closing balance in Taka (e.g. 5000.00)"),
+        statementStartDate: z.string().describe("Statement start date (YYYY-MM-DD)"),
+        statementEndDate: z.string().describe("Statement end date (YYYY-MM-DD)")
+      }
+    },
+    ({ accountId, targetBalance, statementStartDate, statementEndDate }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Please perform an account reconciliation for account '${accountId}'.
+
+Step 1: Check Account Validity
+- Target account ID: ${accountId}
+- ACTION: Call 'get_accounts' to verify that the target account exists and is not 'archived'. If it does not exist or is archived, stop and tell me.
+
+Step 2: Fetch Current System Balance
+- Target period: ${statementStartDate} to ${statementEndDate}
+- ACTION: Call 'get_account_balance' with ONLY the endDate to get the absolute closing balance as of the statement end date.
+- ACTION: Call 'get_account_balance' using both startDate and endDate to see the net movement during the statement period.
+
+Step 3: Compare and Analyze
+- Compare the system's closing balance (from Step 2) to the target balance of ${targetBalance} Taka.
+- If they match exactly, report that the account is reconciled successfully.
+- If they do NOT match, calculate the exact difference.
+
+Step 4: Investigate Discrepancies
+- If there is a difference, ACTION: Call 'get_journals' for the period ${statementStartDate} to ${statementEndDate}.
+- Review the transactions to identify potential missing, duplicated, or mis-entered transactions.
+- Present a final report of your findings.
+- Ask me if you should correct specific entries (using 'update_journal_entry' or 'record_journal_entry'). Do NOT execute write operations without my explicit confirmation.`
+          }
+        }
+      ]
+    })
+  );
+
+  // Skill: Onboard New Entity
+  server.registerPrompt(
+    "onboard_new_entity",
+    {
+      description: "A workflow for onboarding a new business, vendor, or financial category with initial opening balances.",
+      argsSchema: {
+        entityName: z.string().describe("Name of the new entity/category (e.g., 'TechCorp Solutions')"),
+        category: z.enum(["asset", "liability", "equity", "income", "expense"]).describe("The target account category"),
+        openingBalance: z.string().optional().describe("Optional opening balance in Taka. Defaults to 0."),
+        fundingAccount: z.string().optional().describe("If opening balance exists, the offsetting account ID")
+      }
+    },
+    ({ entityName, category, openingBalance, fundingAccount }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Please onboard a new entity/account named '${entityName}' under the category '${category}'.
+
+Step 1: Check for Duplicates
+- ACTION: Call 'get_accounts' to list all current accounts.
+- Analyze the list for any existing account that serves the same purpose as '${entityName}'.
+- If an existing account seems like a match, stop and ask me if we should use the existing one instead.
+
+Step 2: Create Account
+- If no duplicate exists, decide on a short, lowercase, hyphen-separated ID for the new account.
+- ACTION: Call 'create_account' using the chosen ID, '${entityName}', and '${category}'.
+
+Step 3: Process Opening Balance
+- Provided opening balance: ${openingBalance || '0'}
+- Provided funding account: ${fundingAccount || 'None'}
+- If the opening balance > 0, verify the 'fundingAccount' exists and is active using the data from Step 1.
+- Determine the correct 'fromAccountId' and 'toAccountId' based on standard double-entry rules.
+- ACTION: Call 'record_journal_entry' to record the opening balance. Use a description like "Opening balance for ${entityName}" and date it to today. Note: You must explicitly confirm the accounts with me BEFORE calling 'record_journal_entry'.
+
+Step 4: Final Summary
+- Produce a formatted final summary of the new account and any balances recorded.`
+          }
+        }
+      ]
+    })
+  );
+
+  // Skill: Period-End Report
+  server.registerPrompt(
+    "period_end_report",
+    {
+      description: "Generates a period-end financial report including P&L and auditing untagged/suspicious transactions.",
+      argsSchema: {
+        startDate: z.string().describe("Start date of the reporting period (YYYY-MM-DD)"),
+        endDate: z.string().describe("End date of the reporting period (YYYY-MM-DD)")
+      }
+    },
+    ({ startDate, endDate }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Please generate a comprehensive Period-End Report for the date range ${startDate} to ${endDate}.
+
+Step 1: High-Level Financial Summary
+- ACTION: Call 'get_financial_summary' with startDate: ${startDate} and endDate: ${endDate}.
+- Note the total income, expenses, and net profit/loss.
+
+Step 2: Detailed Account Review
+- ACTION: Call 'get_accounts' to retrieve the chart of accounts. Identify key high-volume accounts (such as primary checking or major expense accounts).
+- ACTION: Call 'get_account_balance' for those key accounts to see their period balances.
+
+Step 3: Audit and Clean Up
+- ACTION: Call 'get_journals' for the exact date range ${startDate} to ${endDate}.
+- Analyze the transactions for the following anomalies:
+  * Missing tags (especially for expense or income transactions).
+  * Potential duplicate entries (same amount on the same day).
+  * Vague or unclear descriptions.
+- If you find any untagged or suspicious transactions, list them out clearly.
+
+Step 4: Execute Report
+- Provide a formatted Period-End Report displaying:
+  1. The P&L Summary.
+  2. Key account movements.
+  3. The audit findings.
+- Ask me if you should correct any untagged or suspicious transactions (e.g., adding tags via 'update_journal_entry'). Do NOT execute 'update_journal_entry' without my explicit confirmation.`
+          }
+        }
+      ]
+    })
+  );
 
   // 4. Connect Server to Transport
   await server.connect(transport);

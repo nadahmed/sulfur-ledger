@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
+import { PwaRegister } from "@/components/pwa-register";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -23,6 +24,10 @@ export const metadata: Metadata = {
   description: "A double-entry bookkeeping application",
 };
 
+export const viewport = {
+  themeColor: "#09090b",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,11 +38,12 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <PwaRegister />
         <Providers>
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 sticky top-0 z-50 bg-background">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-6 my-auto" />
                 <Breadcrumbs />
