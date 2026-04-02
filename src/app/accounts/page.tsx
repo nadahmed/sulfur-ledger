@@ -81,9 +81,9 @@ export default function AccountsPage() {
     setPage(1);
   }, [showArchived, search, categoryFilter]);
 
-  const { data: response, isLoading: isFetchingAccounts } = useQuery<{ 
-    data: Account[], 
-    meta: { total: number, page: number, pageSize: number, totalPages: number } 
+  const { data: response, isLoading: isFetchingAccounts } = useQuery<{
+    data: Account[],
+    meta: { total: number, page: number, pageSize: number, totalPages: number }
   }>({
     queryKey: ["accounts", activeOrganizationId, showArchived, page, pageSize, search, categoryFilter],
     queryFn: async () => {
@@ -93,7 +93,7 @@ export default function AccountsPage() {
       url.searchParams.set("pageSize", pageSize.toString());
       if (search) url.searchParams.set("search", search);
       if (categoryFilter !== "all") url.searchParams.set("category", categoryFilter);
-      
+
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
@@ -261,10 +261,10 @@ export default function AccountsPage() {
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-4 items-end flex-wrap">
               <div className="grid w-full sm:max-w-xs items-center gap-1.5">
                 <Label htmlFor="name">Account Name</Label>
-                <Input 
-                  id="name" 
-                  {...register("name")} 
-                  placeholder="e.g. Main Checking" 
+                <Input
+                  id="name"
+                  {...register("name")}
+                  placeholder="e.g. Main Checking"
                   className={errors.name ? "border-red-500" : ""}
                 />
               </div>
@@ -275,7 +275,7 @@ export default function AccountsPage() {
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="category">
+                      <SelectTrigger id="category" className="capitalize">
                         <SelectValue placeholder="Select Category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -308,8 +308,8 @@ export default function AccountsPage() {
           <CardTitle>Accounts</CardTitle>
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             <div className="flex items-center space-x-2 w-full sm:w-auto">
-              <Input 
-                placeholder="Search accounts..." 
+              <Input
+                placeholder="Search accounts..."
                 className="h-9 w-full sm:w-[200px]"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -333,8 +333,8 @@ export default function AccountsPage() {
             <div className="flex items-center space-x-2 shrink-0">
               {mounted ? (
                 <>
-                  <Switch 
-                    id="show-archived" 
+                  <Switch
+                    id="show-archived"
                     checked={showArchived}
                     onCheckedChange={setShowArchived}
                   />
@@ -352,101 +352,101 @@ export default function AccountsPage() {
           ) : (
             <div className="overflow-x-auto">
               <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Created</TableHead>
-                  {canManage && <TableHead className="w-[100px] text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accounts.map((acc) => (
-                  <TableRow key={acc.id} className={acc.status === "archived" ? "opacity-50 line-through" : ""}>
-                    <TableCell className="font-medium">
-                      {editingId === acc.id ? (
-                        <div className="flex items-center gap-2">
-                          <Input 
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            className="h-8 py-1"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") updateNameMutation.mutate({ id: acc.id, name: editName });
-                              if (e.key === "Escape") setEditingId(null);
-                            }}
-                            autoFocus
-                          />
-                          <Button 
-                            size="sm" 
-                            className="h-7 px-2" 
-                            onClick={() => updateNameMutation.mutate({ id: acc.id, name: editName })}
-                            disabled={updateNameMutation.isPending}
-                          >
-                            Save
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2" 
-                            onClick={() => setEditingId(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="group flex items-center gap-2">
-                          <span>{acc.name}</span>
-                          {canManage && acc.status === "active" && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => {
-                                setEditingId(acc.id);
-                                setEditName(acc.name);
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Created</TableHead>
+                    {canManage && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.map((acc) => (
+                    <TableRow key={acc.id} className={acc.status === "archived" ? "opacity-50 line-through" : ""}>
+                      <TableCell className="font-medium">
+                        {editingId === acc.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="h-8 py-1"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") updateNameMutation.mutate({ id: acc.id, name: editName });
+                                if (e.key === "Escape") setEditingId(null);
                               }}
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => updateNameMutation.mutate({ id: acc.id, name: editName })}
+                              disabled={updateNameMutation.isPending}
                             >
-                              <Pencil className="h-3 w-3" />
+                              Save
                             </Button>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="capitalize">{acc.category}</TableCell>
-                    <TableCell>{new Date(acc.createdAt).toLocaleDateString()}</TableCell>
-                    {canManage && (
-                      <TableCell className="text-right">
-                        {acc.status === "archived" ? (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleUnarchive(acc.id, acc.name)}
-                            disabled={unarchiveMutation.isPending}
-                          >
-                            <ArchiveRestore className="h-4 w-4 text-neutral-500 hover:text-green-500" />
-                          </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
                         ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDelete(acc.id, acc.name)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4 text-neutral-500 hover:text-red-500" />
-                          </Button>
+                          <div className="group flex items-center gap-2">
+                            <span>{acc.name}</span>
+                            {canManage && acc.status === "active" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => {
+                                  setEditingId(acc.id);
+                                  setEditName(acc.name);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-                {accounts.length === 0 && !isFetchingAccounts && (
-                  <TableRow>
-                    <TableCell colSpan={canManage ? 4 : 3} className="text-center py-4 text-neutral-500">No accounts created</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                      <TableCell className="capitalize">{acc.category}</TableCell>
+                      <TableCell>{new Date(acc.createdAt).toLocaleDateString()}</TableCell>
+                      {canManage && (
+                        <TableCell className="text-right">
+                          {acc.status === "archived" ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleUnarchive(acc.id, acc.name)}
+                              disabled={unarchiveMutation.isPending}
+                            >
+                              <ArchiveRestore className="h-4 w-4 text-neutral-500 hover:text-green-500" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(acc.id, acc.name)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-neutral-500 hover:text-red-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                  {accounts.length === 0 && !isFetchingAccounts && (
+                    <TableRow>
+                      <TableCell colSpan={canManage ? 4 : 3} className="text-center py-4 text-neutral-500">No accounts created</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
@@ -485,8 +485,8 @@ export default function AccountsPage() {
       </Card>
 
       {confirmConfig && (
-        <AlertDialog 
-          open={confirmConfig.open} 
+        <AlertDialog
+          open={confirmConfig.open}
           onOpenChange={(open) => !open && setConfirmConfig(null)}
         >
           <AlertDialogContent>
@@ -496,8 +496,8 @@ export default function AccountsPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                variant={confirmConfig.variant} 
+              <AlertDialogAction
+                variant={confirmConfig.variant}
                 onClick={() => {
                   confirmConfig.onConfirm();
                   setConfirmConfig(null);

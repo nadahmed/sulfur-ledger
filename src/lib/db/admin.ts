@@ -4,8 +4,9 @@ import { db, TABLE_NAME } from "../dynamodb";
 export async function clearOrganizationData(orgId: string) {
   const accountPk = `ORG#${orgId}#ACCOUNT`;
   const journalPk = `ORG#${orgId}#JOURNAL`;
+  const activityPk = `ORG#${orgId}#ACTIVITY`;
 
-  const pks = [accountPk, journalPk];
+  const pks = [accountPk, journalPk, activityPk];
 
   for (const pk of pks) {
     let lastEvaluatedKey: Record<string, any> | undefined = undefined;

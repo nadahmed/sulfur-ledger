@@ -1173,6 +1173,12 @@ export default function SettingsPage() {
                         Restore JSON Backup
                       </h4>
                       <p className="text-xs text-purple-700 mt-1">Reconstruct your accounts and history from a JSON file.</p>
+                      <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-700 font-medium leading-relaxed">
+                          Warning: Importing data via JSON will wipe out everything including activity logs, except the organization itself.
+                        </p>
+                      </div>
                     </div>
                     <input
                       type="file"
@@ -1200,6 +1206,9 @@ export default function SettingsPage() {
                             toast.error(`Restore failed: ${err.message}`);
                           } finally {
                             setIsImportingJson(false);
+                            if (document.getElementById("json-import")) {
+                              (document.getElementById("json-import") as HTMLInputElement).value = '';
+                            }
                           }
                         };
                         reader.readAsText(file);
@@ -1207,11 +1216,19 @@ export default function SettingsPage() {
                     />
                     <Button 
                       variant="secondary" 
-                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
+                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors"
                       disabled={isImportingJson}
-                      onClick={() => document.getElementById("json-import")?.click()}
+                      onClick={() => {
+                        setConfirmConfig({
+                          open: true,
+                          title: "Destructive Action",
+                          description: "Importing data via JSON will wipe out everything including activity logs, except the organization itself. Are you sure you want to proceed?",
+                          variant: "destructive",
+                          onConfirm: () => document.getElementById("json-import")?.click(),
+                        });
+                      }}
                     >
-                      {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2 text-purple-400" />}
+                      {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2" />}
                       {isImportingJson ? "Restoring..." : "Restore from JSON File"}
                     </Button>
                   </div>

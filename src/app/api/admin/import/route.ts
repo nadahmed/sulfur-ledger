@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkPermission } from "@/lib/auth";
 import { getAccounts, createAccount, Account } from "@/lib/db/accounts";
 import { createJournalEntry, JournalEntry, JournalLine, getJournalEntries } from "@/lib/db/journals";
+import { clearOrganizationData } from "@/lib/db/admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,27 +19,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid import data format" }, { status: 400 });
     }
 
-    // 1. Import Accounts
-    const existingAccounts = await getAccounts(orgId);
-    const existingNames = new Set(existingAccounts.map(a => a.name.toLowerCase()));
-    const existingIds = new Set(existingAccounts.map(a => a.id));
+    // 1. Clear existing dataset (Restore behavior)
+    await clearOrganizationData(orgId);
+
+    // 2. Import Accounts
+    const memoryAccountIds = new Set<string>();
+    const memoryAccountNames = new Set<string>();
 
     let accountsImported = 0;
     for (const acc of importAccounts as Account[]) {
-      if (!existingIds.has(acc.id) && !existingNames.has(acc.name.toLowerCase())) {
-        await createAccount({ ...acc, orgId }, user!.sub, user!.name);
-        accountsImported++;
+      if (!acc.id || !acc.name) continue;
+      
+      const accountData: Account = {
+        orgId,
+        id: acc.id,
+        name: acc.name,
+        category: acc.category,
+        status: acc.status || "active",
+        createdAt: acc.createdAt || new Date().toISOString(),
+      };
+
+      // Protect against duplicate data WITHIN the JSON payload itself
+      if (!memoryAccountIds.has(accountData.id) && !memoryAccountNames.has(accountData.name.toLowerCase())) {
+        try {
+          await createAccount(accountData, user!.sub, user!.name);
+          memoryAccountIds.add(accountData.id);
+          memoryAccountNames.add(accountData.name.toLowerCase());
+          accountsImported++;
+        } catch (e: any) {
+          if (e.name === 'ConditionalCheckFailedException' || e.__type === 'com.amazonaws.dynamodb.v20120810#ConditionalCheckFailedException') {
+             console.warn(`Account ${acc.id} intra-json duplicate detected.`);
+             memoryAccountIds.add(acc.id);
+             memoryAccountNames.add(acc.name.toLowerCase());
+          } else {
+             throw e;
+          }
+        }
       }
     }
 
-    // 2. Import Journals
-    // To be safe, we check if journals with the same ID already exist
-    const existingJournals = await getJournalEntries(orgId);
-    const existingJournalIds = new Set(existingJournals.map(j => j.id));
-
+    // 3. Import Journals
+    const memoryJournalIds = new Set<string>();
     let journalsImported = 0;
     for (const j of importJournals) {
-      if (!existingJournalIds.has(j.id)) {
+      if (!memoryJournalIds.has(j.id)) {
         const entry: JournalEntry = {
           orgId,
           id: j.id,
@@ -47,9 +71,18 @@ export async function POST(req: NextRequest) {
           tags: j.tags,
           createdAt: j.createdAt || new Date().toISOString(),
         };
-        const lines: JournalLine[] = j.lines.map((l: any) => ({ ...l, orgId }));
+        const lines: JournalLine[] = j.lines.map((l: any) => ({
+          orgId,
+          journalId: l.journalId || j.id,
+          id: l.id,
+          accountId: l.accountId,
+          amount: l.amount,
+          date: l.date || j.date,
+          description: l.description || "",
+        }));
         
         await createJournalEntry(entry, lines, user!.sub, user!.name);
+        memoryJournalIds.add(j.id);
         journalsImported++;
       }
     }

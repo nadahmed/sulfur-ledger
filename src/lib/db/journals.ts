@@ -119,6 +119,11 @@ export async function getJournalEntries(orgId: string, startDate?: string, endDa
   };
 
   if (startDate && endDate) {
+    if (startDate > endDate) {
+      const temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
     skCondition = "SK BETWEEN :start AND :end";
     expressionAttributeValues[":start"] = `JNL#${startDate}#`;
     expressionAttributeValues[":end"] = `JNL#${endDate}#zh\uffff`;
@@ -352,6 +357,11 @@ export async function getAccountLines(orgId: string, accountId: string, startDat
   };
 
   if (startDate && endDate) {
+    if (startDate > endDate) {
+      const temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
     skCondition = "GSI1SK BETWEEN :start AND :end";
     expressionAttributeValues[":start"] = `JNL#${startDate}#`;
     expressionAttributeValues[":end"] = `JNL#${endDate}#zh\uffff`;

@@ -25,27 +25,61 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end") || undefined;
     const reportType = searchParams.get("type") || "trial-balance";
 
-    // Fetch accounts and entries to calculate balances
-    const [accounts, entries] = await Promise.all([
-      getAccounts(orgId),
-      getJournalEntries(orgId, startDate, endDate),
-    ]);
+    const accounts = await getAccounts(orgId);
     
     // Fast memory ledger since this is simple ledger app
-    const balances = await Promise.all(accounts.map(async (acc: any) => {
-      // Permanent accounts (Balance Sheet) use cumulative balance (ignore startDate)
-      // Temporary accounts (Income Statement) use period balance
+    let priorRetainedEarnings = 0;
+    let lifeToDateRetainedEarnings = 0;
+
+    const balancesList = await Promise.all(accounts.map(async (acc: any) => {
       const isPermanent = ["asset", "liability", "equity"].includes(acc.category);
-      const effectiveStartDate = isPermanent ? undefined : startDate;
       
-      const lines = await getAccountLines(orgId, acc.id, effectiveStartDate, endDate);
-      const balance = (lines || []).reduce((sum: number, line: any) => sum + (line.amount || 0), 0);
+      const queryStart = "1970-01-01";
+      const queryEnd = endDate || "2100-12-31";
+      
+      const lines = await getAccountLines(orgId, acc.id, queryStart, queryEnd);
+      
+      let priorBalance = 0;
+      let periodBalance = 0;
+
+      lines.forEach((line: any) => {
+        const lineDate = line.date.split("T")[0]; 
+        const startD = startDate ? startDate.split("T")[0] : null;
+
+        if (startD && lineDate < startD) {
+          priorBalance += (line.amount || 0);
+        } else {
+          periodBalance += (line.amount || 0);
+        }
+      });
+
+      const lifeToDateBalance = priorBalance + periodBalance;
+      
+      if (!isPermanent) {
+        priorRetainedEarnings += priorBalance;
+        lifeToDateRetainedEarnings += lifeToDateBalance;
+      }
+
+      const balance = isPermanent ? lifeToDateBalance : periodBalance;
       return { ...acc, balance };
     }));
 
+    const balances = [...balancesList];
+
     if (reportType === "trial-balance") {
+      const tbBalances = [...balances];
+      
+      if (priorRetainedEarnings !== 0 && startDate) {
+        tbBalances.push({
+          id: "retained-earnings-prior",
+          name: "Retained Earnings (Prior)",
+          category: "equity",
+          balance: priorRetainedEarnings
+        });
+      }
+
       const categoryOrder = ["asset", "liability", "equity", "income", "expense"];
-      const sortedBalances = [...balances]
+      const sortedBalances = tbBalances
         .filter(b => b.balance !== 0)
         .sort((a, b) => {
           const orderA = categoryOrder.indexOf(a.category);
@@ -54,15 +88,25 @@ export async function GET(req: NextRequest) {
           return a.name.localeCompare(b.name);
         });
 
-      const totalDebits = balances.filter(b => b.balance > 0).reduce((sum, b) => sum + b.balance, 0);
-      const totalCredits = balances.filter(b => b.balance < 0).reduce((sum, b) => sum + Math.abs(b.balance), 0);
+      const totalDebits = tbBalances.filter(b => b.balance > 0).reduce((sum, b) => sum + b.balance, 0);
+      const totalCredits = tbBalances.filter(b => b.balance < 0).reduce((sum, b) => sum + Math.abs(b.balance), 0);
       return NextResponse.json({ accounts: sortedBalances, totalDebits, totalCredits });
     }
 
     if (reportType === "balance-sheet") {
-      const assets = balances.filter(b => b.category === "asset" && b.balance !== 0);
-      const liabilities = balances.filter(b => b.category === "liability" && b.balance !== 0);
-      const equity = balances.filter(b => b.category === "equity" && b.balance !== 0);
+      const bsBalances = [...balances];
+      if (lifeToDateRetainedEarnings !== 0) {
+        bsBalances.push({
+          id: "retained-earnings-ltd",
+          name: "Retained Earnings",
+          category: "equity",
+          balance: lifeToDateRetainedEarnings
+        });
+      }
+
+      const assets = bsBalances.filter(b => b.category === "asset" && b.balance !== 0);
+      const liabilities = bsBalances.filter(b => b.category === "liability" && b.balance !== 0);
+      const equity = bsBalances.filter(b => b.category === "equity" && b.balance !== 0);
       return NextResponse.json({ assets, liabilities, equity });
     }
 
