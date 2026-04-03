@@ -6,8 +6,8 @@ import { TagsSettings } from "@/components/settings/TagsSettings";
 import { Loader2 } from "lucide-react";
 
 export default function TagsPage() {
-  const { activeOrganizationId, isOrgLoading, organizations, permissions, isOwner } = useOrganization();
-  const { isUserLoading } = useAuthGuard();
+  const { activeOrganizationId, isLoading: isOrgLoading, organizations, permissions, isOwner } = useOrganization();
+  const { isLoading: isUserLoading } = useAuthGuard();
 
   const isLoading = isUserLoading || isOrgLoading;
   const canManage = isOwner || permissions.includes("manage:tags") || permissions.includes("manage:organization");
