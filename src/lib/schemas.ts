@@ -7,6 +7,14 @@ export const AccountSchema = z.object({
 
 export type AccountFormValues = z.infer<typeof AccountSchema>;
 
+export const TagSchema = z.object({
+  name: z.string().min(1, "Tag name is required").max(50),
+  color: z.string().min(4, "Invalid color").max(20),
+  description: z.string().max(200).optional(),
+});
+
+export type TagFormValues = z.infer<typeof TagSchema>;
+
 export const JournalEntrySchema = z.object({
   date: z.string().min(1, "Date or ISO string is required"),
   description: z.string().min(1, "Description is required").max(200),
@@ -16,8 +24,11 @@ export const JournalEntrySchema = z.object({
   fromAccountId: z.string().min(1, "Credit account is required"),
   toAccountId: z.string().min(1, "Debit account is required"),
   tags: z.union([z.array(z.string()), z.string()]).optional().transform((val) => {
-    if (typeof val === "string") return val.split(",").map(t => t.trim()).filter(Boolean);
-    return val;
+    if (typeof val === "string") {
+      if (val.trim() === "") return [];
+      return val.split(",").map(t => t.trim()).filter(Boolean);
+    }
+    return val || [];
   }),
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
   message: "From and To accounts cannot be the same",

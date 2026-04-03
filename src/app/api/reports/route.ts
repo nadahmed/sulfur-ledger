@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end") || undefined;
     const reportType = searchParams.get("type") || "trial-balance";
 
-    const reportData = await generateReportData(orgId, reportType, startDate, endDate, searchParams);
+    const tags = searchParams.get("tags")?.split(",").filter(Boolean) || undefined;
+    const reportData = await generateReportData(orgId, reportType, startDate, endDate, searchParams, tags);
     return NextResponse.json(reportData);
 
   } catch (err: any) {

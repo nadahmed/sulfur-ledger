@@ -21,6 +21,7 @@ export interface JournalLine {
   accountId: string;
   amount: number; // in cents/paisa. Positive = Debit, Negative = Credit
   date: string; // Copied from entry for easy querying in GSI (ISO 8601)
+  tags?: string[]; // Propagated from JournalEntry for reporting
 }
 
 function mergeDuplicateAccountLines(lines: JournalLine[]): JournalLine[] {
@@ -78,6 +79,7 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
           // GSI1 to get all lines for an account, sorted by date
           GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
           GSI1SK: `JNL#${line.date}#${line.journalId}`,
+          tags: entry.tags, // Propagate tags to each line
           ...line,
         }, { removeUndefinedValues: true }),
       },
@@ -110,13 +112,24 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
   return { entry, lines };
 }
 
-export async function getJournalEntries(orgId: string, startDate?: string, endDate?: string): Promise<JournalEntry[]> {
-  // If no dates provided, get all (in a heavily used system, you'd always mandate pagination/dates)
-  // For Simple Ledger, we query SK begins_with JNL#
+export async function getJournalEntries(
+  orgId: string, 
+  startDate?: string, 
+  endDate?: string,
+  tagIds?: string[]
+): Promise<JournalEntry[]> {
   let skCondition = "";
-  const expressionAttributeValues: any = {
+  const expressionAttributeValues: Record<string, any> = {
     ":pk": `ORG#${orgId}#JOURNAL`,
   };
+  let filterExpression = "";
+
+  if (tagIds && tagIds.length > 0) {
+    filterExpression = tagIds.map((_, i) => `contains(tags, :tag${i})`).join(" OR ");
+    tagIds.forEach((tagId, i) => {
+      expressionAttributeValues[`:tag${i}`] = tagId;
+    });
+  }
 
   if (startDate && endDate) {
     if (startDate > endDate) {
@@ -136,6 +149,7 @@ export async function getJournalEntries(orgId: string, startDate?: string, endDa
     new QueryCommand({
       TableName: TABLE_NAME,
       KeyConditionExpression: `PK = :pk AND ${skCondition}`,
+      FilterExpression: filterExpression || undefined,
       ExpressionAttributeValues: expressionAttributeValues,
     })
   );
@@ -503,10 +517,17 @@ export async function updateJournalEntry(
     },
   });
 
-  // 2. Handle Lines: Delete old lines that are NO LONGER in the entry
-  // For lines that persist (even if amount changes), we only need a Put.
-  // DynamoDB transaction fails if an item has both Delete and Put.
-  if (newLines.length > 0) {
+  // 2. Handle Lines: 
+  // We need to fetch existing lines if we are:
+  // a) Replacing them (newLines.length > 0)
+  // b) Updating their tags (newEntry.tags is set)
+  // c) Updating their date (newEntry.date is set)
+  
+  const tagsChanged = newEntry.hasOwnProperty("tags");
+  const dateChanged = newEntry.date && newEntry.date !== oldDate;
+  const replacingLines = newLines.length > 0;
+
+  if (replacingLines || tagsChanged || dateChanged) {
     const oldLinesResult = await db.send(
       new QueryCommand({
         TableName: TABLE_NAME,
@@ -517,34 +538,60 @@ export async function updateJournalEntry(
         },
       })
     );
-    const oldLines = oldLinesResult.Items || [];
+    const oldLines = (oldLinesResult.Items as unknown as JournalLine[]) || [];
 
-    for (const line of oldLines) {
-      if (!newAccountIds.has(line.accountId)) {
+    if (replacingLines) {
+      // Delete old lines that are NO LONGER in the entry
+      for (const line of oldLines) {
+        if (!newAccountIds.has(line.accountId)) {
+          transactItems.push({
+            Delete: {
+              TableName: TABLE_NAME,
+              Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
+            },
+          });
+        }
+      }
+
+      // Add/Update new lines
+      for (const line of mergedNewLines) {
         transactItems.push({
-          Delete: {
+          Put: {
             TableName: TABLE_NAME,
-            Key: marshall({ PK: pk, SK: `LINE#${entryId}#${line.accountId}` }),
+            Item: marshall({
+              PK: pk,
+              SK: `LINE#${entryId}#${line.accountId}`,
+              Type: "JournalLine",
+              GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
+              GSI1SK: `JNL#${line.date}#${line.journalId}`,
+              tags: newEntry.hasOwnProperty("tags") ? newEntry.tags : line.tags, // Use new tags if provided
+              ...line,
+            }, { removeUndefinedValues: true }),
           },
         });
       }
-    }
-
-    // 3. Add/Update new lines
-    for (const line of mergedNewLines) {
-      transactItems.push({
-        Put: {
-          TableName: TABLE_NAME,
-          Item: marshall({
-            PK: pk,
-            SK: `LINE#${entryId}#${line.accountId}`,
-            Type: "JournalLine",
-            GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
-            GSI1SK: `JNL#${line.date}#${line.journalId}`,
-            ...line,
-          }, { removeUndefinedValues: true }),
-        },
-      });
+    } else if (tagsChanged || dateChanged) {
+      // We aren't replacing lines, but we need to update tags or date on EVERY existing line
+      for (const line of oldLines) {
+        const updatedLine = {
+          ...line,
+          date: newEntry.date || line.date,
+          tags: tagsChanged ? newEntry.tags : line.tags,
+        };
+        transactItems.push({
+          Put: {
+            TableName: TABLE_NAME,
+            Item: marshall({
+              PK: pk,
+              SK: `LINE#${entryId}#${line.accountId}`,
+              Type: "JournalLine",
+              GSI1PK: `ORG#${line.orgId}#ACC#${line.accountId}`,
+              GSI1SK: `JNL#${updatedLine.date}#${entryId}`,
+              ...updatedLine,
+            }, { removeUndefinedValues: true }),
+          },
+        });
+      }
     }
   }
 

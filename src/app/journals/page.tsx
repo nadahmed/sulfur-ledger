@@ -91,7 +91,23 @@ export default function JournalsPage() {
     enabled: !!activeOrganizationId && canRead,
   });
 
+  const { data: tagData = [] } = useQuery<any[]>({
+    queryKey: ["tags", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch("/api/tags");
+      if (!res.ok) throw new Error("Failed to fetch tags");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canRead,
+  });
+
   const accounts = accountResponse?.data || [];
+  const tagsMap = useMemo(() => {
+    return tagData.reduce((acc, tag) => {
+      acc[tag.id] = tag;
+      return acc;
+    }, {} as Record<string, any>);
+  }, [tagData]);
   
   const todayLocal = useMemo(() => {
     const now = new Date();
@@ -107,7 +123,7 @@ export default function JournalsPage() {
     amount: "",
     fromAccountId: "",
     toAccountId: "",
-    tags: "" as any,
+    tags: [] as any,
   }), [todayLocal]);
 
   const {
@@ -227,7 +243,7 @@ export default function JournalsPage() {
       amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
       fromAccountId: creditLine?.accountId || "",
       toAccountId: debitLine?.accountId || "",
-      tags: (editingEntry.tags || []).join(", "),
+      tags: editingEntry.tags || [],
     };
   }, [editingEntry]);
 
@@ -371,14 +387,19 @@ export default function JournalsPage() {
                           <TableCell className="max-w-[180px]">
                             <div className="flex flex-wrap gap-1">
                               {jnl.tags && jnl.tags.length > 0 ? (
-                                jnl.tags.map((tag: string, idx: number) => (
-                                  <span 
-                                    key={idx} 
-                                    className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))
+                                jnl.tags.map((tagId: string) => {
+                                  const tag = tagsMap[tagId];
+                                  if (!tag) return null;
+                                  return (
+                                    <span 
+                                      key={tagId} 
+                                      style={{ backgroundColor: tag.color }}
+                                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider"
+                                    >
+                                      {tag.name}
+                                    </span>
+                                  );
+                                })
                               ) : (
                                 <span className="text-neutral-400">-</span>
                               )}

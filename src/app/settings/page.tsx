@@ -428,7 +428,7 @@ function SettingsInner() {
           { id: "members", label: "Members" },
           { id: "email", label: "Email Delivery" },
           { id: "mcp", label: "MCP Server" },
-          { id: "data", label: "Data Management" }
+          { id: "data", label: "Data Management" },
         ].map((tab) => (
           <Button
             key={tab.id}

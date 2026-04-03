@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TagSelector } from "@/components/journals/TagSelector";
 
 interface Account {
   id: string;
@@ -212,11 +213,16 @@ export function JournalForm({
 
       <div className="flex gap-4">
         <div className="grid flex-1 items-center gap-1.5">
-          <Label htmlFor="tags">Tags (Optional, comma-separated)</Label>
-          <Input 
-            id="tags" 
-            {...register("tags")} 
-            placeholder="e.g. marketing, software, monthly" 
+          <Label htmlFor="tags">Tags</Label>
+          <Controller
+            name="tags"
+            control={control}
+            render={({ field }) => (
+              <TagSelector
+                value={field.value as string[] || []}
+                onChange={field.onChange}
+              />
+            )}
           />
         </div>
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkPermission } from "@/lib/auth";
 import { generateReportData } from "@/lib/reports";
 import { getOrganization } from "@/lib/db/organizations";
+import { getTags } from "@/lib/db/tags";
 import { createAuditLog } from "@/lib/db/audit";
 import { uuidv7 } from "uuidv7";
 import jsPDF from "jspdf";
@@ -25,10 +26,11 @@ export async function GET(req: NextRequest) {
 
     // Format utility
     const formatCurrency = (amount: number) => {
+      const normalizedAmount = (amount === 0 || Math.abs(amount) < 0.01) ? 0 : amount;
       return new Intl.NumberFormat("en-BD", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Math.abs(amount) / 100);
+      }).format(normalizedAmount / 100);
     };
 
     // 1. Fetch organization for branding
@@ -36,7 +38,8 @@ export async function GET(req: NextRequest) {
     const orgName = org?.name || "Sulfur Ledger Organization";
 
     // 2. Fetch the report data natively via our shared library function
-    const reportData = await generateReportData(orgId, reportType, startDate, endDate, searchParams);
+    const tags = searchParams.get("tags")?.split(",").filter(Boolean) || undefined;
+    const reportData = await generateReportData(orgId, reportType, startDate, endDate, searchParams, tags);
 
     // 3. Generate PDF
     const doc = new jsPDF();
@@ -65,6 +68,17 @@ export async function GET(req: NextRequest) {
       metaY += 5;
     }
 
+    if (tags && tags.length > 0) {
+      const allTags = await getTags(orgId);
+      const selectedNames = allTags
+        .filter(t => tags.includes(t.id))
+        .map(t => t.name)
+        .join(", ");
+      
+      doc.text(`Filter Tags: ${selectedNames}`, 14, metaY);
+      metaY += 5;
+    }
+
     doc.text(`Printed on: ${format(new Date(), "PPpp")}`, 14, metaY);
 
     let currentY = metaY + 10;
@@ -75,14 +89,14 @@ export async function GET(req: NextRequest) {
         acc.name,
         acc.category.charAt(0).toUpperCase() + acc.category.slice(1),
         acc.balance > 0 ? formatCurrency(acc.balance) : "-",
-        acc.balance < 0 ? formatCurrency(acc.balance) : "-"
+        acc.balance < 0 ? formatCurrency(Math.abs(acc.balance)) : "-"
       ]);
 
       rows.push([
         "TOTAL",
         "",
         formatCurrency(data.totalDebits || 0),
-        formatCurrency(data.totalCredits || 0)
+        formatCurrency(Math.abs(data.totalCredits || 0))
       ]);
 
       autoTable(doc, {
@@ -103,9 +117,9 @@ export async function GET(req: NextRequest) {
     } else if (reportType === "balance-sheet") {
       const data = reportData as any;
       const sections = [
-        { title: 'Assets', accounts: data.assets || [] },
-        { title: 'Liabilities', accounts: data.liabilities || [] },
-        { title: 'Equity', accounts: data.equity || [] }
+        { title: 'Assets', accounts: data.assets || [], normal: 'debit' },
+        { title: 'Liabilities', accounts: data.liabilities || [], normal: 'credit' },
+        { title: 'Equity', accounts: data.equity || [], normal: 'credit' }
       ];
 
       sections.forEach((section) => {
@@ -114,14 +128,19 @@ export async function GET(req: NextRequest) {
         doc.text(section.title, 14, currentY);
         currentY += 5;
 
-        const total = section.accounts.reduce((sum: number, acc: any) => sum + Math.abs(acc.balance), 0);
-        const rows = section.accounts.map((acc: any) => [acc.name, formatCurrency(acc.balance)]);
+        // Algebraic total
+        const total = section.accounts.reduce((sum: number, acc: any) => sum + acc.balance, 0);
+        
+        const rows = section.accounts.map((acc: any) => [
+          acc.name, 
+          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)
+        ]);
         
         if (rows.length === 0) {
            rows.push(['No items found', formatCurrency(0)]);
         }
         
-        rows.push([`Total ${section.title}`, formatCurrency(total)]);
+        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total)]);
 
         autoTable(doc, {
           startY: currentY,
@@ -137,13 +156,15 @@ export async function GET(req: NextRequest) {
             }
           }
         });
-        currentY = (doc as any).lastAutoTable.finalY + 15;
+        currentY = (doc as any).lastAutoTable.finalY + 10;
       });
+
+      // No summary footer (per user request)
     } else if (reportType === "income-statement") {
       const data = reportData as any;
       const sections = [
-        { title: 'Income', accounts: data.income || [] },
-        { title: 'Expenses', accounts: data.expenses || [] }
+        { title: 'Income', accounts: data.income || [], normal: 'credit' },
+        { title: 'Expenses', accounts: data.expenses || [], normal: 'debit' }
       ];
 
       sections.forEach((section) => {
@@ -152,14 +173,17 @@ export async function GET(req: NextRequest) {
         doc.text(section.title, 14, currentY);
         currentY += 5;
 
-        const total = section.accounts.reduce((sum: number, acc: any) => sum + Math.abs(acc.balance), 0);
-        const rows = section.accounts.map((acc: any) => [acc.name, formatCurrency(acc.balance)]);
+        const total = section.accounts.reduce((sum: number, acc: any) => sum + acc.balance, 0);
+        const rows = section.accounts.map((acc: any) => [
+          acc.name, 
+          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)
+        ]);
         
         if (rows.length === 0) {
            rows.push(['No items found', formatCurrency(0)]);
         }
         
-        rows.push([`Total ${section.title}`, formatCurrency(total)]);
+        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total)]);
 
         autoTable(doc, {
           startY: currentY,
@@ -178,9 +202,10 @@ export async function GET(req: NextRequest) {
         currentY = (doc as any).lastAutoTable.finalY + 15;
       });
 
-      const totalIncome = (data.income || []).reduce((s: number, a: any) => s + Math.abs(a.balance), 0);
-      const totalExpenses = (data.expenses || []).reduce((s: number, a: any) => s + Math.abs(a.balance), 0);
-      const netIncome = totalIncome - totalExpenses;
+      const totalIncome = (data.income || []).reduce((s: number, a: any) => s + a.balance, 0);
+      const totalExpenses = (data.expenses || []).reduce((s: number, a: any) => s + a.balance, 0);
+      // Net Income = (Income Credits + Expense Debits) * -1 (to show Net Profit as positive)
+      const netIncome = (totalIncome + totalExpenses) * -1;
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");

@@ -14,6 +14,7 @@ import { Download, RotateCcw } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { TagSelector } from "@/components/journals/TagSelector";
 import { Suspense } from "react";
 
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -65,6 +66,10 @@ function ReportsInner() {
     activeOrganizationId ? `reports-filters-end-${activeOrganizationId}` : "reports-filters-end-default", 
     ""
   );
+  const [selectedTagIds, setSelectedTagIds] = useLocalStorage<string[]>(
+    activeOrganizationId ? `reports-filters-tags-${activeOrganizationId}` : "reports-filters-tags-default",
+    []
+  );
 
   const isLoading = userLoading || orgLoading;
   const canRead = isOwner || permissions.includes("read:reports");
@@ -99,15 +104,17 @@ function ReportsInner() {
     let url = `/api/reports/pdf?type=${reportType}`;
     if (startDate) url += `&start=${startDate}`;
     if (endDate) url += `&end=${endDate}`;
+    if (selectedTagIds.length > 0) url += `&tags=${selectedTagIds.join(",")}`;
     window.open(url, '_blank');
   };
 
   const { data, isLoading: isFetchingReport, isError, error } = useQuery<ReportData>({
-    queryKey: ["reports", activeOrganizationId, reportType, startDate, endDate],
+    queryKey: ["reports", activeOrganizationId, reportType, startDate, endDate, selectedTagIds],
     queryFn: async () => {
       let url = `/api/reports?type=${reportType}`;
       if (startDate) url += `&start=${startDate}`;
       if (endDate) url += `&end=${endDate}`;
+      if (selectedTagIds.length > 0) url += `&tags=${selectedTagIds.join(",")}`;
 
       const res = await fetch(url, {
         headers: { "x-org-id": activeOrganizationId! }
@@ -119,11 +126,13 @@ function ReportsInner() {
   });
 
   const formatCurrency = (amount: number) => {
+    // Avoid -0 display by adding 0
+    const normalizedAmount = amount === 0 ? 0 : amount;
     return new Intl.NumberFormat("en-BD", {
       style: "currency",
       currency: "BDT",
       minimumFractionDigits: 2,
-    }).format(Math.abs(amount) / 100);
+    }).format(normalizedAmount / 100);
   };
 
   const chartData = useMemo(() => {
@@ -137,13 +146,13 @@ function ReportsInner() {
       ];
     }
     if (reportType === "balance-sheet") {
-      const totalAssets = (data.assets || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
-      const totalLia = (data.liabilities || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
-      const totalEq = (data.equity || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      const totalAssets = (data.assets || []).reduce((sum, item) => sum + item.balance, 0) / 100;
+      const totalLia = (data.liabilities || []).reduce((sum, item) => sum + item.balance, 0) / 100;
+      const totalEq = (data.equity || []).reduce((sum, item) => sum + item.balance, 0) / 100;
       return [
         { name: "Assets", amount: totalAssets, fill: "#3b82f6" },
-        { name: "Liabilities", amount: totalLia, fill: "#f59e0b" },
-        { name: "Equity", amount: totalEq, fill: "#8b5cf6" },
+        { name: "Liabilities", amount: Math.abs(totalLia), fill: "#f59e0b" },
+        { name: "Equity", amount: Math.abs(totalEq), fill: "#8b5cf6" },
       ];
     }
     return [];
@@ -191,7 +200,14 @@ function ReportsInner() {
               onChange={(e) => setEndDate(e.target.value)} 
             />
           </div>
-          <Button variant="ghost" className="sm:mb-[2px] h-9 w-full sm:w-auto" onClick={() => { setStartDate(""); setEndDate(""); }}>
+          <div className="grid gap-1 w-full sm:w-[200px]">
+            <Label htmlFor="tags-filter" className="text-xs">Filter by Tags</Label>
+            <TagSelector 
+              value={selectedTagIds}
+              onChange={setSelectedTagIds}
+            />
+          </div>
+          <Button variant="ghost" className="sm:mb-[2px] h-9 w-full sm:w-auto" onClick={() => { setStartDate(""); setEndDate(""); setSelectedTagIds([]); }}>
              <RotateCcw className="mr-2 h-4 w-4" /> Reset
           </Button>
         </div>
@@ -249,13 +265,13 @@ function ReportsInner() {
                             <TableCell>{acc.name}</TableCell>
                             <TableCell className="capitalize text-xs text-muted-foreground">{acc.category}</TableCell>
                             <TableCell className="text-right">{acc.balance > 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
-                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
+                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrency(Math.abs(acc.balance)) : "-"}</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">
                           <TableCell colSpan={2}>Total</TableCell>
                           <TableCell className="text-right">{formatCurrency(data.totalDebits || 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(data.totalCredits || 0)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(Math.abs(data.totalCredits || 0))}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -263,21 +279,76 @@ function ReportsInner() {
 
                   {reportType === "balance-sheet" && data && (
                     <div className="space-y-6">
-                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrency} />
-                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrency} />
-                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrency} />
+                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrency} normal="debit" />
+                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrency} normal="credit" />
+                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrency} normal="credit" />
+                      
+                      <div className="pt-6 border-t-2 space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between gap-4">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Assets</p>
+                            <p className="text-xl font-bold">{formatCurrency((data.assets || []).reduce((s, a) => s + a.balance, 0))}</p>
+                          </div>
+                          <div className="space-y-1 sm:text-right">
+                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Liabilities & Equity</p>
+                            <p className="text-xl font-bold">
+                              {formatCurrency(
+                                ((data.liabilities || []).reduce((s, a) => s + a.balance, 0) + 
+                                (data.equity || []).reduce((s, a) => s + a.balance, 0)) * -1
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const totalAssets = (data.assets || []).reduce((s, a) => s + a.balance, 0);
+                          const totalLiaEqBalances = (data.liabilities || []).reduce((s, a) => s + a.balance, 0) + (data.equity || []).reduce((s, a) => s + a.balance, 0);
+                          
+                          const diff = Math.round(totalAssets + totalLiaEqBalances);
+                          const isBalanced = Math.abs(diff) < 1; // within 1 cent/unit for rounding
+
+                          return (
+                            <div className={`p-4 rounded-lg flex items-center justify-between ${isBalanced ? "bg-green-50 border border-green-100" : "bg-red-50 border border-red-100"}`}>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${isBalanced ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
+                                <span className={`font-semibold ${isBalanced ? "text-green-700" : "text-red-700"}`}>
+                                  {isBalanced ? "Balance Sheet is Balanced" : "Balance Sheet is Out of Balance"}
+                                </span>
+                              </div>
+                              {!isBalanced && (
+                                <span className="text-red-600 font-mono font-bold">
+                                  Diff: {formatCurrency(diff)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
                   )}
 
                   {reportType === "income-statement" && data && (
                     <div className="space-y-6">
-                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrency} />
-                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrency} />
+                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrency} normal="credit" />
+                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrency} normal="debit" />
+                      
                       <div className="pt-4 border-t-2 flex justify-between font-bold text-lg">
                         <span>Net Income</span>
-                        <span className={((data.income || []).reduce((s,a) => s + Math.abs(a.balance), 0) - (data.expenses || []).reduce((s,a) => s + Math.abs(a.balance), 0)) >= 0 ? "text-green-600" : "text-red-600"}>
-                          {formatCurrency((data.income || []).reduce((s,a) => s + Math.abs(a.balance), 0) - (data.expenses || []).reduce((s,a) => s + Math.abs(a.balance), 0))}
-                        </span>
+                        {(() => {
+                          const totalIncome = (data.income || []).reduce((s, a) => s + a.balance, 0);
+                          const totalExpenses = (data.expenses || []).reduce((s, a) => s + a.balance, 0);
+                          // Net Income = Income (credit) - Expenses (debit). 
+                          // In our DB, income is negative, expenses positive.
+                          // So Net Income (Credit) = (Sum(Income) + Sum(Expenses))
+                          // We want to show positive for Profit (Net Credit)
+                          const netIncome = (totalIncome + totalExpenses) * -1;
+                          
+                          return (
+                            <span className={netIncome >= 0 ? "text-green-600" : "text-red-600"}>
+                              {formatCurrency(netIncome)}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -290,8 +361,8 @@ function ReportsInner() {
   );
 }
 
-function ReportSection({ title, accounts, format }: { title: string, accounts: AccountBalance[], format: (v: number) => string }) {
-  const total = useMemo(() => accounts.reduce((sum, acc) => sum + Math.abs(acc.balance), 0), [accounts]);
+function ReportSection({ title, accounts, format, normal = "debit" }: { title: string, accounts: AccountBalance[], format: (v: number) => string, normal?: "debit" | "credit" }) {
+  const total = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
   return (
     <div className="space-y-2">
       <h3 className="font-semibold text-lg border-b pb-1">{title}</h3>
@@ -300,7 +371,9 @@ function ReportSection({ title, accounts, format }: { title: string, accounts: A
           {accounts.map(acc => (
             <TableRow key={acc.id} className="border-none hover:bg-transparent">
               <TableCell className="py-1">{acc.name}</TableCell>
-              <TableCell className="text-right py-1">{format(acc.balance)}</TableCell>
+              <TableCell className={`text-right py-1 font-mono ${acc.balance < 0 && normal === "debit" ? "text-red-600" : ""}`}>
+                {format(normal === "credit" ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)}
+              </TableCell>
             </TableRow>
           ))}
           {accounts.length === 0 && (
@@ -311,7 +384,9 @@ function ReportSection({ title, accounts, format }: { title: string, accounts: A
           )}
           <TableRow className="font-bold">
             <TableCell>Total {title}</TableCell>
-            <TableCell className="text-right border-t">{format(total)}</TableCell>
+            <TableCell className="text-right border-t">
+              {format(normal === "credit" ? (total === 0 ? 0 : total * -1) : total)}
+            </TableCell>
           </TableRow>
         </TableBody>
       </Table>

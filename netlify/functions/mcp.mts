@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import * as journalsDb from "../../src/lib/db/journals";
 import * as accountsDb from "../../src/lib/db/accounts";
+import * as tagsDb from "../../src/lib/db/tags";
 import { getOrganization } from "../../src/lib/db/organizations";
 import { createMcpActivityLog } from "../../src/lib/db/audit";
 import { z } from "zod";
@@ -230,6 +231,71 @@ DON'Ts:
     }
   );
 
+  // ─── TAGS ───────────────────────────────────────────────────────────────────
+
+  // Tool: List Tags
+  server.registerTool(
+    "get_tags",
+    {
+      description: "Returns all formal tags for this organization. Tags have names, colors, and IDs.",
+      inputSchema: {}
+    },
+    async () => {
+      const tags = await tagsDb.getTags(orgId);
+      return {
+        content: [{ type: "text", text: JSON.stringify(tags, null, 2) }]
+      };
+    }
+  );
+
+  // Tool: Create Tag
+  server.registerTool(
+    "create_tag",
+    {
+      description: `Creates a new formal tag with a name and color.
+
+⚠️ MANDATORY WORKFLOW:
+- ALWAYS call get_tags first to check if a suitable tag already exists.
+- NEVER create a tag automatically without presenting the proposed name and color to the user.
+- Suggest similar existing tags if you find a close match (e.g., 'Marketing-2024' vs 'Marketing').
+- Only call this tool once the user has explicitly confirmed the new tag creation.`,
+      inputSchema: {
+        name: z.string().describe("Tag name, e.g. 'Project Alpha'"),
+        color: z.string().describe("CSS color hex code or name, e.g. '#2563eb' or 'blue'"),
+        description: z.string().optional().describe("Optional description of the tag's purpose")
+      }
+    },
+    async (args) => {
+      try {
+        const tag = await tagsDb.createTag({ orgId, ...args });
+        return {
+          content: [{ type: "text", text: `Tag '${tag.name}' created with ID ${tag.id}.` }]
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // Tool: Delete Tag
+  server.registerTool(
+    "delete_tag",
+    {
+      description: "Deletes a formal tag. NOTE: This does not remove it from existing transactions.",
+      inputSchema: {
+        tagId: z.string().describe("The ID of the tag to delete")
+      }
+    },
+    async ({ tagId }) => {
+      try {
+        await tagsDb.deleteTag(orgId, tagId);
+        return { content: [{ type: "text", text: `Tag ${tagId} deleted.` }] };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
   // ─── JOURNALS ────────────────────────────────────────────────────────────────
 
   // Tool: Get Journal Entries
@@ -258,11 +324,12 @@ DON'Ts:
 - Do not call without any filters for large datasets (performance)`,
       inputSchema: {
         startDate: z.string().optional().describe("Start date filter in YYYY-MM-DD format (inclusive)"),
-        endDate: z.string().optional().describe("End date filter in YYYY-MM-DD format (inclusive)")
+        endDate: z.string().optional().describe("End date filter in YYYY-MM-DD format (inclusive)"),
+        tagIds: z.array(z.string()).optional().describe("Filter by one or more tag IDs")
       }
     },
-    async ({ startDate, endDate }) => {
-      const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate);
+    async ({ startDate, endDate, tagIds }) => {
+      const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate, tagIds);
       
       // Fetch lines for all entries in parallel
       const enrichedEntries = await Promise.all(entries.map(async (e) => {
@@ -496,6 +563,7 @@ MANDATORY WORKFLOW before calling this tool:
 1. Call get_accounts to get valid account IDs and confirm they are "active"
 2. Confirm with the user which accounts to use
 3. If a suitable account doesn't exist, follow the create_account workflow first
+4. Call get_tags to verify which tags exist — NEVER guess or create tags automatically
 
 DOs:
 - amount MUST be positive and greater than 0 (e.g. 150.75)
@@ -507,6 +575,7 @@ DON'Ts:
 - Never use the same account for both fromAccountId and toAccountId
 - Never use archived accounts
 - Never record entries without confirming the accounts with the user first
+- Never use new or inferred tags without explicit user approval via the create_tag workflow
 - Do not record duplicate entries — check get_journals if unsure`,
       inputSchema: {
         date: z.string().describe("Transaction date in YYYY-MM-DD format"),
@@ -597,7 +666,8 @@ Use this when:
 MANDATORY WORKFLOW before calling this tool:
 1. Call get_accounts to confirm all account IDs exist and are active
 2. Confirm the list and accounts with the user before executing
-3. If any needed account is missing, follow the create_account workflow first
+3. Call get_tags to verify which tags exist — NEVER guess or create tags automatically
+4. If any needed account or tag is missing, follow the respective create workflow first
 
 DOs:
 - All amounts must be positive and > 0
@@ -608,6 +678,7 @@ DOs:
 DON'Ts:
 - Do not use archived accounts
 - Do not call without user confirmation of the full list
+- Do not ever record tags that haven't been approved by the user
 - Do not use this for a single transaction — use record_journal_entry instead
 
 Returns a summary of successes and any errors per entry.`,

@@ -12,7 +12,8 @@ export async function generateReportData(
   reportType: string, 
   startDate?: string, 
   endDate?: string,
-  searchParams?: URLSearchParams
+  searchParams?: URLSearchParams,
+  filterTags?: string[] // Tag IDs to filter by
 ) {
   const accounts = await getAccounts(orgId);
   
@@ -26,7 +27,14 @@ export async function generateReportData(
     const queryStart = "1970-01-01";
     const queryEnd = endDate || "2100-12-31";
     
-    const lines = await getAccountLines(orgId, acc.id, queryStart, queryEnd);
+    let lines = await getAccountLines(orgId, acc.id, queryStart, queryEnd);
+    
+    // Filter lines by tags if provided
+    if (filterTags && filterTags.length > 0) {
+      lines = lines.filter(line => 
+        line.tags && filterTags.some(t => line.tags!.includes(t))
+      );
+    }
     
     let priorBalance = 0;
     let periodBalance = 0;
@@ -193,7 +201,15 @@ export async function generateReportData(
     }
 
     await Promise.all([...incomeAccounts, ...expenseAccounts].map(async (acc) => {
-      const lines = await getAccountLines(orgId, acc.id, formattedStart, formattedEnd);
+      let lines = await getAccountLines(orgId, acc.id, formattedStart, formattedEnd);
+      
+      // Filter lines by tags if provided
+      if (filterTags && filterTags.length > 0) {
+        lines = lines.filter(line => 
+          line.tags && filterTags.some(t => line.tags!.includes(t))
+        );
+      }
+      
       lines.forEach(line => {
         const lineDate = parseISO(line.date);
         let key: string;

@@ -12,6 +12,7 @@ import {
   Plus,
   Building2,
   History,
+  Tag as TagIcon,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -48,11 +49,6 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Accounts",
-    url: "/accounts",
-    icon: Wallet,
-  },
-  {
     title: "Journals",
     url: "/journals",
     icon: BookOpen,
@@ -63,9 +59,19 @@ const navItems = [
     icon: PieChart,
   },
   {
+    title: "Accounts",
+    url: "/accounts",
+    icon: Wallet,
+  },
+  {
     title: "Activity",
     url: "/activity",
     icon: History,
+  },
+  {
+    title: "Tags",
+    url: "/tags",
+    icon: TagIcon,
   },
   {
     title: "Settings",
