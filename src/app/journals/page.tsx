@@ -275,14 +275,14 @@ export default function JournalsPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 sm:pb-7">
           <CardTitle>Recent Journals</CardTitle>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[240px]">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 min-w-0 sm:min-w-[300px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
               <Input 
-                placeholder="Search description, amount, accounts, or tags..." 
-                className="pl-9 pr-9"
+                placeholder="Search queries..." 
+                className="pl-9 pr-9 h-9 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -298,19 +298,21 @@ export default function JournalsPage() {
               )}
             </div>
             
-            <div className="flex items-center gap-2">
-              <Label htmlFor="filter-date" className="text-sm font-medium whitespace-nowrap">Filter by Date:</Label>
-              <Input 
-                id="filter-date" 
-                type="date" 
-                className="w-40 h-9" 
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-              />
+            <div className="flex items-center gap-2 group">
+              <div className="relative flex-1 sm:flex-initial">
+                <Input 
+                  id="filter-date" 
+                  type="date" 
+                  className="w-full sm:w-40 h-9" 
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                />
+              </div>
               {filterDate && (
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="sm" 
+                  className="h-9 px-2 text-xs"
                   onClick={() => setFilterDate("")}
                 >
                   Clear
