@@ -20,9 +20,6 @@ export default function MarketingLayout({
             <div className="w-8 h-8 rounded-lg flex items-center justify-center">
               <Image src="/icon.png" alt="Logo" width={34} height={34} />
             </div>
-            <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">
-              Sulfur Book
-            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-neutral-400">

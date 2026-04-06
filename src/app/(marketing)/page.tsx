@@ -37,7 +37,7 @@ export default function LandingPage() {
             AI-Powered Bookkeeping Evolution
           </Badge>
           
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 bg-gradient-to-b from-white via-white to-neutral-500 bg-clip-text text-transparent italic decoration-primary">
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 text-white bg-gradient-to-b from-white via-white to-neutral-500 bg-clip-text supports-[background-clip:text]:text-transparent italic decoration-primary">
             Precision Accounting,<br />At Warp Speed.
           </h1>
           
@@ -226,7 +226,7 @@ export default function LandingPage() {
                     <Sparkles className="w-3 h-3 mr-2" />
                     Free Public Beta Launch
                   </Badge>
-                  <h3 className="text-3xl md:text-5xl font-black mb-6 italic tracking-tight uppercase leading-[1.1]">
+                  <h3 className="text-3xl md:text-5xl font-black mb-6 italic tracking-tight uppercase leading-[1.1] text-white">
                     The Modern Standard,<br />Now Open to Everyone.
                   </h3>
                   <p className="text-neutral-400 text-sm md:text-lg mb-8 md:mb-10 max-w-lg mx-auto leading-relaxed">

@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, slugify } from "@/lib/utils";
 import {
   OrganizationSchema,
   OrganizationFormValues,
@@ -1108,7 +1108,7 @@ function SettingsInner() {
                         <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
                           {`{
   "mcpServers": {
-    "${activeOrg?.name || "sulfur"}-ledger": {
+    "${slugify(activeOrg?.name || "sulfur")}-ledger": {
       "url": "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp",
       "transport": "http",
       "headers": {
@@ -1125,7 +1125,7 @@ function SettingsInner() {
                           onClick={() => {
                             const config = {
                               mcpServers: {
-                                [`${activeOrg?.name || "sulfur"}-ledger`]: {
+                                [`${slugify(activeOrg?.name || "sulfur")}-ledger`]: {
                                   url: `${window.location.origin}/api/mcp`,
                                   transport: "http",
                                   headers: {
