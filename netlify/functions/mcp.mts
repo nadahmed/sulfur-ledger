@@ -4,6 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as journalsDb from "../../src/lib/db/journals";
 import * as accountsDb from "../../src/lib/db/accounts";
 import * as tagsDb from "../../src/lib/db/tags";
+import * as recurringDb from "../../src/lib/db/recurring";
 import { getOrganization } from "../../src/lib/db/organizations";
 import { createMcpActivityLog } from "../../src/lib/db/audit";
 import { z } from "zod";
@@ -870,6 +871,161 @@ DON'Ts:
       }
     }
   );
+
+  // ─── RECURRING ─────────────────────────────────────────────────────────────
+
+  // Tool: Get Recurring Entries
+  server.registerTool(
+    "get_recurring_entries",
+    {
+      description: `Returns all recurring journal entry schedules for this organization.
+      
+Use this to:
+- Review existing automated transaction plans
+- Check which schedules are currently 'active' or 'paused'
+- Identify if a specific recurring entry already exists before creating a duplicate`,
+      inputSchema: {}
+    },
+    async () => {
+      const entries = await recurringDb.getRecurringEntries(orgId);
+      const simplified = entries.map(e => ({
+        id: e.id,
+        description: e.description,
+        amount: e.amount / 100, // Convert to Taka
+        frequency: e.frequency,
+        interval: e.interval,
+        startDate: e.startDate,
+        nextProcessDate: e.nextProcessDate,
+        isActive: e.isActive,
+        fromAccountId: e.fromAccountId,
+        toAccountId: e.toAccountId,
+        tags: e.tags || []
+      }));
+      return {
+        content: [{ type: "text", text: JSON.stringify(simplified, null, 2) }]
+      };
+    }
+  );
+
+  // Tool: Create Recurring Entry
+  server.registerTool(
+    "create_recurring_entry",
+    {
+      description: `Creates a new recurring schedule for automated journal entries.
+      
+WORKFLOW before calling this tool:
+1. Call 'get_accounts' to verify that both source and destination accounts exist and are 'active'.
+2. Call 'get_recurring_entries' to ensure you are not creating a redundant schedule.
+3. Confirm the full schedule (amount, frequency, and accounts) with the user before proceeding.
+
+DOs:
+- amount MUST be positive and greater than 0 (in Taka, e.g. 1500.00)
+- startDate should be in YYYY-MM-DD format
+- frequency must be one of: daily | weekly | monthly | yearly
+- interval must be at least 1 (e.g. interval 2 with frequency 'weekly' means every 2 weeks)
+
+DON'Ts:
+- Never use same account for both from/to
+- Never use archived accounts
+- Never create a schedule without user confirmation`,
+      inputSchema: {
+        description: z.string().describe("Clear description of the automated transaction"),
+        amount: z.number().positive().describe("Transaction amount in Taka"),
+        fromAccountId: z.string().describe("Source account ID (Credit)"),
+        toAccountId: z.string().describe("Destination account ID (Debit)"),
+        frequency: z.enum(["daily", "weekly", "monthly", "yearly"]).describe("Scheduling period"),
+        interval: z.number().int().min(1).describe("Number of periods between runs (default 1)"),
+        startDate: z.string().describe("When the schedule should begin (YYYY-MM-DD)"),
+        tags: z.array(z.string()).optional().describe("Optional tags to apply to generated entries")
+      }
+    },
+    async (args) => {
+      try {
+        // Validate accounts
+        const accs = await accountsDb.getAccounts(orgId);
+        const accMap = new Map(accs.map((a: any) => [a.id, a]));
+        const fromAcc = accMap.get(args.fromAccountId);
+        const toAcc = accMap.get(args.toAccountId);
+
+        if (!fromAcc) throw new Error(`Source account '${args.fromAccountId}' not found.`);
+        if (!toAcc) throw new Error(`Destination account '${args.toAccountId}' not found.`);
+        if (fromAcc.status === "archived") throw new Error(`Account '${args.fromAccountId}' is archived.`);
+        if (toAcc.status === "archived") throw new Error(`Account '${args.toAccountId}' is archived.`);
+
+        const entry: recurringDb.RecurringEntry = {
+          orgId,
+          id: randomUUID(),
+          description: args.description,
+          amount: Math.round(args.amount * 100),
+          fromAccountId: args.fromAccountId,
+          toAccountId: args.toAccountId,
+          frequency: args.frequency,
+          interval: args.interval,
+          startDate: args.startDate,
+          nextProcessDate: args.startDate, // Initial run is on startDate
+          tags: args.tags,
+          isActive: true,
+          createdAt: new Date().toISOString()
+        };
+
+        await recurringDb.createRecurringEntry(entry, "mcp-user", "AI Agent");
+        return {
+          content: [{ type: "text", text: `✅ Recurring entry '${args.description}' created successfully.\nID: ${entry.id}\nNext run: ${entry.nextProcessDate}` }]
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // Tool: Toggle Recurring Entry
+  server.registerTool(
+    "toggle_recurring_entry",
+    {
+      description: `Activates or pauses a recurring schedule.
+      
+Use this instead of deleting if the schedule might be needed again in the future.
+ALWAYS confirm with the user before changing the status of a schedule.`,
+      inputSchema: {
+        id: z.string().describe("ID of the recurring entry (get from get_recurring_entries)"),
+        isActive: z.boolean().describe("true to activate, false to pause")
+      }
+    },
+    async ({ id, isActive }) => {
+      try {
+        await recurringDb.updateRecurringEntry(orgId, id, { isActive }, "mcp-user", "AI Agent");
+        return {
+          content: [{ type: "text", text: `✅ Recurring entry ${id} is now ${isActive ? 'active' : 'paused'}.` }]
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
+  // Tool: Delete Recurring Entry
+  server.registerTool(
+    "delete_recurring_entry",
+    {
+      description: `Permanently removes a recurring schedule. NO future transactions will be generated.
+      
+⚠️ WARNING: This action is permanent. Confirm with the user first.`,
+      inputSchema: {
+        id: z.string().describe("ID of the recurring entry to delete")
+      }
+    },
+    async ({ id }) => {
+      try {
+        await recurringDb.deleteRecurringEntry(orgId, id, "mcp-user", "AI Agent");
+        return {
+          content: [{ type: "text", text: `✅ Recurring entry ${id} deleted.` }]
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
+
   // ─── SKILLS / WORKFLOWS (PROMPTS) ──────────────────────────────────────────────────
 
   // Skill: Reconcile Account

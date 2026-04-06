@@ -74,3 +74,31 @@ export const McpSettingsSchema = z.object({
 });
 
 export type McpSettingsFormValues = z.infer<typeof McpSettingsSchema>;
+
+export const RecurringEntrySchema = z.object({
+  description: z.string().min(1, "Description is required").max(200),
+  amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+    message: "Amount must be a positive number",
+  }),
+  fromAccountId: z.string().min(1, "Source account is required"),
+  toAccountId: z.string().min(1, "Destination account is required"),
+  frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+  interval: z.number().min(1, "Interval must be at least 1"),
+  dayOfWeek: z.number().min(0).max(6).optional(),
+  dayOfMonth: z.number().min(1).max(31).optional(),
+  startDate: z.string().min(1, "Start date is required"),
+  tags: z.union([z.array(z.string()), z.string()]).optional().transform((val) => {
+    if (typeof val === "string") {
+      if (val.trim() === "") return [];
+      return val.split(",").map(t => t.trim()).filter(Boolean);
+    }
+    return val || [];
+  }),
+  isActive: z.boolean().default(true),
+}).refine((data) => data.fromAccountId !== data.toAccountId, {
+  message: "From and To accounts cannot be the same",
+  path: ["toAccountId"],
+});
+
+export type RecurringEntryFormValues = z.infer<typeof RecurringEntrySchema>;
+export type RecurringEntryFormInput = z.input<typeof RecurringEntrySchema>;

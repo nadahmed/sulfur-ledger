@@ -747,7 +747,11 @@ function SettingsInner() {
                           control={controlInvite}
                           render={({ field }) => (
                             <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
-                              <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                              <SelectTrigger id="role">
+                                <SelectValue>
+                                  {field.value === "viewer" ? "Viewer" : field.value === "member" ? "Editor" : field.value === "admin" ? "Admin" : undefined}
+                                </SelectValue>
+                              </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="viewer">Viewer</SelectItem>
                                 <SelectItem value="member">Editor</SelectItem>
@@ -863,7 +867,9 @@ function SettingsInner() {
                                           disabled={!canManage || isSelf || updateRoleMutation.isPending}
                                         >
                                           <SelectTrigger className="h-6 w-auto border-none bg-transparent p-0 text-xs font-medium capitalize focus:ring-0">
-                                            <SelectValue />
+                                            <SelectValue>
+                                              {m.role === "admin" ? "Admin" : m.role === "member" ? "Member" : m.role === "viewer" ? "Viewer" : undefined}
+                                            </SelectValue>
                                           </SelectTrigger>
                                           <SelectContent>
                                             <SelectItem value="admin">Admin</SelectItem>
@@ -956,7 +962,11 @@ function SettingsInner() {
                               onValueChange={field.onChange}
                               disabled={!canManage}
                             >
-                              <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
+                              <SelectTrigger id="provider">
+                                <SelectValue>
+                                  {field.value === "none" ? "None (Disabled)" : field.value === "brevo" ? "Brevo (API)" : field.value === "smtp" ? "Custom SMTP" : undefined}
+                                </SelectValue>
+                              </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">None (Disabled)</SelectItem>
                                 <SelectItem value="brevo">Brevo (API)</SelectItem>
@@ -1186,7 +1196,11 @@ function SettingsInner() {
                             control={controlMcp}
                             render={({ field }) => (
                               <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger>
+                                  <SelectValue>
+                                    {field.value === "30" ? "30 Days" : field.value === "60" ? "60 Days" : field.value === "90" ? "90 Days" : field.value === "never" ? "Never Expires" : undefined}
+                                  </SelectValue>
+                                </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="30">30 Days</SelectItem>
                                   <SelectItem value="60">60 Days</SelectItem>

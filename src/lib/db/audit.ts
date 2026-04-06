@@ -7,7 +7,7 @@ export interface AuditLog {
   userId: string;
   userName?: string;
   action: "create" | "update" | "delete" | "export";
-  entityType: "JournalEntry" | "Account" | "Organization" | "Report";
+  entityType: "JournalEntry" | "Account" | "Organization" | "Report" | "RecurringEntry";
   entityId: string;
   details: string; // JSON string or description
   timestamp: string;

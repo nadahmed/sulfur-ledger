@@ -207,15 +207,35 @@ export default function AccountsPage() {
     createMutation.mutate(values);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    setConfirmConfig({
-      open: true,
-      title: "Confirm Deletion",
-      description: `Are you sure you want to archive ${name}? This will hide it from active lists.`,
-      actionLabel: "Archive",
-      variant: "destructive",
-      onConfirm: () => deleteMutation.mutate(id),
-    });
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      const res = await fetch(`/api/recurring?accountId=${id}`);
+      if (!res.ok) throw new Error("Failed to check dependencies");
+      const recurringEntries = await res.json();
+      
+      const hasRecurring = recurringEntries && recurringEntries.length > 0;
+      
+      setConfirmConfig({
+        open: true,
+        title: hasRecurring ? "Warning: Recurring Entries Linked" : "Confirm Deletion",
+        description: hasRecurring 
+          ? `Are you sure you want to archive ${name}? This account is used in ${recurringEntries.length} recurring entry schedule(s). ARCHIVING WILL PERMANENTLY DELETE THESE SCHEDULES.`
+          : `Are you sure you want to archive ${name}? This will hide it from active lists.`,
+        actionLabel: hasRecurring ? "Delete Schedules & Archive" : "Archive",
+        variant: "destructive",
+        onConfirm: () => deleteMutation.mutate(id),
+      });
+    } catch (err) {
+      // Fallback to basic warning if check fails
+      setConfirmConfig({
+        open: true,
+        title: "Confirm Deletion",
+        description: `Are you sure you want to archive ${name}? This will hide it from active lists.`,
+        actionLabel: "Archive",
+        variant: "destructive",
+        onConfirm: () => deleteMutation.mutate(id),
+      });
+    }
   };
 
   const handleUnarchive = (id: string, name: string) => {
@@ -275,8 +295,10 @@ export default function AccountsPage() {
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="category" className="capitalize">
-                        <SelectValue placeholder="Select Category" />
+                      <SelectTrigger id="category" className="capitalize h-10">
+                        <SelectValue placeholder="Select Category">
+                          {field.value ? field.value.charAt(0).toUpperCase() + field.value.slice(1) : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="asset">Asset</SelectItem>
@@ -318,7 +340,9 @@ export default function AccountsPage() {
             <div className="w-full sm:w-auto">
               <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val || "all")}>
                 <SelectTrigger className="h-9 w-full sm:w-[150px]">
-                  <SelectValue placeholder="All Categories" />
+                  <SelectValue placeholder="All Categories">
+                    {categoryFilter === "all" ? "All Categories" : categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>

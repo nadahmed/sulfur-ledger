@@ -241,7 +241,11 @@ export default function ActivityPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground">Action</Label>
                     <Select value={filterAction} onValueChange={v => setFilterAction(v || "all")}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="All Actions" /></SelectTrigger>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="All Actions">
+                          {filterAction === "all" ? "All Actions" : filterAction}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Actions</SelectItem>
                         {uniqueActions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
@@ -251,7 +255,11 @@ export default function ActivityPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground">User</Label>
                     <Select value={filterUser} onValueChange={v => setFilterUser(v || "all")}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="All Users" /></SelectTrigger>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="All Users">
+                          {filterUser === "all" ? "All Users" : filterUser}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Users</SelectItem>
                         {uniqueUsers.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
@@ -261,7 +269,11 @@ export default function ActivityPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground">Log Type</Label>
                     <Select value={filterType} onValueChange={v => setFilterType(v || "all")}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="All Types" /></SelectTrigger>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="All Types">
+                          {filterType === "all" ? "All Types" : filterType === "ui" ? "User Interface" : filterType === "mcp" ? "AI Agent (MCP)" : filterType}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="ui">User Interface</SelectItem>
@@ -381,7 +393,11 @@ export default function ActivityPage() {
                   <div className="flex items-center gap-2 mr-4">
                     <Label className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</Label>
                     <Select value={pageSize.toString()} onValueChange={v => setPageSize(Number(v || 20))}>
-                      <SelectTrigger className="w-[70px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-[70px] h-8 text-xs">
+                        <SelectValue>
+                          {pageSize.toString()}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="20">20</SelectItem>

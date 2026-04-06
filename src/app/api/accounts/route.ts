@@ -132,17 +132,32 @@ export async function DELETE(req: NextRequest) {
     // Check if account has transactions
     const { getAccountLines } = require("@/lib/db/journals");
     const { deleteAccount, archiveAccount } = require("@/lib/db/accounts");
+    const { getRecurringEntriesByAccount, deleteRecurringEntry } = require("@/lib/db/recurring");
+
+    // Cleanup recurring entries first
+    const recurringEntries = await getRecurringEntriesByAccount(orgId, accountId);
+    if (recurringEntries.length > 0) {
+      for (const entry of recurringEntries) {
+        await deleteRecurringEntry(orgId, entry.id, user!.sub, user!.name);
+      }
+    }
 
     const lines = await getAccountLines(orgId, accountId);
 
     if (lines && lines.length > 0) {
       // Soft delete: archive
       await archiveAccount(orgId, accountId, user!.sub, user!.name);
-      return NextResponse.json({ message: "Account archived successfully because it contains transactions." });
+      return NextResponse.json({ 
+        message: "Account archived successfully because it contains transactions.",
+        recurringDeleted: recurringEntries.length
+      });
     } else {
       // Hard delete
       await deleteAccount(orgId, accountId, user!.sub, user!.name);
-      return NextResponse.json({ message: "Account deleted permanently." });
+      return NextResponse.json({ 
+        message: "Account deleted permanently.",
+        recurringDeleted: recurringEntries.length
+      });
     }
 
   } catch (err: any) {

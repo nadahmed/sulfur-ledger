@@ -60,6 +60,11 @@ const navItems = [
     icon: PieChart,
   },
   {
+    title: "Recurring",
+    url: "/recurring",
+    icon: RotateCw,
+  },
+  {
     title: "Accounts",
     url: "/accounts",
     icon: Wallet,
@@ -229,7 +234,7 @@ export function AppSidebar() {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => {
                     // Slight delay for visual feedback
                     setTimeout(() => window.location.reload(), 200);

@@ -287,7 +287,9 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 self-end">
             <Select value={trendPeriod} onValueChange={(v) => v && setTrendPeriod(v as any)}>
               <SelectTrigger className="w-[110px] h-8 text-xs">
-                <SelectValue placeholder="Period" />
+                <SelectValue placeholder="Period">
+                  {trendPeriod.charAt(0).toUpperCase() + trendPeriod.slice(1)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="weeks">Weeks</SelectItem>
@@ -297,7 +299,9 @@ export default function DashboardPage() {
             </Select>
             <Select value={trendCount.toString()} onValueChange={(v) => v && setTrendCount(parseInt(v))}>
               <SelectTrigger className="w-[70px] h-8 text-xs">
-                <SelectValue placeholder="Count" />
+                <SelectValue placeholder="Count">
+                  {trendCount.toString()}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {[3, 6, 12, 24].map(n => (

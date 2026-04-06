@@ -7,73 +7,13 @@ import { JournalEntrySchema, JournalEntryFormInput } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ChevronsUpDown, Check, ArrowRightLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/accounts/SearchableSelect";
+import { ArrowRightLeft } from "lucide-react";
 import { TagSelector } from "@/components/journals/TagSelector";
 
 interface Account {
   id: string;
   name: string;
-}
-
-interface SearchableSelectProps {
-  options: { id: string; name: string }[];
-  value: string;
-  onValueChange: (value: string) => void;
-  placeholder: string;
-  error?: boolean;
-}
-
-function SearchableSelect({ options, value, onValueChange, placeholder, error }: SearchableSelectProps) {
-  const [open, setOpen] = useState(false);
-  const selectedOption = options.find((opt) => opt.id === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        role="combobox"
-        aria-expanded={open}
-        className={cn(
-          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-          !selectedOption && "text-neutral-500",
-          error && "border-red-500"
-        )}
-      >
-        {selectedOption ? selectedOption.name : placeholder}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
-          <CommandList>
-            <CommandEmpty>No account found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={option.name}
-                  onSelect={() => {
-                    onValueChange(option.id === value ? "" : option.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 interface JournalFormProps {
@@ -131,36 +71,36 @@ export function JournalForm({
       <div className="flex flex-col md:flex-row gap-4">
         <div className="grid w-full md:w-[150px] items-center gap-1.5">
           <Label htmlFor="date">Date</Label>
-          <Input 
-            id="date" 
-            type="date" 
-            {...register("date")} 
+          <Input
+            id="date"
+            type="date"
+            {...register("date")}
             className={errors.date ? "border-red-500" : ""}
           />
         </div>
         <div className="grid w-full md:w-[150px] items-center gap-1.5">
           <Label htmlFor="amount">Amount</Label>
-          <Input 
-            type="number" 
-            step="0.01" 
-            min="0.01" 
-            id="amount" 
-            {...register("amount")} 
-            placeholder="0.00" 
+          <Input
+            type="number"
+            step="0.01"
+            min="0.01"
+            id="amount"
+            {...register("amount")}
+            placeholder="0.00"
             className={errors.amount ? "border-red-500" : ""}
           />
         </div>
         <div className="grid flex-1 items-center gap-1.5">
           <Label htmlFor="description">Description</Label>
-          <Input 
-            id="description" 
-            {...register("description")} 
-            placeholder="Transaction description..." 
+          <Input
+            id="description"
+            {...register("description")}
+            placeholder="Transaction description..."
             className={errors.description ? "border-red-500" : ""}
           />
         </div>
       </div>
-      
+
       <div className="flex flex-col md:flex-row items-center md:items-end gap-2 md:gap-4">
         <div className="grid w-full flex-1 items-center gap-1.5">
           <Label htmlFor="fromAccountId">From Account (Credit)</Label>
@@ -178,11 +118,11 @@ export function JournalForm({
             )}
           />
         </div>
-        
-        <Button 
-          type="button" 
-          variant="ghost" 
-          size="icon" 
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           onClick={handleSwap}
           className="mt-2 md:mt-0 md:mb-0.5 shrink-0"
           title="Swap Accounts"
