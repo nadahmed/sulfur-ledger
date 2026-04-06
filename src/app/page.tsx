@@ -28,6 +28,7 @@ import {
   LineChart,
   Line
 } from "recharts";
+import { formatCurrency, cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -52,8 +53,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 interface DashboardSummary {
@@ -68,7 +67,8 @@ interface DashboardSummary {
 
 export default function DashboardPage() {
   const { user, isLoading: isUserLoading } = useAuthGuard();
-  const { activeOrganizationId, isLoading: isOrgLoading } = useOrganization();
+  const { activeOrganizationId, organizations, isLoading: isOrgLoading } = useOrganization();
+  const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
   
   const [persistedDate, setPersistedDate] = useLocalStorage<{ from: string | undefined; to: string | undefined }>(
@@ -133,12 +133,13 @@ export default function DashboardPage() {
     enabled: !!activeOrganizationId,
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-BD", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-    }).format(Math.abs(amount) / 100);
+  const formatCurrencyValue = (amount: number) => {
+    return formatCurrency(
+      amount / 100, 
+      activeOrg?.currencySymbol, 
+      activeOrg?.currencyPosition, 
+      activeOrg?.currencyHasSpace
+    );
   };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
@@ -207,7 +208,13 @@ export default function DashboardPage() {
             <Wallet className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary ? formatCurrency(summary.cashBalance) : "৳0"}</div>
+            <div className="text-2xl font-bold">
+              {summary ? formatCurrencyValue(summary.cashBalance) : (
+                activeOrg?.currencyPosition === "suffix" 
+                  ? `0${activeOrg?.currencySymbol || "৳"}` 
+                  : `${activeOrg?.currencySymbol || "৳"}0`
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Available liquidity</p>
           </CardContent>
         </Card>
@@ -223,7 +230,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className={cn("text-2xl font-bold", summary && summary.netIncome < 0 ? "text-red-600" : "text-green-600")}>
-              {summary ? formatCurrency(summary.netIncome) : "৳0"}
+              {summary ? formatCurrencyValue(summary.netIncome) : (
+                activeOrg?.currencyPosition === "suffix" 
+                  ? `0${activeOrg?.currencySymbol || "৳"}` 
+                  : `${activeOrg?.currencySymbol || "৳"}0`
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">For selected period</p>
           </CardContent>
@@ -235,7 +246,13 @@ export default function DashboardPage() {
             <ArrowUpRight className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary ? formatCurrency(summary.totalIncome) : "৳0"}</div>
+            <div className="text-2xl font-bold">
+              {summary ? formatCurrencyValue(summary.totalIncome) : (
+                activeOrg?.currencyPosition === "suffix" 
+                  ? `0${activeOrg?.currencySymbol || "৳"}` 
+                  : `${activeOrg?.currencySymbol || "৳"}0`
+              )}
+            </div>
             <p className="text-xs text-emerald-600 mt-1 font-medium">Revenue streams</p>
           </CardContent>
         </Card>
@@ -246,7 +263,13 @@ export default function DashboardPage() {
             <ArrowDownRight className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{summary ? formatCurrency(summary.totalExpenses) : "৳0"}</div>
+            <div className="text-2xl font-bold text-orange-600">
+              {summary ? formatCurrencyValue(summary.totalExpenses) : (
+                activeOrg?.currencyPosition === "suffix" 
+                  ? `0${activeOrg?.currencySymbol || "৳"}` 
+                  : `${activeOrg?.currencySymbol || "৳"}0`
+              )}
+            </div>
             <p className="text-xs text-orange-500 mt-1 font-medium">Operational costs</p>
           </CardContent>
         </Card>
@@ -301,10 +324,14 @@ export default function DashboardPage() {
                     fontSize={12} 
                     tickLine={false} 
                     axisLine={false}
-                    tickFormatter={(value) => `৳${value}`}
+                    tickFormatter={(value) => {
+                      const symbol = activeOrg?.currencySymbol || "৳";
+                      const pos = activeOrg?.currencyPosition || "prefix";
+                      return pos === "prefix" ? `${symbol}${value}` : `${value}${symbol}`;
+                    }}
                   />
                   <Tooltip 
-                    formatter={(value: any) => [formatCurrency(value * 100), ""]}
+                    formatter={(value: any) => [formatCurrencyValue(value * 100), ""]}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   />
                   <Legend 
@@ -362,7 +389,7 @@ export default function DashboardPage() {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: any) => [formatCurrency(value * 100), "Amount"]}
+                      formatter={(value: any) => [formatCurrencyValue(value * 100), "Amount"]}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     />
                     <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
@@ -410,7 +437,7 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: any) => [formatCurrency(value * 100), "Value"]}
+                      formatter={(value: any) => [formatCurrencyValue(value * 100), "Value"]}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     />
                     <Legend 
@@ -444,7 +471,11 @@ export default function DashboardPage() {
                   <div>
                     <h4 className="font-semibold text-blue-900">Liquidity Status</h4>
                     <p className="text-sm text-blue-700">
-                      Your current cash balance is {summary ? formatCurrency(summary.cashBalance) : "৳0"}. 
+                      Your current cash balance is {summary ? formatCurrencyValue(summary.cashBalance) : (
+                        activeOrg?.currencyPosition === "suffix" 
+                          ? `0${activeOrg?.currencySymbol || "৳"}` 
+                          : `${activeOrg?.currencySymbol || "৳"}0`
+                      )}. 
                       Ensure this covers upcoming liabilities and operational needs.
                     </p>
                   </div>
@@ -474,8 +505,8 @@ export default function DashboardPage() {
                     )}>
                       {summary 
                         ? (summary.netIncome >= 0 
-                          ? `Great! You have a net profit of ${formatCurrency(summary.netIncome)} for this period.`
-                          : `Warning: You have a net loss of ${formatCurrency(summary.netIncome)} for this period.`)
+                          ? `Great! You have a net profit of ${formatCurrencyValue(summary.netIncome)} for this period.`
+                          : `Warning: You have a net loss of ${formatCurrencyValue(summary.netIncome)} for this period.`)
                         : "Calculating profitability..."
                       }
                     </p>

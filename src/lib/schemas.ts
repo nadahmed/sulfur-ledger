@@ -40,6 +40,9 @@ export type JournalEntryFormInput = z.input<typeof JournalEntrySchema>;
 
 export const OrganizationSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(100),
+  currencySymbol: z.string().min(1, "Currency symbol is required").max(10),
+  currencyPosition: z.enum(["prefix", "suffix"]),
+  currencyHasSpace: z.boolean(),
 });
 
 export type OrganizationFormValues = z.infer<typeof OrganizationSchema>;

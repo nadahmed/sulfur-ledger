@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn, formatCurrency } from "@/lib/utils";
 import { 
   OrganizationSchema, 
   OrganizationFormValues, 
@@ -222,7 +224,13 @@ function SettingsInner() {
       const res = await fetch("/api/organizations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: activeOrganizationId, name: values.name }),
+        body: JSON.stringify({ 
+          id: activeOrganizationId, 
+          name: values.name,
+          currencySymbol: values.currencySymbol,
+          currencyPosition: values.currencyPosition,
+          currencyHasSpace: values.currencyHasSpace
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Update failed");
     },
@@ -351,16 +359,33 @@ function SettingsInner() {
   const {
     register: registerOrg,
     handleSubmit: handleSubmitOrg,
+    control: controlOrg,
+    watch: watchOrg,
     formState: { isDirty: isOrgDirty },
     setValue: setOrgValue,
   } = useForm<OrganizationFormValues>({
     resolver: zodResolver(OrganizationSchema),
-    defaultValues: { name: activeOrg?.name || "" },
+    defaultValues: { 
+      name: activeOrg?.name || "",
+      currencySymbol: activeOrg?.currencySymbol || "৳",
+      currencyPosition: activeOrg?.currencyPosition || "prefix",
+      currencyHasSpace: activeOrg?.currencyHasSpace || false
+    },
   });
 
   useEffect(() => {
-    if (activeOrg) setOrgValue("name", activeOrg.name);
+    if (activeOrg) {
+      setOrgValue("name", activeOrg.name);
+      setOrgValue("currencySymbol", activeOrg.currencySymbol || "৳");
+      setOrgValue("currencyPosition", activeOrg.currencyPosition || "prefix");
+      setOrgValue("currencyHasSpace", activeOrg.currencyHasSpace || false);
+    }
   }, [activeOrg, setOrgValue]);
+
+  const quickSymbols = ["৳", "$", "€", "£", "¥", "₹"];
+  const selectedSymbol = watchOrg("currencySymbol");
+  const selectedPosition = watchOrg("currencyPosition") || "prefix";
+  const selectedHasSpace = watchOrg("currencyHasSpace");
 
   const {
     register: registerInvite,
@@ -443,86 +468,210 @@ function SettingsInner() {
 
       <div className="mt-6">
         {activeTab === "general" && (
-          <div className="space-y-8">
-          <Card className="shadow-lg border-neutral-200">
-            <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
-              <CardHeader>
-                <CardTitle>Organization Details</CardTitle>
-                <CardDescription>Manage your organization's general information.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="org-name">Organization Name</Label>
-                  <Input
-                    id="org-name"
-                    {...registerOrg("name")}
-                    disabled={!canManage}
-                  />
-                </div>
-              </CardContent>
-              {canManage && (
-                <CardFooter className="bg-neutral-50 border-t border-neutral-100 rounded-b-lg">
-                  <Button type="submit" disabled={updateOrgMutation.isPending || !isOrgDirty}>
-                    {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2"><Save className="w-4 h-4" /> Save Changes</span>}
+          <div className="space-y-6">
+            <Card className="shadow-lg border-neutral-200 overflow-hidden">
+              <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl">Organization Details</CardTitle>
+                  <CardDescription className="text-xs">Manage your organization's identity and accounting format.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="org-name" className="text-sm font-semibold">Organization Name</Label>
+                    <Input
+                      id="org-name"
+                      {...registerOrg("name")}
+                      disabled={!canManage}
+                      className="max-w-md h-10"
+                    />
+                  </div>
+
+                  <div className="pt-6 border-t border-neutral-100">
+                    <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-neutral-50/50 rounded-2xl border border-neutral-200 shadow-sm">
+                      <div className="space-y-2 flex-grow lg:flex-grow-0">
+                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Currency Symbol</Label>
+                        <div className="flex items-center gap-2 h-9">
+                          <Input
+                            id="currency-symbol"
+                            placeholder="$"
+                            {...registerOrg("currencySymbol")}
+                            className="h-full w-20 text-base font-bold text-center bg-white shadow-sm"
+                            disabled={!canManage}
+                          />
+                          <div className="flex gap-1 h-7 items-center overflow-x-auto">
+                            {quickSymbols.slice(0, 4).map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                disabled={!canManage}
+                                onClick={() => setOrgValue("currencySymbol", s, { shouldDirty: true })}
+                                className={cn(
+                                  "w-7 h-7 flex items-center justify-center rounded-md text-xs border transition-all shrink-0",
+                                  selectedSymbol === s 
+                                    ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+                                    : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:bg-white"
+                                )}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 w-full lg:w-40">
+                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Symbol Position</Label>
+                        <div className="h-9">
+                          <Controller
+                            name="currencyPosition"
+                            control={controlOrg}
+                            render={({ field }) => (
+                              <Select 
+                                value={field.value} 
+                                onValueChange={field.onChange}
+                                disabled={!canManage}
+                              >
+                                <SelectTrigger className="w-full h-full text-[13px] bg-white shadow-sm ring-offset-white">
+                                  <SelectValue placeholder="Position">
+                                    {field.value === "prefix" ? "Before Amount" : field.value === "suffix" ? "After Amount" : undefined}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="prefix">Before Amount</SelectItem>
+                                  <SelectItem value="suffix">After Amount</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 shrink-0">
+                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Use Spacing</Label>
+                        <div className="flex items-center justify-center bg-white px-3 h-9 rounded-md border border-neutral-200 shadow-sm w-fit">
+                          <Controller
+                            name="currencyHasSpace"
+                            control={controlOrg}
+                            render={({ field }) => (
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="scale-75"
+                                disabled={!canManage}
+                              />
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
+                         <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
+                         <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
+                           <div className="flex items-center gap-2">
+                             <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Positive</span>
+                             <span className="text-sm font-bold text-neutral-800 tabular-nums leading-none">
+                               {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                             </span>
+                           </div>
+                           <div className="w-px h-4 bg-neutral-200 hidden lg:block" />
+                           <div className="flex items-center gap-2">
+                             <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Negative</span>
+                             <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
+                               {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                             </span>
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-[10px] text-indigo-700 flex items-start gap-2 max-w-2xl">
+                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
+                      <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
+                    </div>
+                  </div>
+                </CardContent>
+                {canManage && (
+                  <CardFooter className="bg-neutral-50/80 border-t border-neutral-100 py-3">
+                    <Button type="submit" size="sm" className="h-9 px-6 bg-blue-600 hover:bg-blue-700 shadow-md transition-all active:scale-95" disabled={updateOrgMutation.isPending || !isOrgDirty}>
+                      {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 font-semibold"><Save className="w-3.5 h-3.5" /> Save Changes</span>}
+                    </Button>
+                  </CardFooter>
+                )}
+              </form>
+            </Card>
+
+            {!isOwner && (
+              <Card className="border-amber-200 shadow-sm bg-amber-50/30 overflow-hidden mt-8">
+                <CardHeader className="pb-3 px-6 pt-6">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <LogOut className="w-4 h-4" />
+                    <CardTitle className="text-lg">Leave Organization</CardTitle>
+                  </div>
+                  <CardDescription className="text-xs text-amber-600/80">You will lose all access to this organization's data and reports.</CardDescription>
+                </CardHeader>
+                <CardFooter className="bg-amber-100/50 border-t border-amber-200 px-6 py-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-amber-300 text-amber-700 hover:bg-amber-200 hover:border-amber-400 font-semibold shadow-sm"
+                    onClick={() => {
+                      setConfirmConfig({
+                        open: true,
+                        title: "Leave Organization",
+                        description: "Are you sure you want to leave this organization? This action will immediately revoke your access.",
+                        variant: "destructive",
+                        onConfirm: () => leaveOrgMutation.mutate(),
+                      });
+                    }}
+                    disabled={leaveOrgMutation.isPending}
+                  >
+                    {leaveOrgMutation.isPending ? "Leaving..." : "Leave Organization"}
                   </Button>
                 </CardFooter>
-              )}
-            </form>
-          </Card>
+              </Card>
+            )}
 
-          {!isOwner && (
-            <Card className="shadow-lg border-neutral-200">
-              <CardHeader>
-                <CardTitle className="text-amber-600 flex items-center gap-2">Leave Organization</CardTitle>
-                <CardDescription>You will lose access to this organization and all its data.</CardDescription>
-              </CardHeader>
-              <CardFooter className="bg-amber-50 border-t border-amber-100 rounded-b-lg">
-                <Button 
-                  variant="outline" 
-                  className="border-amber-200 text-amber-700 hover:bg-amber-100"
-                  onClick={() => {
-                    setConfirmConfig({
-                      open: true,
-                      title: "Leave Organization",
-                      description: "Are you sure you want to leave this organization? You will lose access to all its data.",
-                      variant: "destructive",
-                      onConfirm: () => leaveOrgMutation.mutate(),
-                    });
-                  }}
-                  disabled={leaveOrgMutation.isPending}
-                >
-                  {leaveOrgMutation.isPending ? "Leaving..." : "Leave Organization"}
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
-
-          {isOwner && (
-            <Card className="shadow-lg border-red-200">
-              <CardHeader>
-                <CardTitle className="text-red-600 flex items-center gap-2"><AlertCircle className="w-5 h-5" /> Danger Zone</CardTitle>
-                <CardDescription>Permanently delete this organization and everything in it.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-neutral-600">Please type <strong>"{activeOrg?.name}"</strong> to confirm.</p>
-                <Input
-                  value={deleteConfirm}
-                  onChange={(e) => setDeleteConfirm(e.target.value)}
-                  placeholder="Type name to confirm"
-                  className="max-w-md border-red-200"
-                />
-              </CardContent>
-              <CardFooter className="bg-red-50 border-t border-red-100 rounded-b-lg">
-                <Button 
-                  variant="destructive" 
-                  disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name} 
-                  onClick={() => deleteOrgMutation.mutate()}
-                >
-                  {deleteOrgMutation.isPending ? "Deleting..." : <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete Organization</span>}
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
+            {isOwner && (
+              <div className="mt-12 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-red-100" />
+                  <span className="text-[10px] uppercase font-black tracking-widest text-red-400">Danger Zone</span>
+                  <div className="h-px flex-1 bg-red-100" />
+                </div>
+                <Card className="border-red-200 shadow-md bg-red-50/30 overflow-hidden">
+                  <CardHeader className="px-6 pt-6 pb-2">
+                    <div className="flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-4 h-4" />
+                      <CardTitle className="text-lg">Delete Organization</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs text-red-500/70">Permanently delete this organization, all its members, and every single record content.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-6 pb-4 space-y-4">
+                    <div className="space-y-2 max-w-md">
+                      <Label className="text-[10px] uppercase font-bold text-red-400">Confirmation Required</Label>
+                      <p className="text-xs text-red-600/80">To proceed, please type the organization name: <strong className="select-all opacity-100">"{activeOrg?.name}"</strong></p>
+                      <Input
+                        value={deleteConfirm}
+                        onChange={(e) => setDeleteConfirm(e.target.value)}
+                        placeholder="Enter organization name..."
+                        className="h-10 border-red-200 focus:ring-red-500 text-sm font-medium bg-white/80"
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-red-100/50 border-t border-red-200 px-6 py-4">
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      className="font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
+                      disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name} 
+                      onClick={() => deleteOrgMutation.mutate()}
+                    >
+                      {deleteOrgMutation.isPending ? "Deleting..." : <><Trash2 className="w-3.5 h-3.5" /> Delete Forever</>}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </div>
+            )}
           </div>
         )}
 

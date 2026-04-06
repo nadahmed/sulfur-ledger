@@ -18,6 +18,7 @@ import { TagSelector } from "@/components/journals/TagSelector";
 import { Suspense } from "react";
 
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface AccountBalance {
   id: string;
@@ -47,7 +48,8 @@ export default function ReportsPage() {
 
 function ReportsInner() {
   const { user, isLoading: userLoading } = useUser();
-  const { activeOrganizationId, permissions, isOwner, isLoading: orgLoading } = useOrganization();
+  const { activeOrganizationId, organizations, permissions, isOwner, isLoading: orgLoading } = useOrganization();
+  const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -125,14 +127,13 @@ function ReportsInner() {
     enabled: !!activeOrganizationId && canRead,
   });
 
-  const formatCurrency = (amount: number) => {
-    // Avoid -0 display by adding 0
-    const normalizedAmount = amount === 0 ? 0 : amount;
-    return new Intl.NumberFormat("en-BD", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 2,
-    }).format(normalizedAmount / 100);
+  const formatCurrencyValue = (amount: number) => {
+    return formatCurrency(
+      amount / 100, 
+      activeOrg?.currencySymbol, 
+      activeOrg?.currencyPosition, 
+      activeOrg?.currencyHasSpace
+    );
   };
 
   const chartData = useMemo(() => {
@@ -264,14 +265,14 @@ function ReportsInner() {
                           <TableRow key={acc.id}>
                             <TableCell>{acc.name}</TableCell>
                             <TableCell className="capitalize text-xs text-muted-foreground">{acc.category}</TableCell>
-                            <TableCell className="text-right">{acc.balance > 0 ? formatCurrency(acc.balance) : "-"}</TableCell>
-                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrency(Math.abs(acc.balance)) : "-"}</TableCell>
+                            <TableCell className="text-right">{acc.balance > 0 ? formatCurrencyValue(acc.balance) : "-"}</TableCell>
+                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrencyValue(Math.abs(acc.balance)) : "-"}</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">
                           <TableCell colSpan={2}>Total</TableCell>
-                          <TableCell className="text-right">{formatCurrency(data.totalDebits || 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(Math.abs(data.totalCredits || 0))}</TableCell>
+                          <TableCell className="text-right">{formatCurrencyValue(data.totalDebits || 0)}</TableCell>
+                          <TableCell className="text-right">{formatCurrencyValue(Math.abs(data.totalCredits || 0))}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -279,20 +280,20 @@ function ReportsInner() {
 
                   {reportType === "balance-sheet" && data && (
                     <div className="space-y-6">
-                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrency} normal="debit" />
-                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrency} normal="credit" />
-                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrency} normal="credit" />
+                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrencyValue} normal="debit" />
+                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrencyValue} normal="credit" />
+                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrencyValue} normal="credit" />
                       
                       <div className="pt-6 border-t-2 space-y-4">
                         <div className="flex flex-col sm:flex-row justify-between gap-4">
                           <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Assets</p>
-                            <p className="text-xl font-bold">{formatCurrency((data.assets || []).reduce((s, a) => s + a.balance, 0))}</p>
+                            <p className="text-xl font-bold">{formatCurrencyValue((data.assets || []).reduce((s, a) => s + a.balance, 0))}</p>
                           </div>
                           <div className="space-y-1 sm:text-right">
                             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Liabilities & Equity</p>
                             <p className="text-xl font-bold">
-                              {formatCurrency(
+                              {formatCurrencyValue(
                                 ((data.liabilities || []).reduce((s, a) => s + a.balance, 0) + 
                                 (data.equity || []).reduce((s, a) => s + a.balance, 0)) * -1
                               )}
@@ -317,7 +318,7 @@ function ReportsInner() {
                               </div>
                               {!isBalanced && (
                                 <span className="text-red-600 font-mono font-bold">
-                                  Diff: {formatCurrency(diff)}
+                                  Diff: {formatCurrencyValue(diff)}
                                 </span>
                               )}
                             </div>
@@ -329,8 +330,8 @@ function ReportsInner() {
 
                   {reportType === "income-statement" && data && (
                     <div className="space-y-6">
-                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrency} normal="credit" />
-                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrency} normal="debit" />
+                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrencyValue} normal="credit" />
+                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrencyValue} normal="debit" />
                       
                       <div className="pt-4 border-t-2 flex justify-between font-bold text-lg">
                         <span>Net Income</span>
@@ -345,7 +346,7 @@ function ReportsInner() {
                           
                           return (
                             <span className={netIncome >= 0 ? "text-green-600" : "text-red-600"}>
-                              {formatCurrency(netIncome)}
+                              {formatCurrencyValue(netIncome)}
                             </span>
                           );
                         })()}

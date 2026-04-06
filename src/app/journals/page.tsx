@@ -50,7 +50,8 @@ interface Account {
 
 export default function JournalsPage() {
   const { user, isLoading: isUserLoading } = useUser();
-  const { activeOrganizationId, permissions, isOwner, isLoading: isOrgLoading } = useOrganization();
+  const { activeOrganizationId, organizations, permissions, isOwner, isLoading: isOrgLoading } = useOrganization();
+  const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filterDate, setFilterDate] = useState<string>("");
@@ -381,7 +382,12 @@ export default function JournalsPage() {
                             {displayDate}
                           </TableCell>
                           <TableCell className="max-w-[200px] break-words whitespace-normal">{jnl.description}</TableCell>
-                          <TableCell>৳{amountDisp}</TableCell>
+                          <TableCell>
+                            {activeOrg?.currencyPosition === "suffix" 
+                              ? `${amountDisp}${activeOrg?.currencySymbol || "৳"}` 
+                              : `${activeOrg?.currencySymbol || "৳"}${amountDisp}`
+                            }
+                          </TableCell>
                           <TableCell>{fromAcc}</TableCell>
                           <TableCell>{toAcc}</TableCell>
                           <TableCell className="max-w-[180px]">

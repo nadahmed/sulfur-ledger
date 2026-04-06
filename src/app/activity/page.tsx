@@ -323,7 +323,7 @@ export default function ActivityPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
-                          {log.userName === "MCP/AI" ? (
+                          {log.userName === "AI Agent" || log.userName === "MCP/AI" ? (
                             <div className="flex items-center gap-1.5 text-indigo-600 font-semibold">
                               <Bot className="size-4" />
                               <span>AI Agent</span>

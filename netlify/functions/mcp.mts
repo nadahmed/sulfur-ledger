@@ -45,6 +45,7 @@ export default async (req: Request, context: Context) => {
         toolName,
         input: JSON.stringify(input),
         status: error ? "error" : "success",
+        userName: "AI Agent",
         error,
         timestamp: now.toISOString(),
       });
@@ -181,7 +182,7 @@ DON'Ts:
           status: "active" as const,
           createdAt: new Date().toISOString()
         };
-        await accountsDb.createAccount(account, "mcp-user", "MCP/AI");
+        await accountsDb.createAccount(account, "mcp-user", "AI Agent");
         return {
           content: [{ type: "text", text: `Account '${name}' (id: ${id}, category: ${category}) created successfully.` }]
         };
@@ -218,7 +219,7 @@ DON'Ts:
     },
     async ({ accountId }) => {
       try {
-        await accountsDb.archiveAccount(orgId, accountId, "mcp-user", "MCP/AI");
+        await accountsDb.archiveAccount(orgId, accountId, "mcp-user", "AI Agent");
         return {
           content: [{ type: "text", text: `Account '${accountId}' has been archived. It will no longer accept new transactions.` }]
         };
@@ -635,7 +636,7 @@ DON'Ts:
           createdAt: new Date().toISOString()
         };
 
-        await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "MCP/AI");
+        await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "AI Agent");
 
         return {
           content: [{ 
@@ -734,7 +735,7 @@ Returns a summary of successes and any errors per entry.`,
             createdAt: new Date().toISOString()
           };
 
-          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "MCP/AI");
+          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "AI Agent");
           results.push(`✅ ${entryInput.description} → ${entryInput.amount.toFixed(2)} Taka (${id})`);
         } catch (e: any) {
           errors.push(`❌ "${entryInput.description}": ${e.message}`);
@@ -822,7 +823,7 @@ DON'Ts:
           ];
         }
 
-        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines.length > 0 ? finalLines : undefined, "mcp-user", "MCP/AI");
+        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines.length > 0 ? finalLines : undefined, "mcp-user", "AI Agent");
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} updated successfully.` }]
         };
@@ -857,7 +858,7 @@ DON'Ts:
     },
     async ({ id, date }) => {
       try {
-        await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user", "MCP/AI");
+        await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user", "AI Agent");
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} has been permanently deleted. An audit log has been created.` }]
         };

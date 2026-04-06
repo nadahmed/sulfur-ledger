@@ -138,6 +138,18 @@ export function JournalForm({
             className={errors.date ? "border-red-500" : ""}
           />
         </div>
+        <div className="grid w-full md:w-[150px] items-center gap-1.5">
+          <Label htmlFor="amount">Amount</Label>
+          <Input 
+            type="number" 
+            step="0.01" 
+            min="0.01" 
+            id="amount" 
+            {...register("amount")} 
+            placeholder="0.00" 
+            className={errors.amount ? "border-red-500" : ""}
+          />
+        </div>
         <div className="grid flex-1 items-center gap-1.5">
           <Label htmlFor="description">Description</Label>
           <Input 
@@ -148,7 +160,7 @@ export function JournalForm({
           />
         </div>
       </div>
-
+      
       <div className="flex flex-col md:flex-row items-center md:items-end gap-2 md:gap-4">
         <div className="grid w-full flex-1 items-center gap-1.5">
           <Label htmlFor="fromAccountId">From Account (Credit)</Label>
@@ -192,21 +204,6 @@ export function JournalForm({
                 error={!!errors.toAccountId}
               />
             )}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="grid w-full md:w-[150px] items-center gap-1.5">
-          <Label htmlFor="amount">Amount</Label>
-          <Input 
-            type="number" 
-            step="0.01" 
-            min="0.01" 
-            id="amount" 
-            {...register("amount")} 
-            placeholder="0.00" 
-            className={errors.amount ? "border-red-500" : ""}
           />
         </div>
       </div>

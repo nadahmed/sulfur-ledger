@@ -8,6 +8,7 @@ import { uuidv7 } from "uuidv7";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { formatCurrency as globalFormatCurrency } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,18 +25,20 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end") || undefined;
     const reportType = searchParams.get("type") || "trial-balance";
 
-    // Format utility
-    const formatCurrency = (amount: number) => {
-      const normalizedAmount = (amount === 0 || Math.abs(amount) < 0.01) ? 0 : amount;
-      return new Intl.NumberFormat("en-BD", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(normalizedAmount / 100);
-    };
-
     // 1. Fetch organization for branding
     const org = await getOrganization(orgId);
     const orgName = org?.name || "Sulfur Ledger Organization";
+    const currencySymbol = org?.currencySymbol || "৳";
+
+    // Format utility
+    const formatCurrency = (amount: number) => {
+      return globalFormatCurrency(
+        amount / 100, 
+        org?.currencySymbol, 
+        org?.currencyPosition, 
+        org?.currencyHasSpace
+      );
+    };
 
     // 2. Fetch the report data natively via our shared library function
     const tags = searchParams.get("tags")?.split(",").filter(Boolean) || undefined;

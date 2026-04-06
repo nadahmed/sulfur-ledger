@@ -9,6 +9,9 @@ interface Organization {
   name: string;
   role?: string;
   isOwner?: boolean;
+  currencySymbol?: string;
+  currencyPosition?: "prefix" | "suffix";
+  currencyHasSpace?: boolean;
 }
 
 interface OrganizationContextType {
@@ -41,7 +44,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           id: o.orgId, 
           name: o.orgName || o.name || `Org ${o.orgId.slice(0,4)}`,
           role: o.role,
-          isOwner: o.isOwner
+          isOwner: o.isOwner,
+          currencySymbol: o.currencySymbol || "৳",
+          currencyPosition: o.currencyPosition || "prefix",
+          currencyHasSpace: o.currencyHasSpace || false
         })));
 
         // Derive owner status from local user info if needed

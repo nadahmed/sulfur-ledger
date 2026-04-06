@@ -6,13 +6,22 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OrganizationSchema, OrganizationFormValues } from "@/lib/schemas";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Loader2, Building2, Plus, ArrowRight } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
 
 import { Suspense } from "react";
 
@@ -68,11 +77,17 @@ function OnboardingContent() {
   const {
     register,
     handleSubmit,
+    control,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<OrganizationFormValues>({
     resolver: zodResolver(OrganizationSchema),
     defaultValues: {
       name: "",
+      currencySymbol: "৳",
+      currencyPosition: "prefix",
+      currencyHasSpace: false,
     },
   });
 
@@ -105,8 +120,14 @@ function OnboardingContent() {
   const onSubmit = (values: OrganizationFormValues) => {
     mutation.mutate(values);
   };
+  
+  const quickSymbols = ["৳", "$", "€", "£", "¥", "₹"];
+  const selectedSymbol = watch("currencySymbol");
+  const selectedPosition = watch("currencyPosition") || "prefix";
+  const selectedHasSpace = watch("currencyHasSpace");
 
   const handleSelectOrg = (orgId: string) => {
+    if (!orgId) return;
     setActiveOrganizationId(orgId);
     router.push("/");
   };
@@ -134,7 +155,7 @@ function OnboardingContent() {
                 Create a new container for your accounts and journal entries.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-4">
+            <CardContent className="space-y-6 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="org-name">Organization Name</Label>
                 <Input
@@ -147,6 +168,98 @@ function OnboardingContent() {
                 {errors.name && (
                   <p className="text-sm text-red-500">{errors.name.message}</p>
                 )}
+              </div>
+
+              <div className="pt-2 border-t border-neutral-100 mt-4 space-y-6">
+                <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-neutral-50/50 rounded-2xl border border-neutral-200 relative overflow-hidden group shadow-sm">
+                  <div className="space-y-2 flex-grow lg:flex-grow-0">
+                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Currency Symbol</Label>
+                    <div className="flex items-center gap-2 h-9">
+                      <Input
+                        id="currency-symbol"
+                        placeholder="$"
+                        {...register("currencySymbol")}
+                        className="h-full w-20 text-base font-bold text-center bg-white shadow-sm"
+                      />
+                      <div className="flex gap-1 h-7 items-center overflow-x-auto">
+                        {quickSymbols.slice(0, 4).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setValue("currencySymbol", s, { shouldDirty: true })}
+                            className={cn(
+                              "w-7 h-7 flex items-center justify-center rounded-md text-[10px] border transition-all shrink-0",
+                              selectedSymbol === s 
+                                ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+                                : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300"
+                            )}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 w-full lg:w-40">
+                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Symbol Position</Label>
+                    <div className="h-9">
+                      <Controller
+                        name="currencyPosition"
+                        control={control}
+                        render={({ field }) => (
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="w-full h-full text-[13px] bg-white shadow-sm ring-offset-white">
+                              <SelectValue placeholder="Position">
+                                {field.value === "prefix" ? "Before Amount" : field.value === "suffix" ? "After Amount" : undefined}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="prefix">Before Amount</SelectItem>
+                              <SelectItem value="suffix">After Amount</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 shrink-0">
+                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Use Spacing</Label>
+                    <div className="flex items-center justify-center bg-white px-4 h-9 rounded-md border border-neutral-200 shadow-sm w-fit">
+                      <Controller
+                        name="currencyHasSpace"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="scale-75"
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
+                     <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
+                     <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Entry</span>
+                          <span className="text-sm font-bold text-slate-800 tabular-nums leading-none">
+                            {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                          </span>
+                        </div>
+                        <div className="w-px h-4 bg-blue-100 hidden lg:block" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Expense</span>
+                          <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
+                            {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                          </span>
+                        </div>
+                     </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3">

@@ -16,6 +16,9 @@ export interface Organization {
   id: string; // orgId
   name: string;
   ownerId: string; // User who owns this org
+  currencySymbol?: string; // e.g. ৳, $, €
+  currencyPosition?: "prefix" | "suffix";
+  currencyHasSpace?: boolean;
   emailSettings?: EmailSettings;
   mcpApiKey?: string;
   mcpApiKeyExpiresAt?: string;
@@ -31,6 +34,9 @@ export interface OrgUser {
   userPicture?: string;
   role: "admin" | "member" | "viewer";
   isOwner?: boolean; // Owner bypass flag
+  currencySymbol?: string;
+  currencyPosition?: "prefix" | "suffix";
+  currencyHasSpace?: boolean;
   createdAt: string;
 }
 
@@ -159,34 +165,55 @@ export async function getUserOrganizations(userId: string): Promise<OrgUser[]> {
   
   const orgUsers = (result.Items as OrgUser[]) || [];
   
-  // Backward compatibility: fetch orgName/isOwner from metadata if missing
+  // Fetch all metadata records to merge branding, currency, and ownership
   const updatedOrgUsers = await Promise.all(orgUsers.map(async (ou) => {
+    const orgMetadata = await getOrganization(ou.orgId);
     let updated = { ...ou };
-    let orgMetadata = null;
-    if (!ou.orgName || ou.isOwner === undefined) {
-      orgMetadata = await getOrganization(ou.orgId);
-    }
 
-    if (!ou.orgName && orgMetadata) {
-      updated.orgName = orgMetadata.name || ou.orgId;
-    }
-
-    // Always check metadata for owner status if the record says false/undefined
-    if (!ou.isOwner) {
-      if (!orgMetadata) orgMetadata = await getOrganization(ou.orgId);
-      if (orgMetadata?.ownerId === userId) {
+    if (orgMetadata) {
+      updated.orgName = orgMetadata.name || ou.orgName || ou.orgId;
+      updated.currencySymbol = orgMetadata.currencySymbol || "৳";
+      updated.currencyPosition = orgMetadata.currencyPosition || "prefix";
+      updated.currencyHasSpace = orgMetadata.currencyHasSpace || false;
+      if (orgMetadata.ownerId === userId) {
         updated.isOwner = true;
       }
     }
+
     return updated;
   }));
 
   return updatedOrgUsers;
 }
 
-export async function updateOrganization(orgId: string, updates: { name: string }) {
+export async function updateOrganization(orgId: string, updates: { 
+  name: string, 
+  currencySymbol?: string, 
+  currencyPosition?: "prefix" | "suffix",
+  currencyHasSpace?: boolean
+}) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   
+  let updateExp = "SET #name = :name";
+  const attrNames: any = { "#name": "name" };
+  const attrValues: any = { ":name": updates.name };
+
+  if (updates.currencySymbol !== undefined) {
+    updateExp += ", #symbol = :symbol";
+    attrNames["#symbol"] = "currencySymbol";
+    attrValues[":symbol"] = updates.currencySymbol;
+  }
+  if (updates.currencyPosition !== undefined) {
+    updateExp += ", #pos = :pos";
+    attrNames["#pos"] = "currencyPosition";
+    attrValues[":pos"] = updates.currencyPosition;
+  }
+  if (updates.currencyHasSpace !== undefined) {
+    updateExp += ", #space = :space";
+    attrNames["#space"] = "currencyHasSpace";
+    attrValues[":space"] = updates.currencyHasSpace;
+  }
+
   // 1. Update Metadata
   await db.send(
     new UpdateCommand({
@@ -195,9 +222,9 @@ export async function updateOrganization(orgId: string, updates: { name: string 
         PK: `ORG#${orgId}`,
         SK: `METADATA`,
       },
-      UpdateExpression: "SET #name = :name",
-      ExpressionAttributeNames: { "#name": "name" },
-      ExpressionAttributeValues: { ":name": updates.name },
+      UpdateExpression: updateExp,
+      ExpressionAttributeNames: attrNames,
+      ExpressionAttributeValues: attrValues,
     })
   );
 

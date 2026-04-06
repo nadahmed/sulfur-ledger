@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth0 } from "@/lib/auth0";
 import { createAccount, getAccounts, AccountCategory } from "@/lib/db/accounts";
 
 import { checkPermission } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const { user, isOwner, error, status } = await checkPermission("read:accounts", req);
+  const { error, status } = await checkPermission("read:accounts", req);
   if (error) return NextResponse.json({ error }, { status });
 
   const orgId = req.cookies.get("activeOrgId")?.value;
@@ -22,7 +21,7 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category") || "";
 
     let accounts = await getAccounts(orgId);
-    
+
     // Filter by archived status
     if (!includeArchived) {
       accounts = accounts.filter(a => a.status !== "archived");
@@ -125,7 +124,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const accountId = searchParams.get("id");
-    
+
     if (!accountId) {
       return NextResponse.json({ error: "Missing account id" }, { status: 400 });
     }
@@ -133,9 +132,9 @@ export async function DELETE(req: NextRequest) {
     // Check if account has transactions
     const { getAccountLines } = require("@/lib/db/journals");
     const { deleteAccount, archiveAccount } = require("@/lib/db/accounts");
-    
+
     const lines = await getAccountLines(orgId, accountId);
-    
+
     if (lines && lines.length > 0) {
       // Soft delete: archive
       await archiveAccount(orgId, accountId, user!.sub, user!.name);
@@ -178,7 +177,7 @@ export async function PATCH(req: NextRequest) {
     const { name } = await req.json();
     if (name) {
       const { updateAccountName, getAccounts } = require("@/lib/db/accounts");
-      
+
       // Check for duplicate names
       const existingAccounts = await getAccounts(orgId);
       if (existingAccounts.some((a: any) => a.id !== accountId && a.name.toLowerCase() === name.toLowerCase())) {

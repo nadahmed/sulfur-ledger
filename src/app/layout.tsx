@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { PwaRegister } from "@/components/pwa-register";
+import { RefreshButton } from "@/components/refresh-button";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -20,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sulfur Ledger",
+  title: "Sulfur Book",
   description: "A double-entry bookkeeping application",
 };
 
@@ -47,6 +48,9 @@ export default function RootLayout({
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-6 my-auto" />
                 <Breadcrumbs />
+                <div className="ml-auto flex items-center gap-2">
+                  <RefreshButton />
+                </div>
               </header>
               <div className="flex flex-col flex-1 overflow-y-auto">
                 {children}

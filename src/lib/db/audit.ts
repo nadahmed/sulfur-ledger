@@ -20,6 +20,7 @@ export interface McpActivityLog {
   toolName: string;
   input: string; // JSON string
   status: "success" | "error";
+  userName?: string;
   error?: string;
   timestamp: string;
   expiresAt: number; // DynamoDB TTL (seconds since epoch)

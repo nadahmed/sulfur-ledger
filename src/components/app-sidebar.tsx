@@ -13,6 +13,7 @@ import {
   Building2,
   History,
   Tag as TagIcon,
+  RotateCw,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -30,6 +31,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -84,6 +86,7 @@ const navItems = [
 export function AppSidebar() {
   const { user } = useUser();
   const { organizations, activeOrganizationId, setActiveOrganizationId } = useOrganization();
+  const { setOpenMobile } = useSidebar();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -100,6 +103,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    autoCloseMobile={false}
                   />
                 }
               >
@@ -142,7 +146,10 @@ export function AppSidebar() {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => router.push("/onboarding")}
+                  onClick={() => {
+                    setOpenMobile(false);
+                    router.push("/onboarding");
+                  }}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-md border bg-background">
@@ -185,6 +192,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    autoCloseMobile={false}
                   />
                 }
               >
@@ -223,12 +231,28 @@ export function AppSidebar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <DropdownMenuItem onClick={() => {
+                  setOpenMobile(false);
+                  router.push("/settings");
+                }}>
                   <Settings className="mr-2 size-4" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/auth/logout")}>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    // Slight delay for visual feedback
+                    setTimeout(() => window.location.reload(), 200);
+                  }}
+                >
+                  <RotateCw className="mr-2 size-4" />
+                  Refresh App
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  setOpenMobile(false);
+                  router.push("/auth/logout");
+                }}>
                   <LogOut className="mr-2 size-4" />
                   Log out
                 </DropdownMenuItem>
