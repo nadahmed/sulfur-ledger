@@ -31,7 +31,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -86,7 +85,6 @@ const navItems = [
 export function AppSidebar() {
   const { user } = useUser();
   const { organizations, activeOrganizationId, setActiveOrganizationId } = useOrganization();
-  const { setOpenMobile } = useSidebar();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -103,7 +101,6 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                    autoCloseMobile={false}
                   />
                 }
               >
@@ -146,10 +143,7 @@ export function AppSidebar() {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => {
-                    setOpenMobile(false);
-                    router.push("/onboarding");
-                  }}
+                  onClick={() => router.push("/onboarding")}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-md border bg-background">
@@ -192,7 +186,6 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                    autoCloseMobile={false}
                   />
                 }
               >
@@ -231,10 +224,7 @@ export function AppSidebar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => {
-                  setOpenMobile(false);
-                  router.push("/settings");
-                }}>
+                <DropdownMenuItem onClick={() => router.push("/settings")}>
                   <Settings className="mr-2 size-4" />
                   Settings
                 </DropdownMenuItem>
@@ -249,10 +239,7 @@ export function AppSidebar() {
                   Refresh App
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => {
-                  setOpenMobile(false);
-                  router.push("/auth/logout");
-                }}>
+                <DropdownMenuItem onClick={() => router.push("/auth/logout")}>
                   <LogOut className="mr-2 size-4" />
                   Log out
                 </DropdownMenuItem>

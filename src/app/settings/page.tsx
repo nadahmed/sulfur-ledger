@@ -27,12 +27,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
-import { 
-  OrganizationSchema, 
-  OrganizationFormValues, 
-  InvitationSchema, 
-  InvitationFormValues, 
-  EmailSettingsSchema, 
+import {
+  OrganizationSchema,
+  OrganizationFormValues,
+  InvitationSchema,
+  InvitationFormValues,
+  EmailSettingsSchema,
   EmailSettingsFormValues,
   McpSettingsFormValues,
   McpSettingsSchema
@@ -43,18 +43,18 @@ const parseCSVLine = (line: string) => {
   let current = "";
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"' && line[i+1] === '"') {
-          current += '"';
-          i++;
-      } else if (char === '"') {
-          inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-          result.push(current);
-          current = "";
-      } else {
-          current += char;
-      }
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
   }
   result.push(current);
   return result;
@@ -63,7 +63,7 @@ const parseCSVLine = (line: string) => {
 const parseCSV = (csv: string) => {
   const lines = csv.split(/\r?\n/).filter(line => line.trim() !== "");
   if (lines.length < 2) return [];
-  
+
   const headers = parseCSVLine(lines[0]).map(h => h.trim());
   return lines.slice(1).map(line => {
     const values = parseCSVLine(line);
@@ -85,14 +85,14 @@ export default function SettingsPage() {
 
 function SettingsInner() {
   const { user, isLoading: isUserLoading } = useAuthGuard();
-  const { 
-    activeOrganizationId, 
-    organizations, 
-    refreshOrganizations, 
+  const {
+    activeOrganizationId,
+    organizations,
+    refreshOrganizations,
     setActiveOrganizationId,
     permissions,
     isOwner,
-    isLoading: isOrgLoading 
+    isLoading: isOrgLoading
   } = useOrganization();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -224,8 +224,8 @@ function SettingsInner() {
       const res = await fetch("/api/organizations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          id: activeOrganizationId, 
+        body: JSON.stringify({
+          id: activeOrganizationId,
           name: values.name,
           currencySymbol: values.currencySymbol,
           currencyPosition: values.currencyPosition,
@@ -262,10 +262,10 @@ function SettingsInner() {
       const res = await fetch("/api/organizations/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           ...values,
           orgId: activeOrganizationId,
-          orgName: activeOrg?.name 
+          orgName: activeOrg?.name
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Invite failed");
@@ -365,7 +365,7 @@ function SettingsInner() {
     setValue: setOrgValue,
   } = useForm<OrganizationFormValues>({
     resolver: zodResolver(OrganizationSchema),
-    defaultValues: { 
+    defaultValues: {
       name: activeOrg?.name || "",
       currencySymbol: activeOrg?.currencySymbol || "৳",
       currencyPosition: activeOrg?.currencyPosition || "prefix",
@@ -507,8 +507,8 @@ function SettingsInner() {
                                 onClick={() => setOrgValue("currencySymbol", s, { shouldDirty: true })}
                                 className={cn(
                                   "w-7 h-7 flex items-center justify-center rounded-md text-xs border transition-all shrink-0",
-                                  selectedSymbol === s 
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+                                  selectedSymbol === s
+                                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                                     : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:bg-white"
                                 )}
                               >
@@ -526,8 +526,8 @@ function SettingsInner() {
                             name="currencyPosition"
                             control={controlOrg}
                             render={({ field }) => (
-                              <Select 
-                                value={field.value} 
+                              <Select
+                                value={field.value}
                                 onValueChange={field.onChange}
                                 disabled={!canManage}
                               >
@@ -565,22 +565,22 @@ function SettingsInner() {
                       </div>
 
                       <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
-                         <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
-                         <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
-                           <div className="flex items-center gap-2">
-                             <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Positive</span>
-                             <span className="text-sm font-bold text-neutral-800 tabular-nums leading-none">
-                               {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
-                             </span>
-                           </div>
-                           <div className="w-px h-4 bg-neutral-200 hidden lg:block" />
-                           <div className="flex items-center gap-2">
-                             <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Negative</span>
-                             <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
-                               {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
-                             </span>
-                           </div>
-                         </div>
+                        <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
+                        <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Positive</span>
+                            <span className="text-sm font-bold text-neutral-800 tabular-nums leading-none">
+                              {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                            </span>
+                          </div>
+                          <div className="w-px h-4 bg-neutral-200 hidden lg:block" />
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Negative</span>
+                            <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
+                              {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -604,14 +604,14 @@ function SettingsInner() {
               <Card className="border-amber-200 shadow-sm bg-amber-50/30 overflow-hidden mt-8">
                 <CardHeader className="pb-3 px-6 pt-6">
                   <div className="flex items-center gap-2 text-amber-700">
-                    <LogOut className="w-4 h-4" />
+                    {/* <LogOut className="w-4 h-4" /> */}
                     <CardTitle className="text-lg">Leave Organization</CardTitle>
                   </div>
                   <CardDescription className="text-xs text-amber-600/80">You will lose all access to this organization's data and reports.</CardDescription>
                 </CardHeader>
                 <CardFooter className="bg-amber-100/50 border-t border-amber-200 px-6 py-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     className="border-amber-300 text-amber-700 hover:bg-amber-200 hover:border-amber-400 font-semibold shadow-sm"
                     onClick={() => {
@@ -659,11 +659,11 @@ function SettingsInner() {
                     </div>
                   </CardContent>
                   <CardFooter className="bg-red-100/50 border-t border-red-200 px-6 py-4">
-                    <Button 
-                      variant="destructive" 
+                    <Button
+                      variant="destructive"
                       size="sm"
                       className="font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
-                      disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name} 
+                      disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name}
                       onClick={() => deleteOrgMutation.mutate()}
                     >
                       {deleteOrgMutation.isPending ? "Deleting..." : <><Trash2 className="w-3.5 h-3.5" /> Delete Forever</>}
@@ -677,426 +677,426 @@ function SettingsInner() {
 
         {activeTab === "members" && (
           <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="bg-neutral-50/50">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Organization</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div>
-                  <p className="font-medium">{activeOrg?.name || "Current Organization"}</p>
-                  <code className="text-xs break-all text-neutral-500 mt-1 block">{activeOrganizationId}</code>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-neutral-50/50">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Created On</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-neutral-600">
-                  {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-1 space-y-8">
-              <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Card className="bg-neutral-50/50">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Organization</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
-                    {emailSettings?.provider === "none" && (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="font-medium">Email not configured</p>
-                            <p className="text-xs opacity-90 mt-0.5">
-                              Invitations won't be sent. Please{" "}
-                              <button
-                                type="button"
-                                className="font-semibold underline hover:text-amber-900"
-                                onClick={() => handleTabChange("email")}
-                              >
-                                configure email delivery
-                              </button>.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="colleague@example.com" 
-                        {...registerInvite("email")}
-                        disabled={!canManage}
-                        className={inviteErrors.email ? "border-red-500" : ""}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="role">Role</Label>
-                      <Controller
-                        name="role"
-                        control={controlInvite}
-                        render={({ field }) => (
-                          <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
-                            <SelectTrigger id="role"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                              <SelectItem value="member">Editor</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
-                      {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
-                    </Button>
-                  </form>
+                  <div>
+                    <p className="font-medium">{activeOrg?.name || "Current Organization"}</p>
+                    <code className="text-xs break-all text-neutral-500 mt-1 block">{activeOrganizationId}</code>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
+              <Card className="bg-neutral-50/50">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Created On</CardTitle>
+                </CardHeader>
                 <CardContent>
-                  {isLoadingInvites ? (
-                    <p className="text-sm text-neutral-500 italic">Loading invitations...</p>
-                  ) : pendingInvites.length === 0 ? (
-                    <p className="text-sm text-neutral-500 italic">No pending invitations.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {pendingInvites.map((invite: any) => {
-                        const createdAt = new Date(invite.createdAt);
-                        const expiresAt = new Date(createdAt.getTime() + 48 * 60 * 60 * 1000);
-                        const now = new Date();
-                        const diffMs = expiresAt.getTime() - now.getTime();
-                        const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
-                        const diffMins = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
-
-                        return (
-                          <div key={invite.email} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
-                            <div className="flex-1 min-w-0 pr-4">
-                              <p className="text-sm font-medium truncate">{invite.email}</p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <p className="text-xs text-neutral-500 flex items-center gap-1 capitalize">
-                                  <Shield className="w-3 h-3" /> {invite.role}
-                                </p>
-                                <p className="text-xs text-amber-600 font-medium">
-                                  {diffHours}h left
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {canManage && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-neutral-400 hover:text-red-600"
-                                  onClick={() => cancelInviteMutation.mutate(invite.email)}
-                                  disabled={cancelInviteMutation.isPending}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <p className="text-sm text-neutral-600">
+                    {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="md:col-span-2">
-              <Card className="h-full shadow-lg">
-                <CardHeader>
-                  <CardTitle>Active Members</CardTitle>
-                  <CardDescription>Manage the people who have access to this organization.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingMembers ? (
-                    <div className="flex items-center justify-center p-8 text-neutral-500 italic">
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading members...
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {members.map((m: any) => {
-                        const isSelf = m.userId === user?.sub;
-                        return (
-                          <div key={m.userId} className="flex items-center justify-between p-4 bg-neutral-50 hover:bg-neutral-100/50 rounded-xl border border-neutral-100 transition-colors">
-                            <div className="flex items-center gap-4">
-                              {m.userPicture ? (
-                                <img 
-                                  src={m.userPicture} 
-                                  alt={m.userName || "User"} 
-                                  className="w-10 h-10 rounded-full border border-neutral-200"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
-                                  {(m.userName || m.userEmail || "U").charAt(0).toUpperCase()}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-1 space-y-8">
+                <Card>
+                  <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
+                      {emailSettings?.provider === "none" && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <div>
+                              <p className="font-medium">Email not configured</p>
+                              <p className="text-xs opacity-90 mt-0.5">
+                                Invitations won't be sent. Please{" "}
+                                <button
+                                  type="button"
+                                  className="font-semibold underline hover:text-amber-900"
+                                  onClick={() => handleTabChange("email")}
+                                >
+                                  configure email delivery
+                                </button>.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="colleague@example.com"
+                          {...registerInvite("email")}
+                          disabled={!canManage}
+                          className={inviteErrors.email ? "border-red-500" : ""}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="role">Role</Label>
+                        <Controller
+                          name="role"
+                          control={controlInvite}
+                          render={({ field }) => (
+                            <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                              <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="viewer">Viewer</SelectItem>
+                                <SelectItem value="member">Editor</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
+                        {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
+                  <CardContent>
+                    {isLoadingInvites ? (
+                      <p className="text-sm text-neutral-500 italic">Loading invitations...</p>
+                    ) : pendingInvites.length === 0 ? (
+                      <p className="text-sm text-neutral-500 italic">No pending invitations.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {pendingInvites.map((invite: any) => {
+                          const createdAt = new Date(invite.createdAt);
+                          const expiresAt = new Date(createdAt.getTime() + 48 * 60 * 60 * 1000);
+                          const now = new Date();
+                          const diffMs = expiresAt.getTime() - now.getTime();
+                          const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                          const diffMins = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+
+                          return (
+                            <div key={invite.email} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                              <div className="flex-1 min-w-0 pr-4">
+                                <p className="text-sm font-medium truncate">{invite.email}</p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <p className="text-xs text-neutral-500 flex items-center gap-1 capitalize">
+                                    <Shield className="w-3 h-3" /> {invite.role}
+                                  </p>
+                                  <p className="text-xs text-amber-600 font-medium">
+                                    {diffHours}h left
+                                  </p>
                                 </div>
-                              )}
-                              <div>
-                                <p className="font-semibold text-neutral-800 flex items-center gap-2">
-                                  {m.userName || `User ${m.userId.slice(-6)}`}
-                                  {isSelf && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
-                                </p>
-                                <div className="flex flex-col gap-0.5">
-                                  {m.userEmail && <p className="text-xs text-neutral-500 font-medium">{m.userEmail}</p>}
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    <Shield className="w-3 h-3 text-neutral-400" />
-                                    {m.isOwner ? (
-                                      <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-blue-500/50">Owner</span>
-                                    ) : (
-                                      <Select
-                                        value={m.role}
-                                        onValueChange={(newRole) => updateRoleMutation.mutate({ userId: m.userId, role: newRole })}
-                                        disabled={!canManage || isSelf || updateRoleMutation.isPending}
-                                      >
-                                        <SelectTrigger className="h-6 w-auto border-none bg-transparent p-0 text-xs font-medium capitalize focus:ring-0">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="admin">Admin</SelectItem>
-                                          <SelectItem value="member">Member</SelectItem>
-                                          <SelectItem value="viewer">Viewer</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                    {updateRoleMutation.isPending && updateRoleMutation.variables?.userId === m.userId && (
-                                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                    )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {canManage && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-neutral-400 hover:text-red-600"
+                                    onClick={() => cancelInviteMutation.mutate(invite.email)}
+                                    disabled={cancelInviteMutation.isPending}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="md:col-span-2">
+                <Card className="h-full shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Active Members</CardTitle>
+                    <CardDescription>Manage the people who have access to this organization.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingMembers ? (
+                      <div className="flex items-center justify-center p-8 text-neutral-500 italic">
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading members...
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {members.map((m: any) => {
+                          const isSelf = m.userId === user?.sub;
+                          return (
+                            <div key={m.userId} className="flex items-center justify-between p-4 bg-neutral-50 hover:bg-neutral-100/50 rounded-xl border border-neutral-100 transition-colors">
+                              <div className="flex items-center gap-4">
+                                {m.userPicture ? (
+                                  <img
+                                    src={m.userPicture}
+                                    alt={m.userName || "User"}
+                                    className="w-10 h-10 rounded-full border border-neutral-200"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                                    {(m.userName || m.userEmail || "U").charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-semibold text-neutral-800 flex items-center gap-2">
+                                    {m.userName || `User ${m.userId.slice(-6)}`}
+                                    {isSelf && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
+                                  </p>
+                                  <div className="flex flex-col gap-0.5">
+                                    {m.userEmail && <p className="text-xs text-neutral-500 font-medium">{m.userEmail}</p>}
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      <Shield className="w-3 h-3 text-neutral-400" />
+                                      {m.isOwner ? (
+                                        <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-blue-500/50">Owner</span>
+                                      ) : (
+                                        <Select
+                                          value={m.role}
+                                          onValueChange={(newRole) => updateRoleMutation.mutate({ userId: m.userId, role: newRole })}
+                                          disabled={!canManage || isSelf || updateRoleMutation.isPending}
+                                        >
+                                          <SelectTrigger className="h-6 w-auto border-none bg-transparent p-0 text-xs font-medium capitalize focus:ring-0">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="admin">Admin</SelectItem>
+                                            <SelectItem value="member">Member</SelectItem>
+                                            <SelectItem value="viewer">Viewer</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                      {updateRoleMutation.isPending && updateRoleMutation.variables?.userId === m.userId && (
+                                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-2">
+                                {!m.isOwner && !isSelf && canManage && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    onClick={() => {
+                                      setConfirmConfig({
+                                        open: true,
+                                        title: "Remove Member",
+                                        description: `Are you sure you want to remove ${m.userName || m.userEmail} from the organization?`,
+                                        variant: "destructive",
+                                        onConfirm: () => removeMemberMutation.mutate(m.userId),
+                                      });
+                                    }}
+                                    disabled={removeMemberMutation.isPending}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Remove
+                                  </Button>
+                                )}
+                                {!m.isOwner && isSelf && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                                    onClick={() => {
+                                      setConfirmConfig({
+                                        open: true,
+                                        title: "Leave Organization",
+                                        description: "Are you sure you want to leave this organization?",
+                                        variant: "destructive",
+                                        onConfirm: () => leaveOrgMutation.mutate(),
+                                      });
+                                    }}
+                                    disabled={leaveOrgMutation.isPending}
+                                  >
+                                    Leave
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {!m.isOwner && !isSelf && canManage && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                  onClick={() => {
-                                    setConfirmConfig({
-                                      open: true,
-                                      title: "Remove Member",
-                                      description: `Are you sure you want to remove ${m.userName || m.userEmail} from the organization?`,
-                                      variant: "destructive",
-                                      onConfirm: () => removeMemberMutation.mutate(m.userId),
-                                    });
-                                  }}
-                                  disabled={removeMemberMutation.isPending}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Remove
-                                </Button>
-                              )}
-                              {!m.isOwner && isSelf && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-                                  onClick={() => {
-                                    setConfirmConfig({
-                                      open: true,
-                                      title: "Leave Organization",
-                                      description: "Are you sure you want to leave this organization?",
-                                      variant: "destructive",
-                                      onConfirm: () => leaveOrgMutation.mutate(),
-                                    });
-                                  }}
-                                  disabled={leaveOrgMutation.isPending}
-                                >
-                                  Leave
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
           </div>
         )}
 
         {activeTab === "email" && (
           <div className="space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Delivery</CardTitle>
-              <CardDescription>Configure how this organization sends emails.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingEmailSettings ? (
-                <div className="p-8 text-center text-neutral-500 italic">Loading email settings...</div>
-              ) : (
-                <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="grid w-full items-center gap-1.5">
-                      <Label htmlFor="provider">Email Provider</Label>
-                      <Controller
-                        name="provider"
-                        control={controlEmail}
-                        render={({ field }) => (
-                          <Select 
-                            value={field.value} 
-                            onValueChange={field.onChange}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Delivery</CardTitle>
+                <CardDescription>Configure how this organization sends emails.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingEmailSettings ? (
+                  <div className="p-8 text-center text-neutral-500 italic">Loading email settings...</div>
+                ) : (
+                  <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="provider">Email Provider</Label>
+                        <Controller
+                          name="provider"
+                          control={controlEmail}
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None (Disabled)</SelectItem>
+                                <SelectItem value="brevo">Brevo (API)</SelectItem>
+                                <SelectItem value="smtp">Custom SMTP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="senderName">Sender Name</Label>
+                          <Input
+                            id="senderName"
+                            {...registerEmail("senderName")}
                             disabled={!canManage}
-                          >
-                            <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None (Disabled)</SelectItem>
-                              <SelectItem value="brevo">Brevo (API)</SelectItem>
-                              <SelectItem value="smtp">Custom SMTP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="senderName">Sender Name</Label>
-                        <Input 
-                          id="senderName" 
-                          {...registerEmail("senderName")}
-                          disabled={!canManage}
-                        />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="senderEmail">Sender Email</Label>
-                        <Input 
-                          id="senderEmail" 
-                          type="email"
-                          {...registerEmail("senderEmail")}
-                          disabled={!canManage}
-                        />
-                      </div>
-                    </div>
-
-                    {watchProvider === "brevo" && (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="apiKey">Brevo API Key</Label>
-                        <Input 
-                          id="apiKey" 
-                          type="password"
-                          placeholder="xkeysib-..."
-                          {...registerEmail("apiKey")}
-                          disabled={!canManage}
-                        />
-                      </div>
-                    )}
-
-                    {watchProvider === "smtp" && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="smtpHost">SMTP Host</Label>
-                            <Input id="smtpHost" {...registerEmail("smtpHost")} placeholder="smtp.example.com" />
-                          </div>
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="smtpPort">Port</Label>
-                            <Input id="smtpPort" type="number" {...registerEmail("smtpPort", { valueAsNumber: true })} placeholder="587" />
-                          </div>
+                          />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="smtpUser">Username</Label>
-                            <Input id="smtpUser" {...registerEmail("smtpUser")} disabled={!canManage} />
-                          </div>
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="smtpPass">Password</Label>
-                            <Input id="smtpPass" type="password" {...registerEmail("smtpPass")} disabled={!canManage} />
-                          </div>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="senderEmail">Sender Email</Label>
+                          <Input
+                            id="senderEmail"
+                            type="email"
+                            {...registerEmail("senderEmail")}
+                            disabled={!canManage}
+                          />
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {canManage && (
-                    <div className="flex gap-4">
-                      <Button type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
-                        {saveEmailMutation.isPending ? "Saving..." : "Save Email Settings"}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="secondary" 
-                        onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
-                        disabled={saveEmailMutation.isPending || testEmailMutation.isPending || watchProvider === "none"}
-                      >
-                        {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
-                      </Button>
+                      {watchProvider === "brevo" && (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="apiKey">Brevo API Key</Label>
+                          <Input
+                            id="apiKey"
+                            type="password"
+                            placeholder="xkeysib-..."
+                            {...registerEmail("apiKey")}
+                            disabled={!canManage}
+                          />
+                        </div>
+                      )}
+
+                      {watchProvider === "smtp" && (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="smtpHost">SMTP Host</Label>
+                              <Input id="smtpHost" {...registerEmail("smtpHost")} placeholder="smtp.example.com" />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="smtpPort">Port</Label>
+                              <Input id="smtpPort" type="number" {...registerEmail("smtpPort", { valueAsNumber: true })} placeholder="587" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="smtpUser">Username</Label>
+                              <Input id="smtpUser" {...registerEmail("smtpUser")} disabled={!canManage} />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="smtpPass">Password</Label>
+                              <Input id="smtpPass" type="password" {...registerEmail("smtpPass")} disabled={!canManage} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </form>
-              )}
-            </CardContent>
-          </Card>
+
+                    {canManage && (
+                      <div className="flex gap-4">
+                        <Button type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
+                          {saveEmailMutation.isPending ? "Saving..." : "Save Email Settings"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
+                          disabled={saveEmailMutation.isPending || testEmailMutation.isPending || watchProvider === "none"}
+                        >
+                          {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                        </Button>
+                      </div>
+                    )}
+                  </form>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
         {activeTab === "mcp" && (
           <div className="space-y-8">
-          <Card className="shadow-lg border-neutral-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
-              <CardDescription>
-                Expose your ledger tools to AI agents using the Model Context Protocol (MCP).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {isLoadingMcpSettings ? (
-                <div className="p-8 text-center text-neutral-500 italic">Loading MCP settings...</div>
-              ) : mcpSettings?.mcpApiKey ? (
-                <div className="space-y-6">
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                    <h3 className="text-sm font-semibold text-blue-900 mb-2">Your MCP API Key</h3>
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        value={mcpSettings.mcpApiKey} 
-                        readOnly 
-                        type="password"
-                        className="bg-white font-mono text-xs"
-                      />
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        className="shrink-0"
-                        onClick={() => {
-                          navigator.clipboard.writeText(mcpSettings.mcpApiKey!);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                          toast.success("API Key copied to clipboard");
-                        }}
-                      >
-                        {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                      </Button>
+            <Card className="shadow-lg border-neutral-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
+                <CardDescription>
+                  Expose your ledger tools to AI agents using the Model Context Protocol (MCP).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isLoadingMcpSettings ? (
+                  <div className="p-8 text-center text-neutral-500 italic">Loading MCP settings...</div>
+                ) : mcpSettings?.mcpApiKey ? (
+                  <div className="space-y-6">
+                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                      <h3 className="text-sm font-semibold text-blue-900 mb-2">Your MCP API Key</h3>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={mcpSettings.mcpApiKey}
+                          readOnly
+                          type="password"
+                          className="bg-white font-mono text-xs"
+                        />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(mcpSettings.mcpApiKey!);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                            toast.success("API Key copied to clipboard");
+                          }}
+                        >
+                          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      {mcpSettings.mcpApiKeyExpiresAt && (
+                        <p className="text-xs text-blue-700 mt-2">
+                          Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
-                    {mcpSettings.mcpApiKeyExpiresAt && (
-                      <p className="text-xs text-blue-700 mt-2">
-                        Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
 
-                  <div className="space-y-3">
-                    <Label>MCP Server Configuration</Label>
-                    <div className="relative">
-                      <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
-{`{
+                    <div className="space-y-3">
+                      <Label>MCP Server Configuration</Label>
+                      <div className="relative">
+                        <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
+                          {`{
   "mcpServers": {
     "${activeOrg?.name || "sulfur"}-ledger": {
       "url": "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp",
@@ -1107,418 +1107,418 @@ function SettingsInner() {
     }
   }
 }`}
-                      </pre>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="absolute top-2 right-2 h-7 text-[10px]"
-                        onClick={() => {
-                          const config = {
-                            mcpServers: {
-                              [`${activeOrg?.name || "sulfur"}-ledger`]: {
-                                url: `${window.location.origin}/api/mcp`,
-                                transport: "http",
-                                headers: {
-                                  "x-mcp-key": mcpSettings.mcpApiKey
+                        </pre>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="absolute top-2 right-2 h-7 text-[10px]"
+                          onClick={() => {
+                            const config = {
+                              mcpServers: {
+                                [`${activeOrg?.name || "sulfur"}-ledger`]: {
+                                  url: `${window.location.origin}/api/mcp`,
+                                  transport: "http",
+                                  headers: {
+                                    "x-mcp-key": mcpSettings.mcpApiKey
+                                  }
                                 }
                               }
-                            }
-                          };
-                          navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-                          toast.success("Configuration copied!");
-                        }}
-                      >
-                        Copy JSON
-                      </Button>
-                    </div>
-                    <p className="text-xs text-neutral-500">
-                      Add this snippet to your MCP client configuration (e.g. <code>mcp_config.json</code>) to enable AI access to this organization's data.
-                    </p>
-                  </div>
-
-                  {canManage && (
-                    <div className="pt-4 border-t flex items-center justify-between">
-                      <p className="text-sm text-neutral-600">Need a new key? Regenerating will invalidate the current one.</p>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setConfirmConfig({
-                              open: true,
-                              title: "Revoke MCP Key",
-                              description: "This will immediately disable AI access for this organization. Are you sure?",
-                              variant: "destructive",
-                              onConfirm: () => deleteMcpKeyMutation.mutate(),
-                            });
+                            };
+                            navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+                            toast.success("Configuration copied!");
                           }}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" /> Revoke
+                          Copy JSON
                         </Button>
-                        <Button 
-                          variant="secondary" 
-                          size="sm"
+                      </div>
+                      <p className="text-xs text-neutral-500">
+                        Add this snippet to your MCP client configuration (e.g. <code>mcp_config.json</code>) to enable AI access to this organization's data.
+                      </p>
+                    </div>
+
+                    {canManage && (
+                      <div className="pt-4 border-t flex items-center justify-between">
+                        <p className="text-sm text-neutral-600">Need a new key? Regenerating will invalidate the current one.</p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setConfirmConfig({
+                                open: true,
+                                title: "Revoke MCP Key",
+                                description: "This will immediately disable AI access for this organization. Are you sure?",
+                                variant: "destructive",
+                                onConfirm: () => deleteMcpKeyMutation.mutate(),
+                              });
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" /> Revoke
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
+                          >
+                            <RotateCcw className="w-4 h-4 mr-2" /> Regenerate
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
+                    <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center">
+                      <Key className="w-8 h-8 text-neutral-400" />
+                    </div>
+                    <div className="max-w-md">
+                      <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
+                      <p className="text-neutral-500 text-sm mt-2">
+                        Enable AI tools for this organization. Generate a secure API key to connect your MCP-compatible agents.
+                      </p>
+                    </div>
+                    {canManage && (
+                      <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                        <div className="w-full text-left space-y-2">
+                          <Label>Key Expiration (TTL)</Label>
+                          <Controller
+                            name="ttlDays"
+                            control={controlMcp}
+                            render={({ field }) => (
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="30">30 Days</SelectItem>
+                                  <SelectItem value="60">60 Days</SelectItem>
+                                  <SelectItem value="90">90 Days</SelectItem>
+                                  <SelectItem value="never">Never Expires</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+                        <Button
+                          className="w-full"
                           onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
+                          disabled={generateMcpKeyMutation.isPending}
                         >
-                          <RotateCcw className="w-4 h-4 mr-2" /> Regenerate
+                          {generateMcpKeyMutation.isPending ? "Generating..." : "Generate MCP API Key"}
                         </Button>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
-                  <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center">
-                    <Key className="w-8 h-8 text-neutral-400" />
+                    )}
                   </div>
-                  <div className="max-w-md">
-                    <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
-                    <p className="text-neutral-500 text-sm mt-2">
-                      Enable AI tools for this organization. Generate a secure API key to connect your MCP-compatible agents.
-                    </p>
-                  </div>
-                  {canManage && (
-                    <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                      <div className="w-full text-left space-y-2">
-                        <Label>Key Expiration (TTL)</Label>
-                        <Controller
-                          name="ttlDays"
-                          control={controlMcp}
-                          render={({ field }) => (
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="30">30 Days</SelectItem>
-                                <SelectItem value="60">60 Days</SelectItem>
-                                <SelectItem value="90">90 Days</SelectItem>
-                                <SelectItem value="never">Never Expires</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
-                        disabled={generateMcpKeyMutation.isPending}
-                      >
-                        {generateMcpKeyMutation.isPending ? "Generating..." : "Generate MCP API Key"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
         {activeTab === "data" && (
           <div className="space-y-8">
-          <div className="grid gap-8">
-            <Card className="shadow-lg border-neutral-200">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-blue-600 mb-1">
-                  <FileSpreadsheet className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Spreadsheet Interoperability</span>
-                </div>
-                <CardTitle>CSV Data Management</CardTitle>
-                <CardDescription>
-                  Best for viewing, editing in Excel/Google Sheets, or importing data from other ledger tools.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
-                    <div>
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        <Upload className="w-4 h-4 text-neutral-400" />
-                        Import from CSV
-                      </h4>
-                      <p className="text-xs text-neutral-500 mt-1">Upload your ledger entries from a formatted CSV file.</p>
+            <div className="grid gap-8">
+              <Card className="shadow-lg border-neutral-200">
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <FileSpreadsheet className="w-5 h-5" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Spreadsheet Interoperability</span>
+                  </div>
+                  <CardTitle>CSV Data Management</CardTitle>
+                  <CardDescription>
+                    Best for viewing, editing in Excel/Google Sheets, or importing data from other ledger tools.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                      <div>
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                          <Upload className="w-4 h-4 text-neutral-400" />
+                          Import from CSV
+                        </h4>
+                        <p className="text-xs text-neutral-500 mt-1">Upload your ledger entries from a formatted CSV file.</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="file"
+                          id="csv-upload"
+                          className="hidden"
+                          accept=".csv"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsImportingCsv(true);
+                            const reader = new FileReader();
+                            reader.onload = async (evt) => {
+                              const csvContent = evt.target?.result as string;
+                              try {
+                                const records = parseCSV(csvContent);
+                                if (records.length === 0) {
+                                  toast.error("No records found in CSV.");
+                                  return;
+                                }
+                                toast.info(`Parsing ${records.length} records...`);
+                                const accountNames = Array.from(new Set(records.flatMap((r: any) => [r["From (Source)"], r["To (Destination)"]]).filter(Boolean)));
+                                await fetch("/api/admin/ensure-accounts", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ accountNames })
+                                });
+                                for (let i = 0; i < records.length; i++) {
+                                  await fetch("/api/admin/import-entry", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      date: records[i]["Date"],
+                                      description: records[i]["Description"],
+                                      amount: records[i]["Amount"],
+                                      from: records[i]["From (Source)"],
+                                      to: records[i]["To (Destination)"],
+                                      notes: records[i]["Notes"]
+                                    })
+                                  });
+                                }
+                                toast.success("CSV Import complete!");
+                                setTimeout(() => window.location.reload(), 1000);
+                              } catch (err: any) {
+                                toast.error(`Import error: ${err.message}`);
+                              } finally {
+                                setIsImportingCsv(false);
+                              }
+                            };
+                            reader.readAsText(file);
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-12"
+                          disabled={isImportingCsv}
+                          onClick={() => document.getElementById("csv-upload")?.click()}
+                        >
+                          {isImportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                          {isImportingCsv ? "Importing..." : "Choose CSV File"}
+                        </Button>
+                        <a href="/sample-journals.csv" download className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-medium pl-1">
+                          <Download className="w-3 h-3" /> Download Sample Template
+                        </a>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-2">
+
+                    <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                      <div>
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                          <Download className="w-4 h-4 text-neutral-400" />
+                          Export to CSV
+                        </h4>
+                        <p className="text-xs text-neutral-500 mt-1">Download entries in a spreadsheet-compatible format.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-12"
+                        disabled={isExportingCsv}
+                        onClick={async () => {
+                          try {
+                            setIsExportingCsv(true);
+                            const res = await fetch("/api/admin/export?format=csv", {
+                              headers: { "x-org-id": activeOrganizationId! }
+                            });
+                            if (!res.ok) throw new Error("Export failed");
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `ledger-export-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.csv`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            toast.success("CSV Downloaded!");
+                          } catch (err: any) {
+                            toast.error(`Export failed: ${err.message}`);
+                          } finally {
+                            setIsExportingCsv(false);
+                          }
+                        }}
+                      >
+                        {isExportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+                        {isExportingCsv ? "Generating..." : "Download CSV Spreadsheet"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg border-neutral-200">
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-purple-600 mb-1">
+                    <FileJson className="w-5 h-5" />
+                    <span className="text-xs font-bold uppercase tracking-wider">System Backups & Migration</span>
+                  </div>
+                  <CardTitle>JSON Data Management</CardTitle>
+                  <CardDescription>
+                    Lossless backups. Use this to transfer your entire organization's state to another account or for long-term secure archival.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                      <div>
+                        <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
+                          <RotateCcw className="w-4 h-4 text-purple-400" />
+                          Restore JSON Backup
+                        </h4>
+                        <p className="text-xs text-purple-700 mt-1">Reconstruct your accounts and history from a JSON file.</p>
+                        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-red-700 font-medium leading-relaxed">
+                            Warning: Importing data via JSON will wipe out everything including activity logs, except the organization itself.
+                          </p>
+                        </div>
+                      </div>
                       <input
                         type="file"
-                        id="csv-upload"
+                        id="json-import"
                         className="hidden"
-                        accept=".csv"
+                        accept=".json"
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          setIsImportingCsv(true);
+                          setIsImportingJson(true);
                           const reader = new FileReader();
                           reader.onload = async (evt) => {
-                            const csvContent = evt.target?.result as string;
                             try {
-                              const records = parseCSV(csvContent);
-                              if (records.length === 0) {
-                                toast.error("No records found in CSV.");
-                                return;
-                              }
-                              toast.info(`Parsing ${records.length} records...`);
-                              const accountNames = Array.from(new Set(records.flatMap((r: any) => [r["From (Source)"], r["To (Destination)"]]).filter(Boolean)));
-                              await fetch("/api/admin/ensure-accounts", {
+                              const data = JSON.parse(evt.target?.result as string);
+                              const res = await fetch("/api/admin/import", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ accountNames })
+                                headers: { "Content-Type": "application/json", "x-org-id": activeOrganizationId! },
+                                body: JSON.stringify(data)
                               });
-                              for (let i = 0; i < records.length; i++) {
-                                await fetch("/api/admin/import-entry", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    date: records[i]["Date"],
-                                    description: records[i]["Description"],
-                                    amount: records[i]["Amount"],
-                                    from: records[i]["From (Source)"],
-                                    to: records[i]["To (Destination)"],
-                                    notes: records[i]["Notes"]
-                                  })
-                                });
-                              }
-                              toast.success("CSV Import complete!");
+                              if (!res.ok) throw new Error("Restore failed");
+                              const result = await res.json();
+                              toast.success(result.message);
                               setTimeout(() => window.location.reload(), 1000);
                             } catch (err: any) {
-                              toast.error(`Import error: ${err.message}`);
+                              toast.error(`Restore failed: ${err.message}`);
                             } finally {
-                              setIsImportingCsv(false);
+                              setIsImportingJson(false);
+                              if (document.getElementById("json-import")) {
+                                (document.getElementById("json-import") as HTMLInputElement).value = '';
+                              }
                             }
                           };
                           reader.readAsText(file);
                         }}
                       />
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start h-12"
-                        disabled={isImportingCsv}
-                        onClick={() => document.getElementById("csv-upload")?.click()}
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors"
+                        disabled={isImportingJson}
+                        onClick={() => {
+                          setConfirmConfig({
+                            open: true,
+                            title: "Destructive Action",
+                            description: "Importing data via JSON will wipe out everything including activity logs, except the organization itself. Are you sure you want to proceed?",
+                            variant: "destructive",
+                            onConfirm: () => document.getElementById("json-import")?.click(),
+                          });
+                        }}
                       >
-                        {isImportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                        {isImportingCsv ? "Importing..." : "Choose CSV File"}
+                        {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2" />}
+                        {isImportingJson ? "Restoring..." : "Restore from JSON File"}
                       </Button>
-                      <a href="/sample-journals.csv" download className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-medium pl-1">
-                        <Download className="w-3 h-3" /> Download Sample Template
-                      </a>
                     </div>
-                  </div>
 
-                  <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
-                    <div>
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        <Download className="w-4 h-4 text-neutral-400" />
-                        Export to CSV
-                      </h4>
-                      <p className="text-xs text-neutral-500 mt-1">Download entries in a spreadsheet-compatible format.</p>
-                    </div>
-                    <Button 
-                      variant="outline"
-                      className="w-full justify-start h-12"
-                      disabled={isExportingCsv}
-                      onClick={async () => {
-                        try {
-                          setIsExportingCsv(true);
-                          const res = await fetch("/api/admin/export?format=csv", {
-                            headers: { "x-org-id": activeOrganizationId! }
-                          });
-                          if (!res.ok) throw new Error("Export failed");
-                          const blob = await res.blob();
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `ledger-export-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.csv`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                          toast.success("CSV Downloaded!");
-                        } catch (err: any) {
-                          toast.error(`Export failed: ${err.message}`);
-                        } finally {
-                          setIsExportingCsv(false);
-                        }
-                      }}
-                    >
-                      {isExportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
-                      {isExportingCsv ? "Generating..." : "Download CSV Spreadsheet"}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-neutral-200">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-purple-600 mb-1">
-                  <FileJson className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">System Backups & Migration</span>
-                </div>
-                <CardTitle>JSON Data Management</CardTitle>
-                <CardDescription>
-                  Lossless backups. Use this to transfer your entire organization's state to another account or for long-term secure archival.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
-                    <div>
-                      <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
-                        <RotateCcw className="w-4 h-4 text-purple-400" />
-                        Restore JSON Backup
-                      </h4>
-                      <p className="text-xs text-purple-700 mt-1">Reconstruct your accounts and history from a JSON file.</p>
-                      <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                        <p className="text-xs text-red-700 font-medium leading-relaxed">
-                          Warning: Importing data via JSON will wipe out everything including activity logs, except the organization itself.
-                        </p>
+                    <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                      <div>
+                        <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
+                          <Download className="w-4 h-4 text-purple-400" />
+                          Generate JSON Backup
+                        </h4>
+                        <p className="text-xs text-purple-700 mt-1">Export a complete, structured snapshot of your ledger.</p>
                       </div>
-                    </div>
-                    <input
-                      type="file"
-                      id="json-import"
-                      className="hidden"
-                      accept=".json"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setIsImportingJson(true);
-                        const reader = new FileReader();
-                        reader.onload = async (evt) => {
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
+                        disabled={isExportingJson}
+                        onClick={async () => {
                           try {
-                            const data = JSON.parse(evt.target?.result as string);
-                            const res = await fetch("/api/admin/import", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json", "x-org-id": activeOrganizationId! },
-                              body: JSON.stringify(data)
+                            setIsExportingJson(true);
+                            const res = await fetch("/api/admin/export?format=json", {
+                              headers: { "x-org-id": activeOrganizationId! }
                             });
-                            if (!res.ok) throw new Error("Restore failed");
-                            const result = await res.json();
-                            toast.success(result.message);
-                            setTimeout(() => window.location.reload(), 1000);
+                            const data = await res.json();
+                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `ledger-backup-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.json`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            toast.success("Full Backup Generated!");
                           } catch (err: any) {
-                            toast.error(`Restore failed: ${err.message}`);
+                            toast.error(`Backup failed: ${err.message}`);
                           } finally {
-                            setIsImportingJson(false);
-                            if (document.getElementById("json-import")) {
-                              (document.getElementById("json-import") as HTMLInputElement).value = '';
-                            }
+                            setIsExportingJson(false);
                           }
-                        };
-                        reader.readAsText(file);
-                      }}
-                    />
-                    <Button 
-                      variant="secondary" 
-                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors"
-                      disabled={isImportingJson}
-                      onClick={() => {
-                        setConfirmConfig({
-                          open: true,
-                          title: "Destructive Action",
-                          description: "Importing data via JSON will wipe out everything including activity logs, except the organization itself. Are you sure you want to proceed?",
-                          variant: "destructive",
-                          onConfirm: () => document.getElementById("json-import")?.click(),
-                        });
-                      }}
-                    >
-                      {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2" />}
-                      {isImportingJson ? "Restoring..." : "Restore from JSON File"}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
-                    <div>
-                      <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
-                        <Download className="w-4 h-4 text-purple-400" />
-                        Generate JSON Backup
-                      </h4>
-                      <p className="text-xs text-purple-700 mt-1">Export a complete, structured snapshot of your ledger.</p>
+                        }}
+                      >
+                        {isExportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <FileJson className="w-4 h-4 mr-2 text-purple-400" />}
+                        {isExportingJson ? "Generating..." : "Download Complete Backup"}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="outline"
-                      className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
-                      disabled={isExportingJson}
-                      onClick={async () => {
-                        try {
-                          setIsExportingJson(true);
-                          const res = await fetch("/api/admin/export?format=json", {
-                            headers: { "x-org-id": activeOrganizationId! }
-                          });
-                          const data = await res.json();
-                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `ledger-backup-${activeOrg?.name || "org"}-${new Date().toISOString().split('T')[0]}.json`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                          toast.success("Full Backup Generated!");
-                        } catch (err: any) {
-                          toast.error(`Backup failed: ${err.message}`);
-                        } finally {
-                          setIsExportingJson(false);
-                        }
-                      }}
-                    >
-                      {isExportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <FileJson className="w-4 h-4 mr-2 text-purple-400" />}
-                      {isExportingJson ? "Generating..." : "Download Complete Backup"}
-                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <Card className="shadow-lg border-red-200">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-red-600 mb-1">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Danger Zone</span>
-                </div>
-                <CardTitle>Ledger Erasure</CardTitle>
-                <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
-              </CardHeader>
-              <CardFooter className="bg-red-50/50 border-t border-red-100 rounded-b-lg p-6">
-                <Button 
-                  variant="destructive" 
-                  className="h-12 px-8"
-                  onClick={() => {
-                  setConfirmConfig({
-                    open: true,
-                    title: "Clear All Ledger Data",
-                    description: "This will permanently delete all accounts and journal entries in this organization. This cannot be undone.",
-                    variant: "destructive",
-                    onConfirm: async () => {
-                      try {
-                        const res = await fetch("/api/admin/clear-data", { method: "POST" });
-                        if (res.ok) {
-                          toast.success("Data cleared successfully.");
-                          setTimeout(() => window.location.reload(), 1000);
-                        } else {
-                          const error = await res.json();
-                          toast.error(`Error: ${error.error}`);
-                        }
-                      } catch (err) {
-                        toast.error("An unexpected error occurred.");
-                      }
-                    },
-                  });
-                }}
-              >
-                Clear All Data
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
+              <Card className="shadow-lg border-red-200">
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-red-600 mb-1">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Danger Zone</span>
+                  </div>
+                  <CardTitle>Ledger Erasure</CardTitle>
+                  <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
+                </CardHeader>
+                <CardFooter className="bg-red-50/50 border-t border-red-100 rounded-b-lg p-6">
+                  <Button
+                    variant="destructive"
+                    className="h-12 px-8"
+                    onClick={() => {
+                      setConfirmConfig({
+                        open: true,
+                        title: "Clear All Ledger Data",
+                        description: "This will permanently delete all accounts and journal entries in this organization. This cannot be undone.",
+                        variant: "destructive",
+                        onConfirm: async () => {
+                          try {
+                            const res = await fetch("/api/admin/clear-data", { method: "POST" });
+                            if (res.ok) {
+                              toast.success("Data cleared successfully.");
+                              setTimeout(() => window.location.reload(), 1000);
+                            } else {
+                              const error = await res.json();
+                              toast.error(`Error: ${error.error}`);
+                            }
+                          } catch (err) {
+                            toast.error("An unexpected error occurred.");
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Clear All Data
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
           </div>
         )}
       </div>
 
       {confirmConfig && (
-        <AlertDialog 
-          open={confirmConfig.open} 
+        <AlertDialog
+          open={confirmConfig.open}
           onOpenChange={(open) => !open && setConfirmConfig(null)}
         >
           <AlertDialogContent>
@@ -1528,8 +1528,8 @@ function SettingsInner() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                variant={confirmConfig.variant || "default"} 
+              <AlertDialogAction
+                variant={confirmConfig.variant || "default"}
                 onClick={() => {
                   confirmConfig.onConfirm();
                   setConfirmConfig(null);

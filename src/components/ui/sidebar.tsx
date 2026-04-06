@@ -503,26 +503,18 @@ function SidebarMenuButton({
   size = "default",
   tooltip,
   className,
-  autoCloseMobile = true,
   ...props
 }: useRender.ComponentProps<"button"> &
   React.ComponentProps<"button"> & {
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
-    autoCloseMobile?: boolean
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state, setOpenMobile } = useSidebar()
+  const { isMobile, state } = useSidebar()
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
       {
         className: cn(sidebarMenuButtonVariants({ variant, size }), className),
-        onClick: (event) => {
-          props.onClick?.(event)
-          if (isMobile && autoCloseMobile) {
-            setOpenMobile(false)
-          }
-        },
       },
       props
     ),
@@ -676,15 +668,12 @@ function SidebarMenuSubButton({
   size = "md",
   isActive = false,
   className,
-  autoCloseMobile = true,
   ...props
 }: useRender.ComponentProps<"a"> &
   React.ComponentProps<"a"> & {
     size?: "sm" | "md"
     isActive?: boolean
-    autoCloseMobile?: boolean
   }) {
-  const { isMobile, setOpenMobile } = useSidebar()
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(
@@ -693,12 +682,6 @@ function SidebarMenuSubButton({
           "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
           className
         ),
-        onClick: (event) => {
-          props.onClick?.(event as any)
-          if (isMobile && autoCloseMobile) {
-            setOpenMobile(false)
-          }
-        },
       },
       props
     ),
