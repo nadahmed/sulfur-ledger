@@ -31,10 +31,17 @@ export async function GET(req: NextRequest) {
     const currencySymbol = org?.currencySymbol || "৳";
 
     // Format utility
-    const formatCurrency = (amount: number) => {
+    const formatCurrency = (amount: number, isPdf: boolean = false) => {
+      let symbol = org?.currencySymbol || "৳";
+      
+      // Fallback for PDF if the symbol is Taka (which standard PDF fonts don't support)
+      if (isPdf && symbol === "৳") {
+        symbol = "Tk";
+      }
+
       return globalFormatCurrency(
         amount / 100, 
-        org?.currencySymbol, 
+        symbol, 
         org?.currencyPosition, 
         org?.currencyHasSpace
       );
@@ -91,25 +98,31 @@ export async function GET(req: NextRequest) {
       const rows = data.accounts.map((acc: any) => [
         acc.name,
         acc.category.charAt(0).toUpperCase() + acc.category.slice(1),
-        acc.balance > 0 ? formatCurrency(acc.balance) : "-",
-        acc.balance < 0 ? formatCurrency(Math.abs(acc.balance)) : "-"
+        acc.balance > 0 ? formatCurrency(acc.balance, true) : "-",
+        acc.balance < 0 ? formatCurrency(Math.abs(acc.balance), true) : "-"
       ]);
 
       rows.push([
         "TOTAL",
         "",
-        formatCurrency(data.totalDebits || 0),
-        formatCurrency(Math.abs(data.totalCredits || 0))
+        formatCurrency(data.totalDebits || 0, true),
+        formatCurrency(Math.abs(data.totalCredits || 0), true)
       ]);
 
       autoTable(doc, {
         startY: currentY,
         head: [['Account Name', 'Category', 'Debit', 'Credit']],
         body: rows,
-        headStyles: { fillColor: [41, 41, 41] },
+        headStyles: { fillColor: [41, 41, 41], halign: 'center' },
         columnStyles: {
-          2: { halign: 'right' },
-          3: { halign: 'right' }
+          0: { cellWidth: 'auto' },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 35, halign: 'right' },
+          3: { cellWidth: 35, halign: 'right' }
+        },
+        styles: {
+          overflow: 'linebreak',
+          cellPadding: 3
         },
         willDrawCell: (data) => {
           if (data.row.index === rows.length - 1 && data.section === 'body') {
@@ -136,14 +149,14 @@ export async function GET(req: NextRequest) {
         
         const rows = section.accounts.map((acc: any) => [
           acc.name, 
-          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)
+          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance, true)
         ]);
         
         if (rows.length === 0) {
-           rows.push(['No items found', formatCurrency(0)]);
+           rows.push(['No items found', formatCurrency(0, true)]);
         }
         
-        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total)]);
+        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total, true)]);
 
         autoTable(doc, {
           startY: currentY,
@@ -151,7 +164,12 @@ export async function GET(req: NextRequest) {
           theme: 'plain',
           head: [],
           columnStyles: {
-            1: { halign: 'right' }
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 45, halign: 'right' }
+          },
+          styles: {
+            overflow: 'linebreak',
+            cellPadding: 2
           },
           willDrawCell: (data) => {
             if (data.row.index === rows.length - 1) {
@@ -179,14 +197,14 @@ export async function GET(req: NextRequest) {
         const total = section.accounts.reduce((sum: number, acc: any) => sum + acc.balance, 0);
         const rows = section.accounts.map((acc: any) => [
           acc.name, 
-          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)
+          formatCurrency(section.normal === 'credit' ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance, true)
         ]);
         
         if (rows.length === 0) {
-           rows.push(['No items found', formatCurrency(0)]);
+           rows.push(['No items found', formatCurrency(0, true)]);
         }
         
-        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total)]);
+        rows.push([`Total ${section.title}`, formatCurrency(section.normal === 'credit' ? (total === 0 ? 0 : total * -1) : total, true)]);
 
         autoTable(doc, {
           startY: currentY,
@@ -194,7 +212,12 @@ export async function GET(req: NextRequest) {
           theme: 'plain',
           head: [],
           columnStyles: {
-            1: { halign: 'right' }
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 45, halign: 'right' }
+          },
+          styles: {
+            overflow: 'linebreak',
+            cellPadding: 2
           },
           willDrawCell: (data) => {
             if (data.row.index === rows.length - 1) {
@@ -212,7 +235,7 @@ export async function GET(req: NextRequest) {
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text(`Net Income: ${formatCurrency(netIncome)}`, 14, currentY);
+      doc.text(`Net Income: ${formatCurrency(netIncome, true)}`, 14, currentY);
     } else {
        doc.text("Report preview unavailable for this format.", 14, 50);
     }
