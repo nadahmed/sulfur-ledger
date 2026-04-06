@@ -135,7 +135,7 @@ function OnboardingContent() {
   if (isLoading || isJoining) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-50 p-4">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
         <h2 className="text-xl font-semibold text-neutral-800">
           {isJoining ? "Joining organization..." : "Loading organizations..."}
         </h2>
@@ -163,7 +163,7 @@ function OnboardingContent() {
                   placeholder="e.g. My Personal Ledger or ACME Corp"
                   {...register("name")}
                   autoFocus
-                  className={errors.name ? "border-red-500 focus:ring-red-500" : "focus:ring-2 focus:ring-blue-500"}
+                  className={errors.name ? "border-red-500 focus:ring-red-500" : "focus:ring-2 focus:ring-primary"}
                 />
                 {errors.name && (
                   <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -190,7 +190,7 @@ function OnboardingContent() {
                             className={cn(
                               "w-7 h-7 flex items-center justify-center rounded-md text-[10px] border transition-all shrink-0",
                               selectedSymbol === s 
-                                ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+                                ? "bg-primary border-primary text-white shadow-sm" 
                                 : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300"
                             )}
                           >
@@ -242,7 +242,7 @@ function OnboardingContent() {
                   </div>
 
                   <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
-                     <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
+                     <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-60 leading-none">Live Preview</Label>
                      <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Entry</span>
@@ -250,7 +250,7 @@ function OnboardingContent() {
                             {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
                           </span>
                         </div>
-                        <div className="w-px h-4 bg-blue-100 hidden lg:block" />
+                        <div className="w-px h-4 bg-neutral-100 hidden lg:block" />
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Expense</span>
                           <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
@@ -265,7 +265,7 @@ function OnboardingContent() {
             <CardFooter className="flex flex-col gap-3">
               <Button 
                 type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 rounded-lg transition-colors"
                 disabled={mutation.isPending}
               >
                 {mutation.isPending ? "Creating..." : "Create Organization"}
@@ -296,15 +296,15 @@ function OnboardingContent() {
                   <button
                     key={org.id}
                     onClick={() => handleSelectOrg(org.id)}
-                    className="flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
+                    className="flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-xl hover:border-primary hover:bg-neutral-50 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-neutral-100 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                      <div className="p-2 bg-neutral-100 rounded-lg group-hover:bg-neutral-100 group-hover:text-primary transition-colors">
                         <Building2 size={20} />
                       </div>
                       <span className="font-semibold text-neutral-800">{org.name}</span>
                     </div>
-                    <ArrowRight size={18} className="text-neutral-400 group-hover:text-blue-500 transition-colors" />
+                    <ArrowRight size={18} className="text-neutral-400 group-hover:text-primary transition-colors" />
                   </button>
                 ))}
               </div>
@@ -313,7 +313,7 @@ function OnboardingContent() {
               <Button 
                 onClick={() => setShowCreateForm(true)}
                 variant="outline"
-                className="w-full flex items-center justify-center gap-2 py-6 border-dashed border-2 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-all border-neutral-300 text-neutral-500"
+                className="w-full flex items-center justify-center gap-2 py-6 border-dashed border-2 hover:border-primary hover:bg-neutral-50 hover:text-primary transition-all border-neutral-300 text-neutral-500"
               >
                 <Plus size={20} />
                 <span>Create New Organization</span>
@@ -330,7 +330,7 @@ export default function OnboardingPage() {
   return (
     <Suspense fallback={
       <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-50 p-4">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
         <h2 className="text-xl font-semibold text-neutral-800">Loading...</h2>
       </div>
     }>

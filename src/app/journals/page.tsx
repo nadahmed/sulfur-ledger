@@ -272,7 +272,7 @@ export default function JournalsPage() {
       </div>
 
       {canCreate && (
-        <Card className="mb-8 font-sans border-blue-100 shadow-sm">
+        <Card className="mb-8 font-sans border-neutral-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               Record Transaction

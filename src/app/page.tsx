@@ -205,7 +205,7 @@ export default function DashboardPage() {
         <Card className="shadow-sm border-neutral-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Cash Balance</CardTitle>
-            <Wallet className="h-4 w-4 text-blue-500" />
+            <Wallet className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -279,7 +279,7 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-indigo-500" />
+              <TrendingUp className="h-5 w-5 text-primary" />
               Financial Trends
             </CardTitle>
             <CardDescription>Income and expense trajectory over time</CardDescription>
@@ -375,7 +375,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-4 shadow-sm border-neutral-200">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
+              <BarChart3 className="h-5 w-5 text-primary" />
               Income vs Expenses
             </CardTitle>
             <CardDescription>Comparison of revenue and outflow for the period</CardDescription>
@@ -466,11 +466,11 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-start gap-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
-                  <div className="mt-1"><Wallet className="h-5 w-5 text-blue-600" /></div>
+                <div className="flex items-start gap-4 p-3 rounded-lg bg-neutral-50 border border-neutral-200">
+                  <div className="mt-1"><Wallet className="h-5 w-5 text-primary" /></div>
                   <div>
-                    <h4 className="font-semibold text-blue-900">Liquidity Status</h4>
-                    <p className="text-sm text-blue-700">
+                    <h4 className="font-semibold text-neutral-900">Liquidity Status</h4>
+                    <p className="text-sm text-neutral-600">
                       Your current cash balance is {summary ? formatCurrencyValue(summary.cashBalance) : (
                         activeOrg?.currencyPosition === "suffix" 
                           ? `0${activeOrg?.currencySymbol || "৳"}` 

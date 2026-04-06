@@ -508,7 +508,7 @@ function SettingsInner() {
                                 className={cn(
                                   "w-7 h-7 flex items-center justify-center rounded-md text-xs border transition-all shrink-0",
                                   selectedSymbol === s
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                    ? "bg-primary border-primary text-white shadow-sm"
                                     : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:bg-white"
                                 )}
                               >
@@ -565,7 +565,7 @@ function SettingsInner() {
                       </div>
 
                       <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
-                        <Label className="text-[10px] uppercase tracking-widest text-blue-500 font-black opacity-60 leading-none">Live Preview</Label>
+                        <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-60 leading-none">Live Preview</Label>
                         <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
                           <div className="flex items-center gap-2">
                             <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Positive</span>
@@ -584,7 +584,7 @@ function SettingsInner() {
                       </div>
                     </div>
 
-                    <div className="mt-4 p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-[10px] text-indigo-700 flex items-start gap-2 max-w-2xl">
+                    <div className="mt-4 p-3 bg-neutral-50/50 border border-neutral-100 rounded-xl text-[10px] text-neutral-600 flex items-start gap-2 max-w-2xl">
                       <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
                       <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
                     </div>
@@ -592,7 +592,7 @@ function SettingsInner() {
                 </CardContent>
                 {canManage && (
                   <CardFooter className="bg-neutral-50/80 border-t border-neutral-100 py-3">
-                    <Button type="submit" size="sm" className="h-9 px-6 bg-blue-600 hover:bg-blue-700 shadow-md transition-all active:scale-95" disabled={updateOrgMutation.isPending || !isOrgDirty}>
+                    <Button type="submit" size="sm" className="h-9 px-6 bg-primary hover:bg-primary/90 shadow-md transition-all active:scale-95" disabled={updateOrgMutation.isPending || !isOrgDirty}>
                       {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 font-semibold"><Save className="w-3.5 h-3.5" /> Save Changes</span>}
                     </Button>
                   </CardFooter>
@@ -841,21 +841,21 @@ function SettingsInner() {
                                     className="w-10 h-10 rounded-full border border-neutral-200"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                                  <div className="w-10 h-10 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-lg">
                                     {(m.userName || m.userEmail || "U").charAt(0).toUpperCase()}
                                   </div>
                                 )}
                                 <div>
                                   <p className="font-semibold text-neutral-800 flex items-center gap-2">
                                     {m.userName || `User ${m.userId.slice(-6)}`}
-                                    {isSelf && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
+                                    {isSelf && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
                                   </p>
                                   <div className="flex flex-col gap-0.5">
                                     {m.userEmail && <p className="text-xs text-neutral-500 font-medium">{m.userEmail}</p>}
                                     <div className="flex items-center gap-1 mt-0.5">
                                       <Shield className="w-3 h-3 text-neutral-400" />
                                       {m.isOwner ? (
-                                        <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-blue-500/50">Owner</span>
+                                        <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-primary/50">Owner</span>
                                       ) : (
                                         <Select
                                           value={m.role}
@@ -873,7 +873,7 @@ function SettingsInner() {
                                         </Select>
                                       )}
                                       {updateRoleMutation.isPending && updateRoleMutation.variables?.userId === m.userId && (
-                                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
                                       )}
                                     </div>
                                   </div>
@@ -1062,8 +1062,8 @@ function SettingsInner() {
                   <div className="p-8 text-center text-neutral-500 italic">Loading MCP settings...</div>
                 ) : mcpSettings?.mcpApiKey ? (
                   <div className="space-y-6">
-                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                      <h3 className="text-sm font-semibold text-blue-900 mb-2">Your MCP API Key</h3>
+                    <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
+                      <h3 className="text-sm font-semibold text-neutral-900 mb-2">Your MCP API Key</h3>
                       <div className="flex items-center gap-2">
                         <Input
                           value={mcpSettings.mcpApiKey}
@@ -1086,7 +1086,7 @@ function SettingsInner() {
                         </Button>
                       </div>
                       {mcpSettings.mcpApiKeyExpiresAt && (
-                        <p className="text-xs text-blue-700 mt-2">
+                        <p className="text-xs text-neutral-600 mt-2">
                           Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
                         </p>
                       )}
@@ -1218,7 +1218,7 @@ function SettingsInner() {
             <div className="grid gap-8">
               <Card className="shadow-lg border-neutral-200">
                 <CardHeader>
-                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                  <div className="flex items-center gap-2 text-primary mb-1">
                     <FileSpreadsheet className="w-5 h-5" />
                     <span className="text-xs font-bold uppercase tracking-wider">Spreadsheet Interoperability</span>
                   </div>
@@ -1297,7 +1297,7 @@ function SettingsInner() {
                           {isImportingCsv ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
                           {isImportingCsv ? "Importing..." : "Choose CSV File"}
                         </Button>
-                        <a href="/sample-journals.csv" download className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-medium pl-1">
+                        <a href="/sample-journals.csv" download className="text-[10px] text-primary hover:underline flex items-center gap-1 font-medium pl-1">
                           <Download className="w-3 h-3" /> Download Sample Template
                         </a>
                       </div>

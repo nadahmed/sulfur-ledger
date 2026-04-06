@@ -152,7 +152,7 @@ export default function ActivityPage() {
     }
     // For UI actions, if they exist in audit log, they generally represent a success at the point of logging
     return (
-      <Badge variant="secondary" className="gap-1 bg-blue-50 text-blue-700 border-blue-100">
+      <Badge variant="secondary" className="gap-1 bg-neutral-100 text-neutral-700 border-neutral-200">
         <Activity className="size-3" /> Recorded
       </Badge>
     );
@@ -162,7 +162,7 @@ export default function ActivityPage() {
     if (log.type === "mcp") {
       return (
         <div className="flex items-center gap-2">
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-indigo-600">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-primary">
             {log.toolName}
           </code>
         </div>
@@ -324,7 +324,7 @@ export default function ActivityPage() {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           {log.userName === "AI Agent" || log.userName === "MCP/AI" ? (
-                            <div className="flex items-center gap-1.5 text-indigo-600 font-semibold">
+                            <div className="flex items-center gap-1.5 text-primary font-semibold">
                               <Bot className="size-4" />
                               <span>AI Agent</span>
                             </div>

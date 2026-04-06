@@ -44,7 +44,7 @@ export function OrganizationSwitcher() {
           </SelectItem>
         ))}
         <SelectSeparator />
-        <SelectItem value="new" className="text-blue-600 font-medium">
+        <SelectItem value="new" className="text-primary font-medium">
           <div className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
             Create New
