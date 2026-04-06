@@ -181,7 +181,7 @@ function OnboardingContent() {
                         {...register("currencySymbol")}
                         className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
                       />
-                      <div className="flex gap-1 h-7 items-center overflow-x-auto">
+                      <div className="flex gap-1 items-center">
                         {quickSymbols.slice(0, 4).map((s) => (
                           <Button
                             key={s}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +18,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { buttonVariants } from "@/components/ui/button";
-
 interface Option {
   id: string;
   name: string;
@@ -33,6 +31,7 @@ interface SearchableSelectProps {
   error?: boolean;
   disabled?: boolean;
   className?: string;
+  onCreate?: (name: string) => void;
 }
 
 export function SearchableSelect({
@@ -43,8 +42,10 @@ export function SearchableSelect({
   error,
   disabled,
   className,
+  onCreate,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const selectedOption = options.find((opt) => opt.id === value);
 
   return (
@@ -70,9 +71,33 @@ export function SearchableSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandInput 
+            placeholder={`Search ${placeholder.toLowerCase()}...`} 
+            value={searchTerm}
+            onValueChange={setSearchTerm}
+          />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>
+              {onCreate && searchTerm.trim().length > 0 ? (
+                <div className="p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start gap-2 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => {
+                      onCreate(searchTerm);
+                      setOpen(false);
+                      setSearchTerm("");
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create "{searchTerm}"
+                  </Button>
+                </div>
+              ) : (
+                "No results found."
+              )}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
@@ -81,6 +106,7 @@ export function SearchableSelect({
                   onSelect={() => {
                     onValueChange(option.id === value ? "" : option.id);
                     setOpen(false);
+                    setSearchTerm("");
                   }}
                 >
                   <Check

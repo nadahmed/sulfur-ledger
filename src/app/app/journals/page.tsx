@@ -97,7 +97,7 @@ export default function JournalsPage() {
   const { data: tagData = [] } = useQuery<any[]>({
     queryKey: ["tags", activeOrganizationId],
     queryFn: async () => {
-      const res = await fetch("/api/tags");
+      const res = await fetch("/api/tags", { headers: { "x-org-id": activeOrganizationId! } });
       if (!res.ok) throw new Error("Failed to fetch tags");
       return res.json();
     },
@@ -277,6 +277,7 @@ export default function JournalsPage() {
               onSubmit={(values) => postMutation.mutateAsync(values as JournalEntryFormValues)}
               isPending={postMutation.isPending}
               submitLabel="Post Journal"
+              activeOrganizationId={activeOrganizationId}
             />
           </CardContent>
         </Card>
@@ -472,6 +473,7 @@ export default function JournalsPage() {
               onCancel={() => setIsEditDialogOpen(false)}
               isPending={patchMutation.isPending}
               submitLabel="Update Journal"
+              activeOrganizationId={activeOrganizationId}
             />
           )}
         </DialogContent>

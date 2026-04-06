@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Check, Plus, X, Tag as TagIcon, Palette } from "lucide-react";
+import { useState } from "react";
+import { Check, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Tag {
   id: string;
@@ -38,6 +39,7 @@ interface Tag {
 interface TagSelectorProps {
   value: string[]; // Tag IDs
   onChange: (value: string[]) => void;
+  activeOrganizationId?: string | null;
 }
 
 const PREDEFINED_COLORS = [
@@ -46,29 +48,49 @@ const PREDEFINED_COLORS = [
   "#a855f7", "#d946ef", "#ec4899", "#f43f5e", "#71717a", "#4b5563"
 ];
 
-export function TagSelector({ value = [], onChange }: TagSelectorProps) {
+export function TagSelector({ value = [], onChange, activeOrganizationId }: TagSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState(PREDEFINED_COLORS[0]);
 
-  const fetchTags = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tags");
-      if (res.ok) {
-        const data = await res.ok ? await res.json() : [];
-        setTags(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch tags", err);
-    }
-  }, []);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+  const { data: tags = [] } = useQuery<Tag[]>({
+    queryKey: ["tags", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch("/api/tags", {
+        headers: { "x-org-id": activeOrganizationId || "" }
+      });
+      if (!res.ok) throw new Error("Failed to fetch tags");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId,
+  });
+
+  const createTagMutation = useMutation({
+    mutationFn: async (newTag: { name: string; color: string }) => {
+      const res = await fetch("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTag),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create tag");
+      }
+      return res.json();
+    },
+    onSuccess: (newTag) => {
+      queryClient.invalidateQueries({ queryKey: ["tags", activeOrganizationId] });
+      handleSelect(newTag.id);
+      setIsCreating(false);
+      setNewTagName("");
+      setSearchTerm("");
+    },
+  });
 
   const handleSelect = (tagId: string) => {
     const newValue = value.includes(tagId)
@@ -81,25 +103,7 @@ export function TagSelector({ value = [], onChange }: TagSelectorProps) {
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
-
-    try {
-      const res = await fetch("/api/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newTagName, color: newTagColor }),
-      });
-
-      if (res.ok) {
-        const newTag = await res.json();
-        setTags([...tags, newTag]);
-        handleSelect(newTag.id);
-        setIsCreating(false);
-        setNewTagName("");
-        setSearchTerm("");
-      }
-    } catch (err) {
-      console.error("Failed to create tag", err);
-    }
+    createTagMutation.mutate({ name: newTagName, color: newTagColor });
   };
 
   return (

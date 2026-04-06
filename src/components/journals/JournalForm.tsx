@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/accounts/SearchableSelect";
+import { AccountSelector } from "@/components/accounts/AccountSelector";
 import { ArrowRightLeft, Calendar as CalendarIcon } from "lucide-react";
 import { TagSelector } from "@/components/journals/TagSelector";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -27,6 +27,7 @@ interface JournalFormProps {
   isPending: boolean;
   submitLabel: string;
   onSuccess?: () => void;
+  activeOrganizationId?: string | null;
 }
 
 export function JournalForm({
@@ -37,6 +38,7 @@ export function JournalForm({
   isPending,
   submitLabel,
   onSuccess,
+  activeOrganizationId,
 }: JournalFormProps) {
   const {
     register,
@@ -62,7 +64,10 @@ export function JournalForm({
   const onSubmitWithReset = async (values: JournalEntryFormInput) => {
     try {
       await onSubmit(values);
-      reset(initialValues);
+      reset({
+        ...initialValues,
+        date: values.date,
+      });
       if (onSuccess) onSuccess();
     } catch (err) {
       // Error handled by parent
@@ -123,7 +128,7 @@ export function JournalForm({
             name="fromAccountId"
             control={control}
             render={({ field }) => (
-              <SearchableSelect
+              <AccountSelector
                 options={accounts}
                 value={field.value}
                 onValueChange={field.onChange}
@@ -152,7 +157,7 @@ export function JournalForm({
             name="toAccountId"
             control={control}
             render={({ field }) => (
-              <SearchableSelect
+              <AccountSelector
                 options={accounts}
                 value={field.value}
                 onValueChange={field.onChange}
@@ -175,6 +180,7 @@ export function JournalForm({
               <TagSelector
                 value={field.value as string[] || []}
                 onChange={field.onChange}
+                activeOrganizationId={activeOrganizationId}
               />
             )}
           />

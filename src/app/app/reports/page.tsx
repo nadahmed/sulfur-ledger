@@ -221,9 +221,9 @@ function ReportsInner() {
 
       <div className="mt-4">
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <CardTitle className="capitalize">{reportType.replace("-", " ")}</CardTitle>
-              <Button variant="outline" size="sm" onClick={handlePdfDownload}>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handlePdfDownload}>
                 <Download className="h-4 w-4 mr-2" /> Print PDF
               </Button>
             </CardHeader>

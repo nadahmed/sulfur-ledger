@@ -4,7 +4,7 @@ import {
   subWeeks, subMonths, subYears, 
   startOfWeek, startOfMonth, startOfYear, 
   format, parseISO,
-  addWeeks, addMonths, addYears
+  addDays, addWeeks, addMonths, addYears
 } from "date-fns";
 
 export async function generateReportData(
@@ -130,17 +130,39 @@ export async function generateReportData(
     const cashAccounts = balances.filter(b => (b.category === "asset") && (b.name?.toLowerCase().includes("cash") || b.name?.toLowerCase().includes("bank")));
     const cashBalance = cashAccounts.reduce((sum, b) => sum + b.balance, 0);
 
-    const assetDistribution = balances
-      .filter(b => b.category === "asset" && b.balance !== 0)
-      .map((b, i) => ({ 
-        name: b.name, 
-        value: Math.abs(b.balance) / 100,
-        fill: `hsl(${(i * 45) % 360}, 70%, 50%)`
+    const getDistribution = (category: string, maxItems: number = 5) => {
+      const items = balances
+        .filter(b => b.category === category && b.balance !== 0)
+        .map(b => ({ name: b.name, value: Math.abs(b.balance) / 100 }))
+        .sort((a, b) => b.value - a.value);
+
+      if (items.length <= maxItems) {
+        return items.map((item, i) => ({
+          ...item,
+          fill: `hsl(${(i * 137.5) % 360}, 65%, 50%)`
+        }));
+      }
+
+      const topItems = items.slice(0, maxItems);
+      const otherValue = items.slice(maxItems).reduce((sum, item) => sum + item.value, 0);
+      
+      const result = [
+        ...topItems,
+        { name: "Other", value: otherValue }
+      ];
+
+      return result.map((item, i) => ({
+        ...item,
+        fill: `hsl(${(i * 137.5) % 360}, 65%, 50%)`
       }));
+    };
+
+    const assetDistribution = getDistribution("asset");
+    const expenseDistribution = getDistribution("expense");
 
     const incomeStats = [
-      { name: "Income", amount: totalIncome / 100, fill: "#22c55e" },
-      { name: "Expenses", amount: totalExpenses / 100, fill: "#ef4444" }
+      { name: "Income", amount: totalIncome / 100, fill: "hsl(142, 70%, 45%)" },
+      { name: "Expenses", amount: totalExpenses / 100, fill: "hsl(0, 70%, 60%)" }
     ];
 
     return { 
@@ -150,27 +172,37 @@ export async function generateReportData(
       totalExpenses, 
       cashBalance,
       assetDistribution,
+      expenseDistribution,
       incomeStats
     };
   }
 
   if (reportType === "trend" && searchParams) {
-    const period = (searchParams.get("period") || "months") as "weeks" | "months" | "years";
-    const count = parseInt(searchParams.get("count") || "6");
+    const period = (searchParams.get("period") || "months") as "days" | "weeks" | "months" | "years";
     
-    const now = new Date();
-    let startDateTrend: Date;
-    
-    if (period === "weeks") {
-      startDateTrend = startOfWeek(subWeeks(now, count - 1));
-    } else if (period === "years") {
-      startDateTrend = startOfYear(subYears(now, count - 1));
-    } else {
-      startDateTrend = startOfMonth(subMonths(now, count - 1));
+    // Use provided dates or default to past 6 months if missing
+    let start = startDate;
+    let end = endDate || format(new Date(), "yyyy-MM-dd");
+
+    if (!start) {
+      const now = new Date();
+      if (period === "days") start = format(addDays(now, -30), "yyyy-MM-dd");
+      else if (period === "weeks") start = format(subWeeks(now, 12), "yyyy-MM-dd");
+      else if (period === "years") start = format(subYears(now, 5), "yyyy-MM-dd");
+      else start = format(subMonths(now, 6), "yyyy-MM-dd");
     }
 
-    const formattedStart = format(startDateTrend, "yyyy-MM-dd");
-    const formattedEnd = format(now, "yyyy-MM-dd");
+    let parsedStart = parseISO(start);
+    const parsedEnd = parseISO(end);
+    
+    // Limit "days" grouping to at most 90 days from the end of the range
+    if (period === "days") {
+       const ninetyDaysAgo = addDays(parsedEnd, -90);
+       if (parsedStart < ninetyDaysAgo) {
+         parsedStart = ninetyDaysAgo;
+         start = format(parsedStart, "yyyy-MM-dd"); // Update query start date
+       }
+    }
 
     const incomeAccounts = accounts.filter(a => a.category === "income");
     const expenseAccounts = accounts.filter(a => a.category === "expense");
@@ -178,32 +210,43 @@ export async function generateReportData(
 
     const trends: Record<string, { income: number; expense: number; label: string; date: Date }> = {};
     
-    for (let i = 0; i < count; i++) {
-      let bucketDate: Date;
-      let label: string;
-      let key: string;
+    // Generate buckets
+    let currentBucketDate = period === "days" ? parsedStart :
+                         period === "weeks" ? startOfWeek(parsedStart) :
+                         period === "years" ? startOfYear(parsedStart) :
+                         startOfMonth(parsedStart);
 
-      if (period === "weeks") {
-        bucketDate = addWeeks(startDateTrend, i);
-        label = `Wk ${format(bucketDate, "MMM d")}`;
-        key = format(bucketDate, "yyyy-MM-dd");
+    let bucketLimit = 0;
+    while (currentBucketDate <= parsedEnd && bucketLimit < 1000) {
+      let key: string;
+      let label: string;
+      
+      if (period === "days") {
+        key = format(currentBucketDate, "yyyy-MM-dd");
+        label = format(currentBucketDate, "MMM d");
+      } else if (period === "weeks") {
+        key = format(currentBucketDate, "yyyy-MM-dd");
+        label = `Wk ${format(currentBucketDate, "MMM d")}`;
       } else if (period === "years") {
-        bucketDate = addYears(startDateTrend, i);
-        label = format(bucketDate, "yyyy");
-        key = format(bucketDate, "yyyy");
+        key = format(currentBucketDate, "yyyy");
+        label = format(currentBucketDate, "yyyy");
       } else {
-        bucketDate = addMonths(startDateTrend, i);
-        label = format(bucketDate, "MMM yyyy");
-        key = format(bucketDate, "yyyy-MM");
+        key = format(currentBucketDate, "yyyy-MM");
+        label = format(currentBucketDate, "MMM yyyy");
       }
       
-      trends[key] = { income: 0, expense: 0, label, date: bucketDate };
+      trends[key] = { income: 0, expense: 0, label, date: currentBucketDate };
+
+      if (period === "days") currentBucketDate = addDays(currentBucketDate, 1);
+      else if (period === "weeks") currentBucketDate = addWeeks(currentBucketDate, 1);
+      else if (period === "years") currentBucketDate = addYears(currentBucketDate, 1);
+      else currentBucketDate = addMonths(currentBucketDate, 1);
+      bucketLimit++;
     }
 
     await Promise.all([...incomeAccounts, ...expenseAccounts].map(async (acc) => {
-      let lines = await getAccountLines(orgId, acc.id, formattedStart, formattedEnd);
+      let lines = await getAccountLines(orgId, acc.id, start, end);
       
-      // Filter lines by tags if provided
       if (filterTags && filterTags.length > 0) {
         lines = lines.filter(line => 
           line.tags && filterTags.some(t => line.tags!.includes(t))
@@ -213,7 +256,9 @@ export async function generateReportData(
       lines.forEach(line => {
         const lineDate = parseISO(line.date);
         let key: string;
-        if (period === "weeks") {
+        if (period === "days") {
+           key = format(lineDate, "yyyy-MM-dd");
+        } else if (period === "weeks") {
            key = format(startOfWeek(lineDate), "yyyy-MM-dd");
         } else if (period === "years") {
            key = format(lineDate, "yyyy");
@@ -223,10 +268,8 @@ export async function generateReportData(
 
         if (trends[key]) {
           if (incomeIds.has(acc.id)) {
-            // Income is normally credit (negative), so subtract to make positive
             trends[key].income -= line.amount / 100;
           } else {
-            // Expense is normally debit (positive)
             trends[key].expense += line.amount / 100;
           }
         }

@@ -498,7 +498,7 @@ function SettingsInner() {
                             className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
                             disabled={!canManage}
                           />
-                          <div className="flex gap-1 h-7 items-center overflow-x-auto">
+                          <div className="flex gap-1 items-center">
                             {quickSymbols.slice(0, 4).map((s) => (
                               <button
                                 key={s}
@@ -761,7 +761,7 @@ function SettingsInner() {
                           )}
                         />
                       </div>
-                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
+                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending || emailSettings?.provider === "none"}>
                         {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
                       </Button>
                     </form>
