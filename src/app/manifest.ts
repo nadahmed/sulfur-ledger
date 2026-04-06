@@ -2,13 +2,13 @@ import { MetadataRoute } from 'next'
  
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Sulfur Ledger',
-    short_name: 'Sulfur Ledger',
-    description: 'A double-entry bookkeeping application',
-    start_url: '/',
+    name: 'Sulfur Book',
+    short_name: 'Sulfur Book',
+    description: 'A professional double-entry bookkeeping application',
+    start_url: '/app/dashboard',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#09090b',
+    background_color: '#000000',
+    theme_color: '#000000',
     icons: [
       {
         src: '/icon-192x192.png',

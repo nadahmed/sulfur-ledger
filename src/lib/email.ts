@@ -69,11 +69,11 @@ export async function testEmail(settings: EmailSettings, to: string) {
   await sendRawEmail(settings, {
     to,
     subject: "SMTP Setup Test Email",
-    text: "Hello!\n\nThis is a test email from Sulfur Ledger to verify your SMTP settings.\n\nIf you received this, your configuration is working correctly.",
+    text: "Hello!\n\nThis is a test email from Sulfur Book to verify your SMTP settings.\n\nIf you received this, your configuration is working correctly.",
     html: `
       <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
         <h2 style="color: #2563eb;">SMTP Setup Successful</h2>
-        <p>This is a test email to verify your email delivery settings on <strong>Sulfur Ledger</strong>.</p>
+        <p>This is a test email to verify your email delivery settings on <strong>Sulfur Book</strong>.</p>
         <p>Your configuration is working correctly.</p>
       </div>
     `

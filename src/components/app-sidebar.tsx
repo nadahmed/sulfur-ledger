@@ -46,42 +46,42 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const navItems = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/app/dashboard",
     icon: LayoutDashboard,
   },
   {
     title: "Journals",
-    url: "/journals",
+    url: "/app/journals",
     icon: BookOpen,
   },
   {
     title: "Reports",
-    url: "/reports",
+    url: "/app/reports",
     icon: PieChart,
   },
   {
     title: "Recurring",
-    url: "/recurring",
+    url: "/app/recurring",
     icon: RotateCw,
   },
   {
     title: "Accounts",
-    url: "/accounts",
+    url: "/app/accounts",
     icon: Wallet,
   },
   {
     title: "Activity",
-    url: "/activity",
+    url: "/app/activity",
     icon: History,
   },
   {
     title: "Tags",
-    url: "/tags",
+    url: "/app/tags",
     icon: TagIcon,
   },
   {
     title: "Settings",
-    url: "/settings",
+    url: "/app/settings",
     icon: Settings,
   },
 ];
@@ -116,7 +116,7 @@ export function AppSidebar() {
                   <span className="truncate font-semibold">
                     {activeOrg?.name || "Select Organization"}
                   </span>
-                  <span className="truncate text-xs">Sulfur Ledger</span>
+                  <span className="truncate text-xs">Sulfur Book</span>
                 </div>
                 <ChevronRight className="ml-auto size-4" />
               </DropdownMenuTrigger>
@@ -148,7 +148,7 @@ export function AppSidebar() {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => router.push("/onboarding")}
+                  onClick={() => router.push("/app/onboarding")}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-md border bg-background">
@@ -229,7 +229,7 @@ export function AppSidebar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <DropdownMenuItem onClick={() => router.push("/app/settings")}>
                   <Settings className="mr-2 size-4" />
                   Settings
                 </DropdownMenuItem>

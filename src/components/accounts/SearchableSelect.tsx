@@ -51,13 +51,19 @@ export function SearchableSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
-        className={cn(
-          buttonVariants({ variant: "outline" }),
-          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 h-10 font-normal",
-          !selectedOption && "text-neutral-500",
-          error && "border-red-500",
-          className
-        )}
+        render={
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-invalid={error}
+            className={cn(
+              "w-full justify-between font-normal h-10",
+              !selectedOption && "text-muted-foreground",
+              className
+            )}
+          />
+        }
       >
         <span className="truncate">{selectedOption ? selectedOption.name : placeholder}</span>
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

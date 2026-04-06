@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { JournalEntrySchema, JournalEntryFormInput } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/accounts/SearchableSelect";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Calendar as CalendarIcon } from "lucide-react";
 import { TagSelector } from "@/components/journals/TagSelector";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseISO, format } from "date-fns";
 
 interface Account {
   id: string;
@@ -69,14 +72,21 @@ export function JournalForm({
   return (
     <form onSubmit={handleSubmit(onSubmitWithReset)} className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row gap-4">
-        <div className="grid w-full md:w-[150px] items-center gap-1.5">
+        <div className="grid w-full md:w-[170px] items-center gap-1.5">
           <Label htmlFor="date">Date</Label>
-          <Input
-            id="date"
-            type="date"
-            {...register("date")}
-            className={errors.date ? "border-red-500" : ""}
+          <Controller
+            name="date"
+            control={control}
+            render={({ field }) => (
+              <DatePicker
+                date={field.value ? parseISO(field.value) : undefined}
+                setDate={(d) => field.onChange(d ? format(d, "yyyy-MM-dd") : "")}
+                className={cn("w-full h-10", errors.date && "border-red-500")}
+                placeholder="Select date"
+              />
+            )}
           />
+          {errors.date && <p className="text-xs text-destructive font-medium mt-1">{errors.date.message}</p>}
         </div>
         <div className="grid w-full md:w-[150px] items-center gap-1.5">
           <Label htmlFor="amount">Amount</Label>
@@ -87,8 +97,11 @@ export function JournalForm({
             id="amount"
             {...register("amount")}
             placeholder="0.00"
-            className={errors.amount ? "border-red-500" : ""}
+            aria-invalid={!!errors.amount}
+            className="h-10"
+            onWheel={(e) => e.currentTarget.blur()}
           />
+          {errors.amount && <p className="text-xs text-destructive font-medium mt-1">{errors.amount.message}</p>}
         </div>
         <div className="grid flex-1 items-center gap-1.5">
           <Label htmlFor="description">Description</Label>
@@ -96,8 +109,10 @@ export function JournalForm({
             id="description"
             {...register("description")}
             placeholder="Transaction description..."
-            className={errors.description ? "border-red-500" : ""}
+            aria-invalid={!!errors.description}
+            className="h-10"
           />
+          {errors.description && <p className="text-xs text-destructive font-medium mt-1">{errors.description.message}</p>}
         </div>
       </div>
 
@@ -117,6 +132,7 @@ export function JournalForm({
               />
             )}
           />
+          {errors.fromAccountId && <p className="text-xs text-destructive font-medium mt-1">{errors.fromAccountId.message}</p>}
         </div>
 
         <Button
@@ -127,7 +143,7 @@ export function JournalForm({
           className="mt-2 md:mt-0 md:mb-0.5 shrink-0"
           title="Swap Accounts"
         >
-          <ArrowRightLeft className="h-4 w-4 rotate-90 md:rotate-0 text-neutral-500" />
+          <ArrowRightLeft className="h-4 w-4 rotate-90 md:rotate-0 text-muted-foreground" />
         </Button>
 
         <div className="grid w-full flex-1 items-center gap-1.5">
@@ -145,6 +161,7 @@ export function JournalForm({
               />
             )}
           />
+          {errors.toAccountId && <p className="text-xs text-destructive font-medium mt-1">{errors.toAccountId.message}</p>}
         </div>
       </div>
 
@@ -176,10 +193,15 @@ export function JournalForm({
       </div>
 
       {Object.keys(errors).length > 0 && (
-        <div className="text-red-500 text-sm flex flex-col gap-1">
-          {Object.values(errors).map((err, i) => (
-            <p key={i}>{typeof err?.message === 'string' ? err.message : 'Invalid input'}</p>
-          ))}
+        <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
+          <p className="text-sm font-semibold text-destructive mb-2">
+            Please fix the following errors:
+          </p>
+          <ul className="list-disc pl-5 text-xs text-destructive/90 space-y-1">
+            {Object.values(errors).map((error: any, i) => (
+              <li key={i}>{error.message}</li>
+            ))}
+          </ul>
         </div>
       )}
     </form>

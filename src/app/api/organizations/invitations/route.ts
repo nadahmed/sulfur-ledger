@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
     await sendEmail(orgId, {
       to: email,
       subject: `Invitation to join ${orgName}`,
-      text: `Hello,\n\nYou have been invited to join ${orgName} on Sulfur Ledger as a ${role}.\n\nThis invitation expires in ${EXPIRATION_HOURS} hours.\n\nAccept invitation: ${inviteLink}`,
+      text: `Hello,\n\nYou have been invited to join ${orgName} on Sulfur Book as a ${role}.\n\nThis invitation expires in ${EXPIRATION_HOURS} hours.\n\nAccept invitation: ${inviteLink}`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
           <h2 style="color: #2563eb;">Join ${orgName}</h2>
-          <p>You have been invited to join <strong>${orgName}</strong> on Sulfur Ledger as a <strong>${role}</strong>.</p>
+          <p>You have been invited to join <strong>${orgName}</strong> on Sulfur Book as a <strong>${role}</strong>.</p>
           <p>This invitation expires in <strong>${EXPIRATION_HOURS}</strong> hours.</p>
           <div style="margin: 30px 0;">
             <a href="${inviteLink}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>

@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
 import Link from "next/link";
-import { Download, RotateCcw } from "lucide-react";
+import { Download, RotateCcw, Calendar as CalendarIcon } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseISO, format as formatISO } from "date-fns";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -47,7 +49,6 @@ export default function ReportsPage() {
 }
 
 function ReportsInner() {
-  const { user, isLoading: userLoading } = useUser();
   const { activeOrganizationId, organizations, permissions, isOwner, isLoading: orgLoading } = useOrganization();
   const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
@@ -73,14 +74,14 @@ function ReportsInner() {
     []
   );
 
-  const isLoading = userLoading || orgLoading;
+  const isLoading = orgLoading;
   const canRead = isOwner || permissions.includes("read:reports");
 
   useEffect(() => {
-    if (!isLoading && user && !activeOrganizationId) {
-      router.push("/onboarding");
+    if (!isLoading && activeOrganizationId === null && organizations.length === 0) {
+      router.push("/app/onboarding");
     }
-  }, [user, activeOrganizationId, isLoading, router]);
+  }, [activeOrganizationId, organizations.length, isLoading, router]);
 
   useEffect(() => {
     if (urlType && ["trial-balance", "balance-sheet", "income-statement"].includes(urlType)) {
@@ -142,8 +143,8 @@ function ReportsInner() {
       const totalIncome = (data.income || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
       const totalExpenses = (data.expenses || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
       return [
-        { name: "Income", amount: totalIncome, fill: "#22c55e" },
-        { name: "Expenses", amount: totalExpenses, fill: "#ef4444" },
+        { name: "Income", amount: totalIncome, fill: "var(--primary)" },
+        { name: "Expenses", amount: totalExpenses, fill: "var(--destructive)" },
       ];
     }
     if (reportType === "balance-sheet") {
@@ -151,9 +152,9 @@ function ReportsInner() {
       const totalLia = (data.liabilities || []).reduce((sum, item) => sum + item.balance, 0) / 100;
       const totalEq = (data.equity || []).reduce((sum, item) => sum + item.balance, 0) / 100;
       return [
-        { name: "Assets", amount: totalAssets, fill: "#3b82f6" },
-        { name: "Liabilities", amount: Math.abs(totalLia), fill: "#f59e0b" },
-        { name: "Equity", amount: Math.abs(totalEq), fill: "#8b5cf6" },
+        { name: "Assets", amount: totalAssets, fill: "var(--chart-1)" },
+        { name: "Liabilities", amount: Math.abs(totalLia), fill: "var(--chart-2)" },
+        { name: "Equity", amount: Math.abs(totalEq), fill: "var(--chart-3)" },
       ];
     }
     return [];
@@ -161,19 +162,8 @@ function ReportsInner() {
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
-  if (!user) {
-    return (
-      <div className="p-8 text-center">
-        <p className="mb-4">Please log in to view this page.</p>
-        <Link href="/auth/login">
-          <Button>Log In</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  if (!activeOrganizationId) {
-    return <div className="p-8 text-center">Redirecting to setup...</div>;
+  if (!activeOrganizationId && !orgLoading) {
+    return <div className="p-8 text-center">No organization selected. Please go to <Link href="/app/onboarding" className="underline">Onboarding</Link></div>;
   }
 
   return (
@@ -182,23 +172,21 @@ function ReportsInner() {
         <h1 className="text-2xl font-bold">Financial Reports</h1>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 sm:gap-2 w-full sm:w-auto">
           <div className="grid gap-1 w-full sm:w-auto">
-            <Label htmlFor="start" className="text-xs">From</Label>
-            <Input 
-              id="start" 
-              type="date" 
-              className="h-9 w-full" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
+            <Label htmlFor="start" className="text-xs font-semibold text-muted-foreground">From</Label>
+            <DatePicker 
+              date={startDate ? parseISO(startDate) : undefined} 
+              setDate={(d: Date | undefined) => setStartDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
+              className="h-9 w-full sm:w-40" 
+              placeholder="From Date" 
             />
           </div>
           <div className="grid gap-1 w-full sm:w-auto">
-            <Label htmlFor="end" className="text-xs">To</Label>
-            <Input 
-              id="end" 
-              type="date" 
-              className="h-9 w-full" 
-              value={endDate} 
-              onChange={(e) => setEndDate(e.target.value)} 
+            <Label htmlFor="end" className="text-xs font-semibold text-muted-foreground">To</Label>
+            <DatePicker 
+              date={endDate ? parseISO(endDate) : undefined} 
+              setDate={(d: Date | undefined) => setEndDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
+              className="h-9 w-full sm:w-40" 
+              placeholder="To Date" 
             />
           </div>
           <div className="grid gap-1 w-full sm:w-[200px]">
@@ -245,9 +233,9 @@ function ReportsInner() {
                   You do not have permission to view financial reports.
                 </div>
               ) : isFetchingReport ? (
-                <div className="py-20 text-center text-neutral-500">Generating report...</div>
+                <div className="py-20 text-center text-muted-foreground">Generating report...</div>
               ) : isError ? (
-                <div className="py-20 text-center text-red-500">Error: {(error as Error).message}</div>
+                <div className="py-20 text-center text-destructive">Error: {(error as Error).message}</div>
               ) : (
                 <div className="overflow-x-auto">
                   {reportType === "trial-balance" && data && (
@@ -309,15 +297,15 @@ function ReportsInner() {
                           const isBalanced = Math.abs(diff) < 1; // within 1 cent/unit for rounding
 
                           return (
-                            <div className={`p-4 rounded-lg flex items-center justify-between ${isBalanced ? "bg-green-50 border border-green-100" : "bg-red-50 border border-red-100"}`}>
+                            <div className={`p-4 rounded-lg flex items-center justify-between ${isBalanced ? "bg-primary/10 border border-primary/20" : "bg-destructive/10 border border-destructive/20"}`}>
                               <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${isBalanced ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
-                                <span className={`font-semibold ${isBalanced ? "text-green-700" : "text-red-700"}`}>
+                                <div className={`w-2 h-2 rounded-full ${isBalanced ? "bg-primary" : "bg-destructive animate-pulse"}`} />
+                                <span className={`font-semibold ${isBalanced ? "text-primary" : "text-destructive"}`}>
                                   {isBalanced ? "Balance Sheet is Balanced" : "Balance Sheet is Out of Balance"}
                                 </span>
                               </div>
                               {!isBalanced && (
-                                <span className="text-red-600 font-mono font-bold">
+                                <span className="text-destructive font-mono font-bold">
                                   Diff: {formatCurrencyValue(diff)}
                                 </span>
                               )}
@@ -345,7 +333,7 @@ function ReportsInner() {
                           const netIncome = (totalIncome + totalExpenses) * -1;
                           
                           return (
-                            <span className={netIncome >= 0 ? "text-green-600" : "text-red-600"}>
+                            <span className={netIncome >= 0 ? "text-primary" : "text-destructive"}>
                               {formatCurrencyValue(netIncome)}
                             </span>
                           );
@@ -379,7 +367,7 @@ function ReportSection({ title, accounts, format, normal = "debit" }: { title: s
           ))}
           {accounts.length === 0 && (
             <TableRow className="border-none">
-              <TableCell className="text-neutral-400 italic py-1">No items found</TableCell>
+              <TableCell className="text-muted-foreground italic py-1">No items found</TableCell>
               <TableCell className="text-right py-1">{format(0)}</TableCell>
             </TableRow>
           )}

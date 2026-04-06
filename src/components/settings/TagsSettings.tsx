@@ -176,12 +176,12 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
               placeholder="Search tags..." 
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 h-10 border-neutral-200 shadow-sm"
+              className="pl-9 h-10 border-border shadow-sm"
             />
           </div>
         </div>
@@ -192,9 +192,9 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
         )}
       </div>
 
-      <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader className="bg-neutral-50/50">
+          <TableHeader className="bg-muted/30">
             <TableRow>
               <TableHead className="w-[200px]">Tag</TableHead>
               <TableHead>Description</TableHead>
@@ -210,7 +210,7 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
               </TableRow>
             ) : (
               paginatedTags.map((tag) => (
-                <TableRow key={tag.id} className="group hover:bg-neutral-50/50 transition-colors">
+                <TableRow key={tag.id} className="group transition-colors">
                   <TableCell>
                     <Badge 
                       style={{ backgroundColor: tag.color, color: "#fff", border: "none" }}
@@ -219,8 +219,8 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
                       {tag.name}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-neutral-600 text-sm">
-                    {tag.description || <span className="text-neutral-300">No description</span>}
+                  <TableCell className="text-foreground/80 text-sm">
+                    {tag.description || <span className="text-muted-foreground/50">No description</span>}
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
@@ -228,7 +228,7 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-neutral-400 hover:text-primary"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
                           onClick={() => handleEdit(tag)}
                         >
                           <Edit2 className="h-3.5 w-3.5" />
@@ -236,7 +236,7 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-neutral-400 hover:text-red-500"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
                           onClick={() => {
                             if (confirm(`Are you sure you want to delete the tag "${tag.name}"?`)) {
                               deleteTagMutation.mutate(tag.id);
@@ -256,9 +256,9 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-4 border-t border-neutral-100 bg-neutral-50/30 rounded-xl">
-          <div className="text-sm text-neutral-500">
-            Showing <span className="font-medium text-neutral-900">{paginatedTags.length}</span> of <span className="font-medium text-neutral-900">{filteredTags.length}</span> tags
+        <div className="flex items-center justify-between px-2 py-4 border-t border-border bg-muted/20 rounded-xl">
+          <div className="text-sm text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{paginatedTags.length}</span> of <span className="font-medium text-foreground">{filteredTags.length}</span> tags
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -347,7 +347,7 @@ export function TagsSettings({ orgId, canManage }: TagsSettingsProps) {
             </div>
             <div className="flex justify-center pt-4 border-t">
                <div className="text-center">
-                  <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2 font-bold">Preview</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-bold">Preview</p>
                   <Badge
                     style={{ backgroundColor: tagColor, color: "#fff", border: "none" }}
                     className="px-4 py-1 text-sm font-medium"

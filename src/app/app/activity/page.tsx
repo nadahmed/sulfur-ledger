@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { History, CheckCircle2, XCircle, ChevronDown, ChevronUp, User, Bot, Activity, Search, FilterX } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { History, CheckCircle2, XCircle, ChevronDown, ChevronUp, User, Bot, Activity, Search, FilterX, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,20 +140,20 @@ export default function ActivityPage() {
     if (log.type === "mcp") {
       if (log.status === "success") {
         return (
-          <Badge variant="success" className="gap-1 bg-green-100 text-green-800 border-green-200">
+          <Badge className="gap-1 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors">
             <CheckCircle2 className="size-3" /> Success
           </Badge>
         );
       }
       return (
-        <Badge variant="destructive" className="gap-1 bg-red-100 text-red-800 border-red-200">
+        <Badge variant="destructive" className="gap-1 bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 transition-colors">
           <XCircle className="size-3" /> Error
         </Badge>
       );
     }
     // For UI actions, if they exist in audit log, they generally represent a success at the point of logging
     return (
-      <Badge variant="secondary" className="gap-1 bg-neutral-100 text-neutral-700 border-neutral-200">
+      <Badge variant="secondary" className="gap-1 bg-muted text-muted-foreground border-border hover:bg-muted/80 transition-colors">
         <Activity className="size-3" /> Recorded
       </Badge>
     );
@@ -286,11 +287,21 @@ export default function ActivityPage() {
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
                     <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">From</Label>
-                    <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-auto h-9 text-sm" />
+                    <DatePicker
+                      date={dateFrom ? parseISO(dateFrom) : undefined}
+                      setDate={(d: Date | undefined) => setDateFrom(d ? format(d, "yyyy-MM-dd") : "")}
+                      className="w-[150px] sm:w-auto h-9 text-sm"
+                      placeholder="From Date"
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">To</Label>
-                    <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-auto h-9 text-sm" />
+                    <DatePicker
+                      date={dateTo ? parseISO(dateTo) : undefined}
+                      setDate={(d: Date | undefined) => setDateTo(d ? format(d, "yyyy-MM-dd") : "")}
+                      className="w-[150px] sm:w-auto h-9 text-sm"
+                      placeholder="To Date"
+                    />
                   </div>
                   <div className="flex-1"></div>
                   <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={() => {
@@ -341,7 +352,7 @@ export default function ActivityPage() {
                               <span>AI Agent</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-slate-700">
+                            <div className="flex items-center gap-1.5 text-foreground">
                               <User className="size-4" />
                               <span>{log.userName || "Unknown User"}</span>
                             </div>
@@ -367,8 +378,8 @@ export default function ActivityPage() {
                             </div>
                             {log.error && (
                               <div>
-                                <h4 className="text-sm font-semibold mb-2 text-red-600">Error Message</h4>
-                                <pre className="text-xs bg-red-50 text-red-900 p-3 rounded-md border border-red-100 overflow-auto">
+                                <h4 className="text-sm font-semibold mb-2 text-destructive">Error Message</h4>
+                                <pre className="text-xs bg-destructive/10 text-destructive p-3 rounded-md border border-destructive/20 overflow-auto">
                                   {log.error}
                                 </pre>
                               </div>

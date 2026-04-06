@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     // 1. Fetch organization for branding
     const org = await getOrganization(orgId);
-    const orgName = org?.name || "Sulfur Ledger Organization";
+    const orgName = org?.name || "Sulfur Book Organization";
     const currencySymbol = org?.currencySymbol || "৳";
 
     // Format utility

@@ -11,11 +11,12 @@ export function useAuthGuard() {
 
   useEffect(() => {
     // List of public paths that don't need authentication
-    const publicPaths = ["/auth/login", "/auth/callback", "/onboarding"]; // onboarding might have its own logic
+    const publicPaths = ["/", "/auth/login", "/auth/callback"];
 
-    if (!isLoading && !user && !publicPaths.some(p => pathname.startsWith(p))) {
+    const isPublic = publicPaths.some(p => pathname === p || pathname.startsWith(p + "/"));
+
+    if (!isLoading && !user && !isPublic) {
       // Redirect to login if not authenticated and trying to access a private path
-      // We use the Auth0 login route
       window.location.href = "/auth/login";
     }
   }, [user, isLoading, router, pathname]);

@@ -3,7 +3,7 @@
 import { useOrganization } from "@/context/OrganizationContext";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useUser } from "@auth0/nextjs-auth0/client";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
@@ -66,7 +66,7 @@ interface DashboardSummary {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading: isUserLoading } = useAuthGuard();
+  const { user, isLoading: isUserLoading } = useUser();
   const { activeOrganizationId, organizations, isLoading: isOrgLoading } = useOrganization();
   const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
@@ -144,13 +144,8 @@ export default function DashboardPage() {
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
 
-  if (!user) {
-    router.push("/auth/login");
-    return null;
-  }
-
   if (!activeOrganizationId) {
-    router.push("/onboarding");
+    router.push("/app/onboarding");
     return null;
   }
 
@@ -159,7 +154,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user.name}. Here&apos;s your financial overview.</p>
+          <p className="text-muted-foreground">Welcome back, {user?.name || "User"}. Here&apos;s your financial overview.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -202,7 +197,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-sm border-neutral-200">
+        <Card className="shadow-2xl border-border bg-card/50 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Cash Balance</CardTitle>
             <Wallet className="h-4 w-4 text-primary" />
@@ -219,17 +214,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm border-neutral-200">
+        <Card className="shadow-2xl border-border bg-card/50 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Net Income</CardTitle>
             {summary && summary.netIncome >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-500" />
+              <TrendingUp className="h-4 w-4 text-primary" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
+              <TrendingDown className="h-4 w-4 text-destructive" />
             )}
           </CardHeader>
           <CardContent>
-            <div className={cn("text-2xl font-bold", summary && summary.netIncome < 0 ? "text-red-600" : "text-green-600")}>
+            <div className={cn("text-2xl font-bold", summary && summary.netIncome < 0 ? "text-destructive" : "text-primary")}>
               {summary ? formatCurrencyValue(summary.netIncome) : (
                 activeOrg?.currencyPosition === "suffix" 
                   ? `0${activeOrg?.currencySymbol || "৳"}` 
@@ -240,10 +235,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-neutral-200">
+        <Card className="shadow-2xl border-border bg-card/50 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            <ArrowUpRight className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -253,29 +248,29 @@ export default function DashboardPage() {
                   : `${activeOrg?.currencySymbol || "৳"}0`
               )}
             </div>
-            <p className="text-xs text-emerald-600 mt-1 font-medium">Revenue streams</p>
+            <p className="text-xs text-primary mt-1 font-medium">Revenue streams</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-neutral-200">
+        <Card className="shadow-2xl border-border bg-card/50 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
-            <ArrowDownRight className="h-4 w-4 text-orange-500" />
+            <ArrowDownRight className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-destructive">
               {summary ? formatCurrencyValue(summary.totalExpenses) : (
                 activeOrg?.currencyPosition === "suffix" 
                   ? `0${activeOrg?.currencySymbol || "৳"}` 
                   : `${activeOrg?.currencySymbol || "৳"}0`
               )}
             </div>
-            <p className="text-xs text-orange-500 mt-1 font-medium">Operational costs</p>
+            <p className="text-xs text-destructive mt-1 font-medium">Operational costs</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="shadow-sm border-neutral-200">
+      <Card className="shadow-2xl border-border bg-card/30 backdrop-blur-sm">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -335,8 +330,17 @@ export default function DashboardPage() {
                     }}
                   />
                   <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'var(--popover)', 
+                      borderRadius: 'var(--radius)', 
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      padding: '8px 12px'
+                    }}
+                    labelStyle={{ color: 'var(--popover-foreground)', fontWeight: '600', marginBottom: '4px' }}
+                    itemStyle={{ color: 'var(--primary)', padding: '0' }}
                     formatter={(value: any) => [formatCurrencyValue(value * 100), ""]}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    cursor={{ stroke: 'var(--primary)', strokeWidth: 2, strokeOpacity: 0.2 }}
                   />
                   <Legend 
                     verticalAlign="top" 
@@ -347,9 +351,9 @@ export default function DashboardPage() {
                   <Line 
                     type="monotone" 
                     dataKey="income" 
-                    stroke="#22c55e" 
-                    strokeWidth={2.5} 
-                    dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                    stroke="var(--primary)" 
+                    strokeWidth={3} 
+                    dot={{ r: 0 }} 
                     activeDot={{ r: 6, strokeWidth: 0 }}
                     name="Income"
                     animationDuration={1500}
@@ -357,9 +361,9 @@ export default function DashboardPage() {
                   <Line 
                     type="monotone" 
                     dataKey="expense" 
-                    stroke="#ef4444" 
-                    strokeWidth={2.5} 
-                    dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                    stroke="var(--chart-2)" 
+                    strokeWidth={3} 
+                    dot={{ r: 0 }} 
                     activeDot={{ r: 6, strokeWidth: 0 }}
                     name="Expense"
                     animationDuration={1500}
@@ -376,7 +380,7 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4 shadow-sm border-neutral-200">
+        <Card className="lg:col-span-4 shadow-2xl border-border bg-card/30 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -389,16 +393,29 @@ export default function DashboardPage() {
               {isMounted && summary ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={summary.incomeStats}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.5} />
+                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip 
-                      formatter={(value: any) => [formatCurrencyValue(value * 100), "Amount"]}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      contentStyle={{ 
+                        backgroundColor: 'var(--popover)', 
+                        borderRadius: 'var(--radius)', 
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      labelStyle={{ color: 'var(--popover-foreground)', fontWeight: '600', marginBottom: '4px' }}
+                      itemStyle={{ color: 'var(--primary)', padding: '0' }}
+                      formatter={(value: any) => [formatCurrencyValue(value * 100), ""]}
+                      cursor={{ fill: 'var(--muted)', fillOpacity: 0.3 }}
                     />
-                    <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="amount" radius={[4, 4, 0, 0]} animationDuration={1000}>
                       {summary.incomeStats.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.fill.includes('#') ? `var(--chart-${(index % 5) + 1})` : entry.fill} 
+                          className="hover:opacity-80 transition-opacity cursor-pointer"
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -412,10 +429,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 shadow-sm border-neutral-200">
+        <Card className="lg:col-span-3 shadow-2xl border-border bg-card/30 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5 text-purple-500" />
+              <PieChartIcon className="h-5 w-5 text-primary" />
               Asset Distribution
             </CardTitle>
             <CardDescription>Breakdown of current asset categories</CardDescription>
@@ -437,12 +454,20 @@ export default function DashboardPage() {
                       labelLine={true}
                     >
                       {summary.assetDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell key={`cell-${index}`} fill={`var(--chart-${(index % 5) + 1})`} />
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: any) => [formatCurrencyValue(value * 100), "Value"]}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      contentStyle={{ 
+                        backgroundColor: 'var(--popover)', 
+                        borderRadius: 'var(--radius)', 
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      labelStyle={{ color: 'var(--popover-foreground)', fontWeight: '600', marginBottom: '4px' }}
+                      itemStyle={{ color: 'var(--primary)', padding: '0' }}
+                      formatter={(value: any) => [formatCurrencyValue(value * 100), ""]}
                     />
                     <Legend 
                       verticalAlign="bottom" 
@@ -463,18 +488,18 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-         <Card className="shadow-sm border-neutral-200">
+         <Card className="shadow-2xl border-border bg-card/30 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Accountant Insights</CardTitle>
               <CardDescription>Key observations for your organization</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-start gap-4 p-3 rounded-lg bg-neutral-50 border border-neutral-200">
+                <div className="flex items-start gap-4 p-3 rounded-lg bg-muted/30 border border-border">
                   <div className="mt-1"><Wallet className="h-5 w-5 text-primary" /></div>
                   <div>
-                    <h4 className="font-semibold text-neutral-900">Liquidity Status</h4>
-                    <p className="text-sm text-neutral-600">
+                    <h4 className="font-semibold text-foreground">Liquidity Status</h4>
+                    <p className="text-sm text-muted-foreground">
                       Your current cash balance is {summary ? formatCurrencyValue(summary.cashBalance) : (
                         activeOrg?.currencyPosition === "suffix" 
                           ? `0${activeOrg?.currencySymbol || "৳"}` 
@@ -488,13 +513,13 @@ export default function DashboardPage() {
                 <div className={cn(
                   "flex items-start gap-4 p-3 rounded-lg border",
                   summary && summary.netIncome >= 0 
-                    ? "bg-green-50 border-green-100" 
-                    : "bg-red-50 border-red-100"
+                    ? "bg-primary/10 border-primary/20 text-primary" 
+                    : "bg-destructive/10 border-destructive/20 text-destructive"
                 )}>
                   <div className="mt-1">
                     {summary && summary.netIncome >= 0 
-                      ? <TrendingUp className="h-5 w-5 text-green-600" /> 
-                      : <TrendingDown className="h-5 w-5 text-red-600" />}
+                      ? <TrendingUp className="h-5 w-5 text-primary" /> 
+                      : <TrendingDown className="h-5 w-5 text-destructive" />}
                   </div>
                   <div>
                     <h4 className={cn(
@@ -520,25 +545,25 @@ export default function DashboardPage() {
             </CardContent>
          </Card>
 
-         <Card className="shadow-sm border-neutral-200">
+         <Card className="shadow-2xl border-border bg-card/30 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Commonly used ledger functions</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => router.push("/journals")}>
+              <Button variant="outline" className="h-20 flex flex-col gap-2 border-border hover:bg-primary/10" onClick={() => router.push("/app/journals")}>
                 <ArrowUpRight className="h-5 w-5" />
                 New Journal
               </Button>
-              <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => router.push("/accounts")}>
+              <Button variant="outline" className="h-20 flex flex-col gap-2 border-border hover:bg-primary/10" onClick={() => router.push("/app/accounts")}>
                 <Building2 className="h-5 w-5" />
                 Add Account
               </Button>
-              <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => router.push("/reports")}>
+              <Button variant="outline" className="h-20 flex flex-col gap-2 border-border hover:bg-primary/10" onClick={() => router.push("/app/reports")}>
                 <PieChartIcon className="h-5 w-5" />
                 View Reports
               </Button>
-              <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => router.push("/settings")}>
+              <Button variant="outline" className="h-20 flex flex-col gap-2 border-border hover:bg-primary/10" onClick={() => router.push("/app/settings")}>
                 <Settings className="h-5 w-5" />
                 Org Settings
               </Button>

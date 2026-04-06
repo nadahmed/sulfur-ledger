@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Link from "next/link";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { JournalEntryFormValues } from "@/lib/schemas";
-import { Pencil, Trash2, MoreVertical, Search, X } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, Search, X, Calendar as CalendarIcon } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseISO, format as formatISO } from "date-fns";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -49,7 +51,7 @@ interface Account {
 }
 
 export default function JournalsPage() {
-  const { user, isLoading: isUserLoading } = useUser();
+  const { user } = useUser();
   const { activeOrganizationId, organizations, permissions, isOwner, isLoading: isOrgLoading } = useOrganization();
   const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const router = useRouter();
@@ -69,13 +71,13 @@ export default function JournalsPage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const isLoading = isUserLoading || isOrgLoading;
+  const isLoading = isOrgLoading;
 
   useEffect(() => {
-    if (!isLoading && user && !activeOrganizationId) {
-      router.push("/onboarding");
+    if (!isLoading && activeOrganizationId === null && organizations.length === 0) {
+      router.push("/app/onboarding");
     }
-  }, [user, activeOrganizationId, isLoading, router]);
+  }, [activeOrganizationId, organizations.length, isLoading, router]);
 
   const canRead = isOwner || permissions.includes("read:journals");
   const canCreate = isOwner || permissions.includes("create:journals");
@@ -250,19 +252,8 @@ export default function JournalsPage() {
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
-  if (!user) {
-    return (
-      <div className="p-8 text-center">
-        <p className="mb-4">Please log in to view this page.</p>
-        <Link href="/auth/login">
-          <Button>Log In</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  if (!activeOrganizationId) {
-    return <div className="p-8 text-center">Redirecting to setup...</div>;
+  if (!activeOrganizationId && !isOrgLoading) {
+    return <div className="p-8 text-center">No organization selected. Please go to <Link href="/app/onboarding" className="underline">Onboarding</Link></div>;
   }
 
   return (
@@ -272,7 +263,7 @@ export default function JournalsPage() {
       </div>
 
       {canCreate && (
-        <Card className="mb-8 font-sans border-neutral-200 shadow-sm">
+        <Card className="mb-8 font-sans border-border shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               Record Transaction
@@ -296,7 +287,7 @@ export default function JournalsPage() {
           <CardTitle>Recent Journals</CardTitle>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <div className="relative flex-1 min-w-0 sm:min-w-[300px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search queries..." 
                 className="pl-9 pr-9 h-9 w-full"
@@ -307,7 +298,7 @@ export default function JournalsPage() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-neutral-400"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
                   onClick={() => setSearchQuery("")}
                 >
                   <X className="h-4 w-4" />
@@ -317,12 +308,11 @@ export default function JournalsPage() {
             
             <div className="flex items-center gap-2 group">
               <div className="relative flex-1 sm:flex-initial">
-                <Input 
-                  id="filter-date" 
-                  type="date" 
-                  className="w-full sm:w-40 h-9" 
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
+                <DatePicker 
+                  date={filterDate ? parseISO(filterDate) : undefined}
+                  setDate={(d: Date | undefined) => setFilterDate(d ? formatISO(d, "yyyy-MM-dd") : "")}
+                  className="w-full sm:w-40 h-9"
+                  placeholder="Filter by date"
                 />
               </div>
               {filterDate && (
@@ -340,7 +330,7 @@ export default function JournalsPage() {
         </CardHeader>
         <CardContent>
           {!canRead ? (
-            <div className="p-8 text-center text-red-500">
+            <div className="p-8 text-center text-destructive">
               You do not have permission to view journal entries.
             </div>
           ) : isFetchingJournals && !journals.length ? (
@@ -407,7 +397,7 @@ export default function JournalsPage() {
                                   );
                                 })
                               ) : (
-                                <span className="text-neutral-400">-</span>
+                                <span className="text-muted-foreground">-</span>
                               )}
                             </div>
                           </TableCell>
@@ -440,7 +430,7 @@ export default function JournalsPage() {
                     })}
                     {journals.length === 0 && !isFetchingJournals && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-neutral-500">No journals found</TableCell>
+                        <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">No journals found</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -504,7 +494,7 @@ export default function JournalsPage() {
                   confirmConfig.onConfirm();
                   setConfirmConfig(null);
                 }}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               >
                 Delete
               </AlertDialogAction>

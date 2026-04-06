@@ -113,31 +113,38 @@ export function TagSelector({ value = [], onChange }: TagSelectorProps) {
               className="flex items-center gap-1 pr-1"
             >
               {tag.name}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSelect(tag.id);
                 }}
-                className="hover:bg-white/20 rounded-full p-0.5"
+                className="hover:bg-white/20 text-white rounded-full p-0.5 size-4"
               >
                 <X className="h-3 w-3" />
-              </button>
+              </Button>
             </Badge>
           ))
         ) : (
-          <span className="text-sm text-neutral-500 italic">No tags selected</span>
+          <span className="text-sm text-muted-foreground italic">No tags selected</span>
         )}
       </div>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          role="combobox"
-          className="w-full h-8 justify-start text-neutral-500 font-normal border rounded-md px-3 flex items-center hover:bg-neutral-50 transition-colors"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add tag...
-        </PopoverTrigger>
+          render={
+            <Button
+              variant="outline"
+              size="default"
+              className="w-full justify-start text-muted-foreground font-normal border-border h-10"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add tag...
+            </Button>
+          }
+        />
         <PopoverContent className="w-[300px] p-0" align="start">
           <Command>
             <CommandInput 
@@ -164,7 +171,7 @@ export function TagSelector({ value = [], onChange }: TagSelectorProps) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="p-4 text-center text-sm text-neutral-500 italic">
+                  <div className="p-4 text-center text-sm text-muted-foreground italic">
                     Type to find or create tags...
                   </div>
                 )}
@@ -213,11 +220,13 @@ export function TagSelector({ value = [], onChange }: TagSelectorProps) {
               <div className="col-span-3 flex flex-col gap-3">
                 <div className="grid grid-cols-6 gap-2">
                   {PREDEFINED_COLORS.map((color) => (
-                    <button
+                    <Button
                       key={color}
                       type="button"
+                      variant="outline"
+                      size="icon-xs"
                       className={cn(
-                        "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                        "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 p-0",
                         newTagColor === color ? "border-white ring-2 ring-primary ring-offset-2" : "border-transparent"
                       )}
                       style={{ backgroundColor: color }}

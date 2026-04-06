@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrganization } from "@/context/OrganizationContext";
-import { useUser } from "@auth0/nextjs-auth0/client";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, RotateCw, AlertCircle, ArrowRightLeft } from "lucide-react";
+import { Plus, Trash2, RotateCw, AlertCircle, ArrowRightLeft, Calendar as CalendarIcon } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 import { useForm, Controller } from "react-hook-form";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SearchableSelect } from "@/components/accounts/SearchableSelect";
 import { TagSelector } from "@/components/journals/TagSelector";
@@ -33,7 +34,6 @@ import {
 export default function RecurringPage() {
   const { activeOrganizationId, organizations, isOwner, permissions } = useOrganization();
   const activeOrg = organizations.find(o => o.id === activeOrganizationId);
-  const { user } = useUser();
   const queryClient = useQueryClient();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -165,19 +165,21 @@ export default function RecurringPage() {
       : `${symbol}${space}${amountDisp}`;
   };
 
-  if (isLoading) return <div className="p-8 text-center text-neutral-500">Loading recurring entries...</div>;
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading recurring entries...</div>;
 
-  if (!activeOrganizationId) return <div className="p-8 text-center">Please select an organization.</div>;
+  if (!activeOrganizationId && !isLoading) {
+    return <div className="p-8 text-center text-muted-foreground">No organization selected. Please go to <Link href="/app/onboarding" className="underline font-bold text-primary">Onboarding</Link></div>;
+  }
 
   return (
     <div className="w-full max-w-screen-2xl p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Recurring Entries</h1>
-        <p className="text-neutral-500">Schedule automatic journal entries for regular transactions.</p>
+        <p className="text-muted-foreground">Schedule automatic journal entries for regular transactions.</p>
       </div>
 
       {canManage && (
-        <Card className="border-neutral-200 shadow-sm overflow-hidden group">
+        <Card className="border-border shadow-sm overflow-hidden group">
           <div className="h-1 bg-primary/20 group-hover:bg-primary transition-colors" />
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
@@ -195,15 +197,16 @@ export default function RecurringPage() {
                     placeholder="1500.00" 
                     type="number" 
                     step="0.01" 
-                    className="h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    className="h-10" 
+                    onWheel={(e) => e.currentTarget.blur()}
                   />
-                  {form.formState.errors.amount && <p className="text-xs text-red-500 font-medium">{form.formState.errors.amount.message}</p>}
+                  {form.formState.errors.amount && <p className="text-xs text-destructive font-medium">{form.formState.errors.amount.message}</p>}
                 </div>
 
                 <div className="flex-1 grid items-center gap-1.5">
                   <Label htmlFor="description">Description</Label>
                   <Input id="description" {...form.register("description")} placeholder="Monthly Office Rent" className="h-10" />
-                  {form.formState.errors.description && <p className="text-xs text-red-500 font-medium">{form.formState.errors.description.message}</p>}
+                  {form.formState.errors.description && <p className="text-xs text-destructive font-medium mt-1">{form.formState.errors.description.message}</p>}
                 </div>
               </div>
 
@@ -233,7 +236,7 @@ export default function RecurringPage() {
                   className="mt-2 md:mt-0 md:mb-0.5 shrink-0"
                   title="Swap Accounts"
                 >
-                  <ArrowRightLeft className="h-4 w-4 rotate-90 md:rotate-0 text-neutral-500" />
+                  <ArrowRightLeft className="h-4 w-4 rotate-90 md:rotate-0 text-muted-foreground" />
                 </Button>
 
                 <div className="flex-1 grid items-center gap-1.5 w-full">
@@ -282,7 +285,7 @@ export default function RecurringPage() {
                   <Label>Repeat Every</Label>
                   <div className="flex items-center gap-2">
                     <Input type="number" {...form.register("interval", { valueAsNumber: true })} className="h-10 w-full" />
-                    <span className="text-sm text-neutral-500 capitalize whitespace-nowrap">
+                    <span className="text-sm text-muted-foreground capitalize whitespace-nowrap">
                       {{
                         daily: "Day",
                         weekly: "Week",
@@ -295,8 +298,19 @@ export default function RecurringPage() {
 
                 <div className="grid w-full md:w-[200px] items-center gap-1.5">
                   <Label htmlFor="startDate">Start Date</Label>
-                  <Input id="startDate" type="date" {...form.register("startDate")} className="h-10" />
-                  {form.formState.errors.startDate && <p className="text-xs text-red-500 font-medium">{form.formState.errors.startDate.message}</p>}
+                  <Controller
+                    name="startDate"
+                    control={form.control}
+                    render={({ field }) => (
+                      <DatePicker
+                        date={field.value ? parseISO(field.value) : undefined}
+                        setDate={(d) => field.onChange(d ? format(d, "yyyy-MM-dd") : "")}
+                        className="h-10 w-full"
+                        placeholder="Select start date"
+                      />
+                    )}
+                  />
+                  {form.formState.errors.startDate && <p className="text-xs text-destructive font-medium">{form.formState.errors.startDate.message}</p>}
                 </div>
               </div>
 
@@ -324,16 +338,16 @@ export default function RecurringPage() {
         </Card>
       )}
 
-      <Card className="border-neutral-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-xl font-bold flex items-center gap-2">
-            <RotateCw className="w-5 h-5 text-neutral-400" /> Active Schedules
+            <RotateCw className="w-5 h-5 text-muted-foreground" /> Active Schedules
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-neutral-50/50">
+              <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="pl-6 py-4">Description</TableHead>
                   <TableHead className="py-4">Amount</TableHead>
@@ -347,7 +361,7 @@ export default function RecurringPage() {
               <TableBody>
                 {entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center text-neutral-400">
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <RotateCw className="w-8 h-8 opacity-20" />
                         <p>No recurring entries scheduled yet.</p>
@@ -356,18 +370,18 @@ export default function RecurringPage() {
                   </TableRow>
                 ) : (
                   entries.map((entry: any) => (
-                    <TableRow key={entry.id} className="hover:bg-neutral-50/50 transition-colors group">
+                    <TableRow key={entry.id} className="transition-colors group">
                       <TableCell className="pl-6 py-4 font-medium">{entry.description}</TableCell>
                       <TableCell className="py-4 font-semibold text-primary">{formatAmount(entry.amount)}</TableCell>
                       <TableCell className="py-4">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-bold text-neutral-400 w-8">From</span>
-                            <span className="text-sm text-neutral-600 truncate max-w-[120px]">{getAccountName(entry.fromAccountId)}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground w-8">From</span>
+                            <span className="text-sm text-foreground/80 truncate max-w-[120px]">{getAccountName(entry.fromAccountId)}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-bold text-neutral-400 w-8">To</span>
-                            <span className="text-sm text-neutral-600 truncate max-w-[120px]">{getAccountName(entry.toAccountId)}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground w-8">To</span>
+                            <span className="text-sm text-foreground/80 truncate max-w-[120px]">{getAccountName(entry.toAccountId)}</span>
                           </div>
                         </div>
                       </TableCell>
@@ -401,7 +415,7 @@ export default function RecurringPage() {
                             {entry.nextProcessDate ? format(parseISO(entry.nextProcessDate), "MMM d, yyyy") : "N/A"}
                           </span>
                           {entry.lastProcessedDate && (
-                            <span className="text-[10px] text-neutral-400">Last: {format(parseISO(entry.lastProcessedDate), "MMM d")}</span>
+                            <span className="text-[10px] text-muted-foreground">Last: {format(parseISO(entry.lastProcessedDate), "MMM d")}</span>
                           )}
                         </div>
                       </TableCell>
@@ -411,9 +425,9 @@ export default function RecurringPage() {
                             checked={entry.isActive}
                             onCheckedChange={(checked) => toggleMutation.mutate({ id: entry.id, isActive: checked })}
                             disabled={!canManage}
-                            className="data-[state=checked]:bg-emerald-500"
+                            className="data-[state=checked]:bg-primary"
                           />
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${entry.isActive ? 'text-emerald-600' : 'text-neutral-400'}`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${entry.isActive ? 'text-primary' : 'text-muted-foreground'}`}>
                             {entry.isActive ? 'Active' : 'Paused'}
                           </span>
                         </div>
@@ -422,7 +436,7 @@ export default function RecurringPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
                           onClick={() => setDeleteConfirmId(entry.id)} 
                           disabled={!canManage}
                         >
@@ -441,7 +455,7 @@ export default function RecurringPage() {
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <div className="flex items-center gap-2 text-red-600 mb-2">
+            <div className="flex items-center gap-2 text-destructive mb-2">
               <AlertCircle className="w-5 h-5" />
               <AlertDialogTitle>Permanent Deletion</AlertDialogTitle>
             </div>
@@ -452,7 +466,7 @@ export default function RecurringPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold"
               onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
             >
               Delete Schedule

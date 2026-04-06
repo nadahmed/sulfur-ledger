@@ -38,7 +38,7 @@ interface Account {
 }
 
 export default function AccountsPage() {
-  const { user, isLoading: isUserLoading } = useUser();
+  const { user } = useUser();
   const { activeOrganizationId, permissions, isOwner, isLoading: isOrgLoading } = useOrganization();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -57,13 +57,13 @@ export default function AccountsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  const isLoading = isUserLoading || isOrgLoading;
+  const isLoading = isOrgLoading;
 
   useEffect(() => {
-    if (!isLoading && user && !activeOrganizationId) {
-      router.push("/onboarding");
+    if (!isLoading && activeOrganizationId === null) {
+      router.push("/app/onboarding");
     }
-  }, [user, activeOrganizationId, isLoading, router]);
+  }, [activeOrganizationId, isLoading, router]);
 
   useEffect(() => {
     setMounted(true);
@@ -98,7 +98,7 @@ export default function AccountsPage() {
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
     },
-    enabled: !!activeOrganizationId && !!user && canRead,
+    enabled: !!activeOrganizationId && canRead,
   });
 
   const accounts = response?.data || [];
@@ -251,19 +251,8 @@ export default function AccountsPage() {
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
-  if (!user) {
-    return (
-      <div className="p-8 text-center">
-        <p className="mb-4">Please log in to view this page.</p>
-        <Link href="/auth/login">
-          <Button>Log In</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  if (!activeOrganizationId) {
-    return <div className="p-8 text-center">Redirecting to setup...</div>;
+  if (!activeOrganizationId && !isOrgLoading) {
+    return <div className="p-8 text-center">No organization selected. Please go to <Link href="/app/onboarding" className="underline">Onboarding</Link></div>;
   }
 
   return (
@@ -285,7 +274,7 @@ export default function AccountsPage() {
                   id="name"
                   {...register("name")}
                   placeholder="e.g. Main Checking"
-                  className={errors.name ? "border-red-500" : ""}
+                  className={errors.name ? "border-destructive" : ""}
                 />
               </div>
               <div className="grid w-full sm:max-w-xs items-center gap-1.5">
@@ -316,7 +305,7 @@ export default function AccountsPage() {
               </Button>
             </form>
             {(errors.name || errors.category) && (
-              <div className="text-red-500 mt-4 text-sm flex flex-col gap-1">
+              <div className="text-destructive mt-4 text-sm flex flex-col gap-1">
                 {errors.name && <p>{errors.name.message}</p>}
                 {errors.category && <p>{errors.category.message}</p>}
               </div>
@@ -365,7 +354,7 @@ export default function AccountsPage() {
                   <Label htmlFor="show-archived" className="text-sm">Archived</Label>
                 </>
               ) : (
-                <div className="w-24 h-6 bg-neutral-100 animate-pulse rounded-full" />
+                <div className="w-24 h-6 bg-muted animate-pulse rounded-full" />
               )}
             </div>
           </div>
@@ -447,7 +436,7 @@ export default function AccountsPage() {
                               onClick={() => handleUnarchive(acc.id, acc.name)}
                               disabled={unarchiveMutation.isPending}
                             >
-                              <ArchiveRestore className="h-4 w-4 text-neutral-500 hover:text-green-500" />
+                              <ArchiveRestore className="h-4 w-4 text-muted-foreground hover:text-primary" />
                             </Button>
                           ) : (
                             <Button
@@ -456,7 +445,7 @@ export default function AccountsPage() {
                               onClick={() => handleDelete(acc.id, acc.name)}
                               disabled={deleteMutation.isPending}
                             >
-                              <Trash2 className="h-4 w-4 text-neutral-500 hover:text-red-500" />
+                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                             </Button>
                           )}
                         </TableCell>
@@ -465,7 +454,7 @@ export default function AccountsPage() {
                   ))}
                   {accounts.length === 0 && !isFetchingAccounts && (
                     <TableRow>
-                      <TableCell colSpan={canManage ? 4 : 3} className="text-center py-4 text-neutral-500">No accounts created</TableCell>
+                      <TableCell colSpan={canManage ? 4 : 3} className="text-center py-4 text-muted-foreground">No accounts created</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -501,7 +490,7 @@ export default function AccountsPage() {
             </div>
           )}
           {!canRead && !isFetchingAccounts && (
-            <div className="p-8 text-center text-red-500">
+            <div className="p-8 text-center text-destructive">
               You do not have permission to view account details.
             </div>
           )}

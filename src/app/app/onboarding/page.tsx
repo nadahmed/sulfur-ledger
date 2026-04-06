@@ -64,13 +64,13 @@ function OnboardingContent() {
       await refreshOrganizations();
       setActiveOrganizationId(data.orgId);
       toast.success("Successfully joined the organization!");
-      router.push("/");
+      router.push("/app/dashboard");
     },
     onError: (error: Error) => {
       setIsJoining(false);
       toast.error(error.message);
       // Remove query param on error so user can proceed normally
-      router.replace("/onboarding");
+      router.replace("/app/onboarding");
     },
   });
 
@@ -110,7 +110,7 @@ function OnboardingContent() {
       await refreshOrganizations();
       setActiveOrganizationId(org.id);
       toast.success("Organization created successfully");
-      router.push("/");
+      router.push("/app/dashboard");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -129,24 +129,24 @@ function OnboardingContent() {
   const handleSelectOrg = (orgId: string) => {
     if (!orgId) return;
     setActiveOrganizationId(orgId);
-    router.push("/");
+    router.push("/app/dashboard");
   };
 
   if (isLoading || isJoining) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-50 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 text-foreground">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <h2 className="text-xl font-semibold text-neutral-800">
+        <h2 className="text-xl font-semibold text-foreground">
           {isJoining ? "Joining organization..." : "Loading organizations..."}
         </h2>
-        <p className="text-neutral-500 mt-2">Please wait while we set things up for you.</p>
+        <p className="text-muted-foreground mt-2">Please wait while we set things up for you.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-neutral-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-neutral-200">
+    <div className="flex items-center justify-center min-h-screen bg-background p-4 text-foreground">
+      <Card className="w-full max-w-md shadow-2xl border-border bg-card">
         {showCreateForm ? (
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader className="space-y-1">
@@ -163,53 +163,55 @@ function OnboardingContent() {
                   placeholder="e.g. My Personal Ledger or ACME Corp"
                   {...register("name")}
                   autoFocus
-                  className={errors.name ? "border-red-500 focus:ring-red-500" : "focus:ring-2 focus:ring-primary"}
+                  className={errors.name ? "border-destructive focus:ring-destructive" : "focus:ring-2 focus:ring-primary"}
                 />
                 {errors.name && (
-                  <p className="text-sm text-red-500">{errors.name.message}</p>
+                  <p className="text-sm text-destructive">{errors.name.message}</p>
                 )}
               </div>
 
-              <div className="pt-2 border-t border-neutral-100 mt-4 space-y-6">
-                <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-neutral-50/50 rounded-2xl border border-neutral-200 relative overflow-hidden group shadow-sm">
+              <div className="pt-2 border-t border-border mt-4 space-y-6">
+                <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-muted/30 rounded-2xl border border-border relative overflow-hidden group shadow-sm">
                   <div className="space-y-2 flex-grow lg:flex-grow-0">
-                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Currency Symbol</Label>
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold leading-none">Currency Symbol</Label>
                     <div className="flex items-center gap-2 h-9">
                       <Input
                         id="currency-symbol"
                         placeholder="$"
                         {...register("currencySymbol")}
-                        className="h-full w-20 text-base font-bold text-center bg-white shadow-sm"
+                        className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
                       />
                       <div className="flex gap-1 h-7 items-center overflow-x-auto">
                         {quickSymbols.slice(0, 4).map((s) => (
-                          <button
+                          <Button
                             key={s}
                             type="button"
+                            variant={selectedSymbol === s ? "default" : "outline"}
+                            size="sm"
                             onClick={() => setValue("currencySymbol", s, { shouldDirty: true })}
                             className={cn(
-                              "w-7 h-7 flex items-center justify-center rounded-md text-[10px] border transition-all shrink-0",
+                              "w-8 h-8 p-0 text-[10px] transition-all shrink-0",
                               selectedSymbol === s 
-                                ? "bg-primary border-primary text-white shadow-sm" 
-                                : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300"
+                                ? "shadow-sm" 
+                                : "bg-card border-border text-muted-foreground hover:border-accent hover:bg-accent/10"
                             )}
                           >
                             {s}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2 w-full lg:w-40">
-                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Symbol Position</Label>
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold leading-none">Symbol Position</Label>
                     <div className="h-9">
                       <Controller
                         name="currencyPosition"
                         control={control}
                         render={({ field }) => (
                           <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger className="w-full h-full text-[13px] bg-white shadow-sm ring-offset-white">
+                            <SelectTrigger className="w-full h-full text-[13px] bg-card shadow-sm ring-offset-background">
                               <SelectValue placeholder="Position">
                                 {field.value === "prefix" ? "Before Amount" : field.value === "suffix" ? "After Amount" : undefined}
                               </SelectValue>
@@ -225,8 +227,8 @@ function OnboardingContent() {
                   </div>
 
                   <div className="space-y-2 shrink-0">
-                    <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold leading-none">Use Spacing</Label>
-                    <div className="flex items-center justify-center bg-white px-4 h-9 rounded-md border border-neutral-200 shadow-sm w-fit">
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold leading-none">Use Spacing</Label>
+                    <div className="flex items-center justify-center bg-card px-4 h-9 rounded-md border border-border shadow-sm w-fit">
                       <Controller
                         name="currencyHasSpace"
                         control={control}
@@ -241,19 +243,19 @@ function OnboardingContent() {
                     </div>
                   </div>
 
-                  <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
+                  <div className="flex-1 space-y-2 lg:border-l border-border lg:pl-8 lg:ml-2 min-w-[200px]">
                      <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-60 leading-none">Live Preview</Label>
                      <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
                         <div className="flex items-center gap-2">
-                          <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Entry</span>
-                          <span className="text-sm font-bold text-slate-800 tabular-nums leading-none">
+                          <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Entry</span>
+                          <span className="text-sm font-bold text-foreground tabular-nums leading-none">
                             {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
                           </span>
                         </div>
-                        <div className="w-px h-4 bg-neutral-100 hidden lg:block" />
+                        <div className="w-px h-4 bg-border hidden lg:block" />
                         <div className="flex items-center gap-2">
-                          <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Expense</span>
-                          <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
+                          <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Expense</span>
+                          <span className="text-sm font-bold text-red-500 tabular-nums leading-none">
                             {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
                           </span>
                         </div>
@@ -274,7 +276,7 @@ function OnboardingContent() {
                 <Button 
                   type="button" 
                   variant="ghost" 
-                  className="w-full text-neutral-500 hover:text-neutral-800"
+                  className="w-full text-muted-foreground hover:text-foreground"
                   onClick={() => setShowCreateForm(false)}
                 >
                   Back to selection
@@ -296,15 +298,15 @@ function OnboardingContent() {
                   <button
                     key={org.id}
                     onClick={() => handleSelectOrg(org.id)}
-                    className="flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-xl hover:border-primary hover:bg-neutral-50 transition-all text-left group"
+                    className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary hover:bg-accent transition-all text-left group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-neutral-100 rounded-lg group-hover:bg-neutral-100 group-hover:text-primary transition-colors">
-                        <Building2 size={20} />
+                      <div className="p-2 bg-muted rounded-lg group-hover:bg-primary/20 group-hover:text-primary transition-colors">
+                        <Building2 size={20} className="text-muted-foreground group-hover:text-primary" />
                       </div>
-                      <span className="font-semibold text-neutral-800">{org.name}</span>
+                      <span className="font-semibold text-foreground">{org.name}</span>
                     </div>
-                    <ArrowRight size={18} className="text-neutral-400 group-hover:text-primary transition-colors" />
+                    <ArrowRight size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
                   </button>
                 ))}
               </div>
@@ -313,7 +315,7 @@ function OnboardingContent() {
               <Button 
                 onClick={() => setShowCreateForm(true)}
                 variant="outline"
-                className="w-full flex items-center justify-center gap-2 py-6 border-dashed border-2 hover:border-primary hover:bg-neutral-50 hover:text-primary transition-all border-neutral-300 text-neutral-500"
+                className="w-full flex items-center justify-center gap-2 py-6 border-dashed border-2 hover:border-primary hover:bg-accent hover:text-primary transition-all border-border text-muted-foreground"
               >
                 <Plus size={20} />
                 <span>Create New Organization</span>
@@ -329,9 +331,9 @@ function OnboardingContent() {
 export default function OnboardingPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-50 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <h2 className="text-xl font-semibold text-neutral-800">Loading...</h2>
+        <h2 className="text-xl font-semibold text-foreground">Loading...</h2>
       </div>
     }>
       <OnboardingContent />

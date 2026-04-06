@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -77,14 +77,14 @@ const parseCSV = (csv: string) => {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-neutral-500">Loading settings...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading settings...</div>}>
       <SettingsInner />
     </Suspense>
   );
 }
 
 function SettingsInner() {
-  const { user, isLoading: isUserLoading } = useAuthGuard();
+  const { user, isLoading: isUserLoading } = useUser();
   const {
     activeOrganizationId,
     organizations,
@@ -119,7 +119,7 @@ function SettingsInner() {
 
   const activeOrg = organizations.find(o => o.id === activeOrganizationId);
   const canManage = isOwner || permissions.includes("manage:organization");
-  const isLoading = isUserLoading || isOrgLoading;
+  const isLoading = isOrgLoading;
 
   // --- Queries ---
 
@@ -406,7 +406,7 @@ function SettingsInner() {
     watch: watchEmail,
   } = useForm<EmailSettingsFormValues>({
     resolver: zodResolver(EmailSettingsSchema),
-    defaultValues: emailSettings || { provider: "none", senderEmail: "", senderName: "Sulfur Ledger" },
+    defaultValues: emailSettings || { provider: "none", senderEmail: "", senderName: "Sulfur Book" },
   });
 
   const {
@@ -435,7 +435,7 @@ function SettingsInner() {
     }
   }, [emailSettings, setEmailValue]);
 
-  if (isLoading) return <div className="p-8 text-center text-neutral-500">Loading settings...</div>;
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading settings...</div>;
 
   if (!activeOrganizationId) {
     return <div className="p-8 text-center">Redirecting to setup...</div>;
@@ -469,7 +469,7 @@ function SettingsInner() {
       <div className="mt-6">
         {activeTab === "general" && (
           <div className="space-y-6">
-            <Card className="shadow-lg border-neutral-200 overflow-hidden">
+            <Card className="shadow-lg border-border overflow-hidden">
               <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl">Organization Details</CardTitle>
@@ -486,16 +486,16 @@ function SettingsInner() {
                     />
                   </div>
 
-                  <div className="pt-6 border-t border-neutral-100">
-                    <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-neutral-50/50 rounded-2xl border border-neutral-200 shadow-sm">
+                  <div className="pt-6 border-t border-border">
+                    <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-muted/30 rounded-2xl border border-border shadow-sm">
                       <div className="space-y-2 flex-grow lg:flex-grow-0">
-                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Currency Symbol</Label>
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Currency Symbol</Label>
                         <div className="flex items-center gap-2 h-9">
                           <Input
                             id="currency-symbol"
                             placeholder="$"
                             {...registerOrg("currencySymbol")}
-                            className="h-full w-20 text-base font-bold text-center bg-white shadow-sm"
+                            className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
                             disabled={!canManage}
                           />
                           <div className="flex gap-1 h-7 items-center overflow-x-auto">
@@ -509,7 +509,7 @@ function SettingsInner() {
                                   "w-7 h-7 flex items-center justify-center rounded-md text-xs border transition-all shrink-0",
                                   selectedSymbol === s
                                     ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:bg-white"
+                                    : "bg-card border-border text-muted-foreground hover:border-accent hover:bg-accent"
                                 )}
                               >
                                 {s}
@@ -520,7 +520,7 @@ function SettingsInner() {
                       </div>
 
                       <div className="space-y-2 w-full lg:w-40">
-                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Symbol Position</Label>
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Symbol Position</Label>
                         <div className="h-9">
                           <Controller
                             name="currencyPosition"
@@ -531,7 +531,7 @@ function SettingsInner() {
                                 onValueChange={field.onChange}
                                 disabled={!canManage}
                               >
-                                <SelectTrigger className="w-full h-full text-[13px] bg-white shadow-sm ring-offset-white">
+                                <SelectTrigger className="w-full h-full text-[13px] bg-card shadow-sm ring-offset-background">
                                   <SelectValue placeholder="Position">
                                     {field.value === "prefix" ? "Before Amount" : field.value === "suffix" ? "After Amount" : undefined}
                                   </SelectValue>
@@ -547,8 +547,8 @@ function SettingsInner() {
                       </div>
 
                       <div className="space-y-2 shrink-0">
-                        <Label className="text-[10px] uppercase tracking-widest text-neutral-400 font-black leading-none">Use Spacing</Label>
-                        <div className="flex items-center justify-center bg-white px-3 h-9 rounded-md border border-neutral-200 shadow-sm w-fit">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Use Spacing</Label>
+                        <div className="flex items-center justify-center bg-card px-3 h-9 rounded-md border border-border shadow-sm w-fit">
                           <Controller
                             name="currencyHasSpace"
                             control={controlOrg}
@@ -564,19 +564,19 @@ function SettingsInner() {
                         </div>
                       </div>
 
-                      <div className="flex-1 space-y-2 lg:border-l border-neutral-200 lg:pl-8 lg:ml-2 min-w-[200px]">
+                      <div className="flex-1 space-y-2 lg:border-l border-border lg:pl-8 lg:ml-2 min-w-[200px]">
                         <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-60 leading-none">Live Preview</Label>
                         <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
                           <div className="flex items-center gap-2">
-                            <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Positive</span>
-                            <span className="text-sm font-bold text-neutral-800 tabular-nums leading-none">
+                            <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Positive</span>
+                            <span className="text-sm font-bold text-foreground tabular-nums leading-none">
                               {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
                             </span>
                           </div>
-                          <div className="w-px h-4 bg-neutral-200 hidden lg:block" />
+                          <div className="w-px h-4 bg-border hidden lg:block" />
                           <div className="flex items-center gap-2">
-                            <span className="text-[8px] uppercase text-neutral-400 font-bold hidden sm:inline">Negative</span>
-                            <span className="text-sm font-bold text-red-600 tabular-nums leading-none">
+                            <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Negative</span>
+                            <span className="text-sm font-bold text-destructive tabular-nums leading-none">
                               {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
                             </span>
                           </div>
@@ -584,14 +584,14 @@ function SettingsInner() {
                       </div>
                     </div>
 
-                    <div className="mt-4 p-3 bg-neutral-50/50 border border-neutral-100 rounded-xl text-[10px] text-neutral-600 flex items-start gap-2 max-w-2xl">
+                    <div className="mt-4 p-3 bg-muted/30 border border-border rounded-xl text-[10px] text-muted-foreground flex items-start gap-2 max-w-2xl">
                       <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
                       <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
                     </div>
                   </div>
                 </CardContent>
                 {canManage && (
-                  <CardFooter className="bg-neutral-50/80 border-t border-neutral-100 py-3">
+                  <CardFooter className="bg-muted/20 border-t border-border py-3">
                     <Button type="submit" size="sm" className="h-9 px-6 bg-primary hover:bg-primary/90 shadow-md transition-all active:scale-95" disabled={updateOrgMutation.isPending || !isOrgDirty}>
                       {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 font-semibold"><Save className="w-3.5 h-3.5" /> Save Changes</span>}
                     </Button>
@@ -601,19 +601,19 @@ function SettingsInner() {
             </Card>
 
             {!isOwner && (
-              <Card className="border-amber-200 shadow-sm bg-amber-50/30 overflow-hidden mt-8">
+              <Card className="border-warning/20 shadow-sm bg-warning/5 overflow-hidden mt-8">
                 <CardHeader className="pb-3 px-6 pt-6">
-                  <div className="flex items-center gap-2 text-amber-700">
+                  <div className="flex items-center gap-2 text-warning">
                     {/* <LogOut className="w-4 h-4" /> */}
                     <CardTitle className="text-lg">Leave Organization</CardTitle>
                   </div>
-                  <CardDescription className="text-xs text-amber-600/80">You will lose all access to this organization's data and reports.</CardDescription>
+                  <CardDescription className="text-xs text-warning/80">You will lose all access to this organization's data and reports.</CardDescription>
                 </CardHeader>
-                <CardFooter className="bg-amber-100/50 border-t border-amber-200 px-6 py-4">
+                <CardFooter className="bg-warning/10 border-t border-warning/20 px-6 py-4">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-amber-300 text-amber-700 hover:bg-amber-200 hover:border-amber-400 font-semibold shadow-sm"
+                    className="border-warning/30 text-warning hover:bg-warning/20 hover:border-warning/40 font-semibold shadow-sm"
                     onClick={() => {
                       setConfirmConfig({
                         open: true,
@@ -634,31 +634,31 @@ function SettingsInner() {
             {isOwner && (
               <div className="mt-12 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-red-100" />
-                  <span className="text-[10px] uppercase font-black tracking-widest text-red-400">Danger Zone</span>
-                  <div className="h-px flex-1 bg-red-100" />
+                  <div className="h-px flex-1 bg-destructive/10" />
+                  <span className="text-[10px] uppercase font-black tracking-widest text-destructive/60">Danger Zone</span>
+                  <div className="h-px flex-1 bg-destructive/10" />
                 </div>
-                <Card className="border-red-200 shadow-md bg-red-50/30 overflow-hidden">
+                <Card className="border-destructive/20 shadow-md bg-destructive/5 overflow-hidden">
                   <CardHeader className="px-6 pt-6 pb-2">
-                    <div className="flex items-center gap-2 text-red-600">
+                    <div className="flex items-center gap-2 text-destructive">
                       <AlertCircle className="w-4 h-4" />
                       <CardTitle className="text-lg">Delete Organization</CardTitle>
                     </div>
-                    <CardDescription className="text-xs text-red-500/70">Permanently delete this organization, all its members, and every single record content.</CardDescription>
+                    <CardDescription className="text-xs text-destructive/70">Permanently delete this organization, all its members, and every single record content.</CardDescription>
                   </CardHeader>
                   <CardContent className="px-6 pb-4 space-y-4">
                     <div className="space-y-2 max-w-md">
-                      <Label className="text-[10px] uppercase font-bold text-red-400">Confirmation Required</Label>
-                      <p className="text-xs text-red-600/80">To proceed, please type the organization name: <strong className="select-all opacity-100">"{activeOrg?.name}"</strong></p>
+                      <Label className="text-[10px] uppercase font-bold text-destructive/40">Confirmation Required</Label>
+                      <p className="text-xs text-destructive/80">To proceed, please type the organization name: <strong className="select-all opacity-100">"{activeOrg?.name}"</strong></p>
                       <Input
                         value={deleteConfirm}
                         onChange={(e) => setDeleteConfirm(e.target.value)}
                         placeholder="Enter organization name..."
-                        className="h-10 border-red-200 focus:ring-red-500 text-sm font-medium bg-white/80"
+                        className="h-10 border-destructive/20 focus:ring-destructive text-sm font-medium bg-background/50"
                       />
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-red-100/50 border-t border-red-200 px-6 py-4">
+                  <CardFooter className="bg-destructive/10 border-t border-destructive/20 px-6 py-4">
                     <Button
                       variant="destructive"
                       size="sm"
@@ -678,24 +678,24 @@ function SettingsInner() {
         {activeTab === "members" && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="bg-neutral-50/50">
+              <Card className="bg-muted/30">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">Organization</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div>
                     <p className="font-medium">{activeOrg?.name || "Current Organization"}</p>
-                    <code className="text-xs break-all text-neutral-500 mt-1 block">{activeOrganizationId}</code>
+                    <code className="text-xs break-all text-muted-foreground mt-1 block">{activeOrganizationId}</code>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-neutral-50/50">
+              <Card className="bg-muted/30">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">Created On</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-muted-foreground/80">
                     {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </CardContent>
@@ -710,7 +710,7 @@ function SettingsInner() {
                   <CardContent>
                     <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
                       {emailSettings?.provider === "none" && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                        <div className="p-3 bg-warning/5 border border-warning/20 rounded-lg text-sm text-warning">
                           <div className="flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                             <div>
@@ -719,7 +719,7 @@ function SettingsInner() {
                                 Invitations won't be sent. Please{" "}
                                 <button
                                   type="button"
-                                  className="font-semibold underline hover:text-amber-900"
+                                  className="font-semibold underline hover:text-warning"
                                   onClick={() => handleTabChange("email")}
                                 >
                                   configure email delivery
@@ -737,7 +737,7 @@ function SettingsInner() {
                           placeholder="colleague@example.com"
                           {...registerInvite("email")}
                           disabled={!canManage}
-                          className={inviteErrors.email ? "border-red-500" : ""}
+                          className={inviteErrors.email ? "border-destructive" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -772,9 +772,9 @@ function SettingsInner() {
                   <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
                   <CardContent>
                     {isLoadingInvites ? (
-                      <p className="text-sm text-neutral-500 italic">Loading invitations...</p>
+                      <p className="text-sm text-muted-foreground italic">Loading invitations...</p>
                     ) : pendingInvites.length === 0 ? (
-                      <p className="text-sm text-neutral-500 italic">No pending invitations.</p>
+                      <p className="text-sm text-muted-foreground italic">No pending invitations.</p>
                     ) : (
                       <div className="space-y-3">
                         {pendingInvites.map((invite: any) => {
@@ -786,11 +786,11 @@ function SettingsInner() {
                           const diffMins = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
 
                           return (
-                            <div key={invite.email} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                            <div key={invite.email} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border">
                               <div className="flex-1 min-w-0 pr-4">
                                 <p className="text-sm font-medium truncate">{invite.email}</p>
                                 <div className="flex items-center gap-3 mt-1">
-                                  <p className="text-xs text-neutral-500 flex items-center gap-1 capitalize">
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1 capitalize">
                                     <Shield className="w-3 h-3" /> {invite.role}
                                   </p>
                                   <p className="text-xs text-amber-600 font-medium">
@@ -803,7 +803,7 @@ function SettingsInner() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-neutral-400 hover:text-red-600"
+                                    className="h-8 w-8 text-muted-foreground hover:text-red-600"
                                     onClick={() => cancelInviteMutation.mutate(invite.email)}
                                     disabled={cancelInviteMutation.isPending}
                                   >
@@ -828,7 +828,7 @@ function SettingsInner() {
                   </CardHeader>
                   <CardContent>
                     {isLoadingMembers ? (
-                      <div className="flex items-center justify-center p-8 text-neutral-500 italic">
+                      <div className="flex items-center justify-center p-8 text-muted-foreground italic">
                         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading members...
                       </div>
                     ) : (
@@ -836,30 +836,30 @@ function SettingsInner() {
                         {members.map((m: any) => {
                           const isSelf = m.userId === user?.sub;
                           return (
-                            <div key={m.userId} className="flex items-center justify-between p-4 bg-neutral-50 hover:bg-neutral-100/50 rounded-xl border border-neutral-100 transition-colors">
+                            <div key={m.userId} className="flex items-center justify-between p-4 bg-muted/20 hover:bg-accent rounded-xl border border-border transition-colors">
                               <div className="flex items-center gap-4">
                                 {m.userPicture ? (
                                   <img
                                     src={m.userPicture}
                                     alt={m.userName || "User"}
-                                    className="w-10 h-10 rounded-full border border-neutral-200"
+                                    className="w-10 h-10 rounded-full border border-border"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-lg">
+                                  <div className="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-lg">
                                     {(m.userName || m.userEmail || "U").charAt(0).toUpperCase()}
                                   </div>
                                 )}
                                 <div>
-                                  <p className="font-semibold text-neutral-800 flex items-center gap-2">
+                                  <p className="font-semibold text-foreground flex items-center gap-2">
                                     {m.userName || `User ${m.userId.slice(-6)}`}
                                     {isSelf && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">You</span>}
                                   </p>
                                   <div className="flex flex-col gap-0.5">
-                                    {m.userEmail && <p className="text-xs text-neutral-500 font-medium">{m.userEmail}</p>}
+                                    {m.userEmail && <p className="text-xs text-muted-foreground font-medium">{m.userEmail}</p>}
                                     <div className="flex items-center gap-1 mt-0.5">
-                                      <Shield className="w-3 h-3 text-neutral-400" />
+                                      <Shield className="w-3 h-3 text-muted-foreground" />
                                       {m.isOwner ? (
-                                        <span className="text-xs text-neutral-500 capitalize underline decoration-dotted underline-offset-2 decoration-primary/50">Owner</span>
+                                        <span className="text-xs text-muted-foreground capitalize underline decoration-dotted underline-offset-2 decoration-primary/50">Owner</span>
                                       ) : (
                                         <Select
                                           value={m.role}
@@ -890,7 +890,7 @@ function SettingsInner() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
                                     onClick={() => {
                                       setConfirmConfig({
                                         open: true,
@@ -910,7 +910,7 @@ function SettingsInner() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                                    className="text-warning hover:bg-warning/10 hover:text-warning transition-colors"
                                     onClick={() => {
                                       setConfirmConfig({
                                         open: true,
@@ -947,7 +947,7 @@ function SettingsInner() {
               </CardHeader>
               <CardContent>
                 {isLoadingEmailSettings ? (
-                  <div className="p-8 text-center text-neutral-500 italic">Loading email settings...</div>
+                  <div className="p-8 text-center text-muted-foreground italic">Loading email settings...</div>
                 ) : (
                   <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))} className="space-y-6">
                     <div className="space-y-4">
@@ -1060,7 +1060,7 @@ function SettingsInner() {
 
         {activeTab === "mcp" && (
           <div className="space-y-8">
-            <Card className="shadow-lg border-neutral-200">
+            <Card className="shadow-lg border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
                 <CardDescription>
@@ -1069,17 +1069,17 @@ function SettingsInner() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {isLoadingMcpSettings ? (
-                  <div className="p-8 text-center text-neutral-500 italic">Loading MCP settings...</div>
+                  <div className="p-8 text-center text-muted-foreground italic">Loading MCP settings...</div>
                 ) : mcpSettings?.mcpApiKey ? (
                   <div className="space-y-6">
-                    <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
-                      <h3 className="text-sm font-semibold text-neutral-900 mb-2">Your MCP API Key</h3>
+                    <div className="p-4 bg-muted border border-border rounded-lg">
+                      <h3 className="text-sm font-semibold text-foreground mb-2">Your MCP API Key</h3>
                       <div className="flex items-center gap-2">
                         <Input
                           value={mcpSettings.mcpApiKey}
                           readOnly
                           type="password"
-                          className="bg-white font-mono text-xs"
+                          className="bg-muted/50 font-mono text-xs"
                         />
                         <Button
                           size="icon"
@@ -1092,11 +1092,11 @@ function SettingsInner() {
                             toast.success("API Key copied to clipboard");
                           }}
                         >
-                          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
                         </Button>
                       </div>
                       {mcpSettings.mcpApiKeyExpiresAt && (
-                        <p className="text-xs text-neutral-600 mt-2">
+                        <p className="text-xs text-muted-foreground/80 mt-2">
                           Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
                         </p>
                       )}
@@ -1141,14 +1141,14 @@ function SettingsInner() {
                           Copy JSON
                         </Button>
                       </div>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-muted-foreground">
                         Add this snippet to your MCP client configuration (e.g. <code>mcp_config.json</code>) to enable AI access to this organization's data.
                       </p>
                     </div>
 
                     {canManage && (
                       <div className="pt-4 border-t flex items-center justify-between">
-                        <p className="text-sm text-neutral-600">Need a new key? Regenerating will invalidate the current one.</p>
+                        <p className="text-sm text-muted-foreground/80">Need a new key? Regenerating will invalidate the current one.</p>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
@@ -1178,12 +1178,12 @@ function SettingsInner() {
                   </div>
                 ) : (
                   <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
-                    <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center">
-                      <Key className="w-8 h-8 text-neutral-400" />
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                      <Key className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div className="max-w-md">
                       <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
-                      <p className="text-neutral-500 text-sm mt-2">
+                      <p className="text-muted-foreground text-sm mt-2">
                         Enable AI tools for this organization. Generate a secure API key to connect your MCP-compatible agents.
                       </p>
                     </div>
@@ -1230,7 +1230,7 @@ function SettingsInner() {
         {activeTab === "data" && (
           <div className="space-y-8">
             <div className="grid gap-8">
-              <Card className="shadow-lg border-neutral-200">
+              <Card className="shadow-lg border-border">
                 <CardHeader>
                   <div className="flex items-center gap-2 text-primary mb-1">
                     <FileSpreadsheet className="w-5 h-5" />
@@ -1243,16 +1243,16 @@ function SettingsInner() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                          <Upload className="w-4 h-4 text-neutral-400" />
+                          <Upload className="w-4 h-4 text-muted-foreground" />
                           Import from CSV
                         </h4>
-                        <p className="text-xs text-neutral-500 mt-1">Upload your ledger entries from a formatted CSV file.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Upload your ledger entries from a formatted CSV file.</p>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <input
+                        <Input
                           type="file"
                           id="csv-upload"
                           className="hidden"
@@ -1317,13 +1317,13 @@ function SettingsInner() {
                       </div>
                     </div>
 
-                    <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                          <Download className="w-4 h-4 text-neutral-400" />
+                          <Download className="w-4 h-4 text-muted-foreground" />
                           Export to CSV
                         </h4>
-                        <p className="text-xs text-neutral-500 mt-1">Download entries in a spreadsheet-compatible format.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Download entries in a spreadsheet-compatible format.</p>
                       </div>
                       <Button
                         variant="outline"
@@ -1361,7 +1361,7 @@ function SettingsInner() {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-lg border-neutral-200">
+              <Card className="shadow-lg border-border">
                 <CardHeader>
                   <div className="flex items-center gap-2 text-purple-600 mb-1">
                     <FileJson className="w-5 h-5" />
@@ -1374,21 +1374,21 @@ function SettingsInner() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                    <div className="space-y-4 p-4 bg-muted border border-border rounded-xl">
                       <div>
-                        <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
-                          <RotateCcw className="w-4 h-4 text-purple-400" />
+                        <h4 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+                          <RotateCcw className="w-4 h-4 text-primary" />
                           Restore JSON Backup
                         </h4>
-                        <p className="text-xs text-purple-700 mt-1">Reconstruct your accounts and history from a JSON file.</p>
-                        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                          <p className="text-xs text-red-700 font-medium leading-relaxed">
+                        <p className="text-xs text-muted-foreground mt-1">Reconstruct your accounts and history from a JSON file.</p>
+                        <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                          <p className="text-xs text-destructive/80 font-medium leading-relaxed">
                             Warning: Importing data via JSON will wipe out everything including activity logs, except the organization itself.
                           </p>
                         </div>
                       </div>
-                      <input
+                      <Input
                         type="file"
                         id="json-import"
                         className="hidden"
@@ -1424,7 +1424,7 @@ function SettingsInner() {
                       />
                       <Button
                         variant="secondary"
-                        className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors"
+                        className="w-full justify-start h-12 bg-card border-warning/20 text-warning hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
                         disabled={isImportingJson}
                         onClick={() => {
                           setConfirmConfig({
@@ -1451,7 +1451,7 @@ function SettingsInner() {
                       </div>
                       <Button
                         variant="outline"
-                        className="w-full justify-start h-12 bg-white border-purple-200 text-purple-900 hover:bg-purple-50"
+                        className="w-full justify-start h-12 bg-card border-border hover:bg-accent"
                         disabled={isExportingJson}
                         onClick={async () => {
                           try {
@@ -1485,16 +1485,16 @@ function SettingsInner() {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-lg border-red-200">
+              <Card className="shadow-lg border-destructive/30">
                 <CardHeader>
-                  <div className="flex items-center gap-2 text-red-600 mb-1">
+                  <div className="flex items-center gap-2 text-destructive mb-1">
                     <AlertCircle className="w-5 h-5" />
                     <span className="text-xs font-bold uppercase tracking-wider">Danger Zone</span>
                   </div>
                   <CardTitle>Ledger Erasure</CardTitle>
                   <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
                 </CardHeader>
-                <CardFooter className="bg-red-50/50 border-t border-red-100 rounded-b-lg p-6">
+                <CardFooter className="bg-destructive/5 border-t border-destructive/10 rounded-b-lg p-6">
                   <Button
                     variant="destructive"
                     className="h-12 px-8"
