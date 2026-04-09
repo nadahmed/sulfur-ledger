@@ -1,5 +1,5 @@
 import { TransactWriteItemsCommand, TransactWriteItem } from "@aws-sdk/client-dynamodb";
-import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { marshall } from "@aws-sdk/util-dynamodb";
 import { uuidv7 } from "uuidv7";
 import { db, TABLE_NAME } from "../dynamodb";
@@ -162,6 +162,44 @@ export async function getJournalEntries(
   );
 
   return (result.Items as unknown as JournalEntry[]) || [];
+}
+
+export async function getJournalEntry(orgId: string, entryId: string, date?: string): Promise<JournalEntry | null> {
+  const pk = `ORG#${orgId}#JOURNAL`;
+  
+  // 1. Try date-based query first (efficient)
+  if (date) {
+    const safeDate = typeof date === 'string' ? date.slice(0, 10) : "";
+    const result = await db.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+        ExpressionAttributeValues: {
+          ":pk": pk,
+          ":skPrefix": `JNL#${safeDate}#${entryId}`,
+        },
+      })
+    );
+    const items = (result.Items as any[]) || [];
+    if (items.length > 0) return items[0] as JournalEntry;
+  }
+
+  // 2. Fallback: Search the entire journal partition for this ID (robust for corrupt dates)
+  const fallbackResult = await db.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+      FilterExpression: "id = :id",
+      ExpressionAttributeValues: {
+        ":pk": pk,
+        ":skPrefix": "JNL#",
+        ":id": entryId,
+      },
+    })
+  );
+  
+  const fallbackItems = (fallbackResult.Items as any[]) || [];
+  return (fallbackItems[0] as JournalEntry) || null;
 }
 
 export async function getJournalEntriesWithLines(
@@ -418,7 +456,11 @@ export async function getJournalLinesForJournal(orgId: string, journalId: string
 }
 
 export async function deleteJournalEntry(orgId: string, entryId: string, date: string, userId: string, userName?: string) {
-  // 1. Get lines to delete (PK=ORG#ID#JOURNAL, SK=LINE#ID#)
+  // 1. Fetch the entry first so we can return its data (e.g. receipt) for cleanup
+  const entry = await getJournalEntry(orgId, entryId, date);
+  if (!entry) return null;
+
+  // 2. Get lines to delete (PK=ORG#ID#JOURNAL, SK=LINE#ID#)
   const pk = `ORG#${orgId}#JOURNAL`;
   const linesResult = await db.send(
     new QueryCommand({
@@ -435,13 +477,13 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
 
   const transactItems: TransactWriteItem[] = [];
 
-  // Delete Entry
+  // Delete Entry - Use the actual SK from the fetched entry to be exact
   transactItems.push({
     Delete: {
       TableName: TABLE_NAME,
       Key: marshall({
         PK: pk,
-        SK: `JNL#${date}#${entryId}`,
+        SK: (entry as any).SK,
       }),
     },
   });
@@ -475,6 +517,8 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
     details: JSON.stringify({ date }),
     timestamp: new Date().toISOString(),
   });
+
+  return entry;
 }
 
 export async function updateJournalEntry(
@@ -486,11 +530,12 @@ export async function updateJournalEntry(
   userId: string,
   userName?: string
 ) {
-  // Simplest way is to delete old and create new in a single transaction if date changed,
-  // or just update if date is same. To keep it robust, let's treat it as a replacement of lines.
+  // 0. Fetch the old entry to get its actual SK and data
+  const oldEntry = await getJournalEntry(orgId, entryId, oldDate);
+  if (!oldEntry) throw new Error("Journal entry not found for update");
+  const actualOldSk = (oldEntry as any).SK;
 
-  // 1. Get existing lines (only if we are updating lines or if we need them for deletion logic)
-  // Actually, we always need them if we are replacing the line set.
+  // 1. Get existing data
   const pk = `ORG#${orgId}#JOURNAL`;
 
   // Deduplicate and merge new lines
@@ -500,11 +545,11 @@ export async function updateJournalEntry(
   const transactItems: TransactWriteItem[] = [];
 
   // If date changed, we must delete old entry record and create a new one because date is in SK
-  if (newEntry.date && newEntry.date !== oldDate) {
+  if (newEntry.date && newEntry.date.slice(0, 10) !== (oldEntry.date || "").slice(0, 10)) {
     transactItems.push({
       Delete: {
         TableName: TABLE_NAME,
-        Key: marshall({ PK: pk, SK: `JNL#${oldDate}#${entryId}` }),
+        Key: marshall({ PK: pk, SK: actualOldSk }),
       },
     });
   }
@@ -514,12 +559,13 @@ export async function updateJournalEntry(
     Put: {
       TableName: TABLE_NAME,
       Item: marshall({
+        ...oldEntry,
+        ...newEntry,
         PK: pk,
-        SK: `JNL#${newEntry.date || oldDate}#${entryId}`,
+        SK: `JNL#${(newEntry.date || oldEntry.date).slice(0, 10)}#${entryId}`,
         Type: "JournalEntry",
         orgId,
         id: entryId,
-        ...newEntry,
       }, { removeUndefinedValues: true }),
     },
   });
@@ -622,4 +668,7 @@ export async function updateJournalEntry(
     }),
     timestamp: new Date().toISOString(),
   });
+
+  // Return the updated entry from the DB (merged with new values)
+  return getJournalEntry(orgId, entryId, newEntry.date || oldDate);
 }

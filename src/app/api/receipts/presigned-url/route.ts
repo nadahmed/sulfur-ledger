@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     }
 
     const config = getEffectiveStorageConfig(org);
-    const key = `${uuidv7()}-${fileName}`;
+    const key = `tmp/${uuidv7()}-${fileName}`;
     
     const result = await getPresignedUploadUrl(config, key, contentType);
     

@@ -243,7 +243,7 @@ export default function JournalsPage() {
     const creditLine = editingEntry.lines?.find((l: any) => l.amount < 0);
     
     return {
-      date: editingEntry.date.slice(0, 10),
+      date: editingEntry.date?.slice(0, 10) || "",
       description: editingEntry.description,
       amount: (Math.abs(debitLine?.amount || 0) / 100).toString(),
       fromAccountId: creditLine?.accountId || "",
@@ -373,7 +373,7 @@ export default function JournalsPage() {
                       const toAcc = accounts.find(a => a.id === debitLine?.accountId)?.name || "Loading...";
                       const amountDisp = debitLine ? (debitLine.amount / 100).toFixed(2) : "0.00";
 
-                      const datePart = jnl.date.slice(0, 10);
+                      const datePart = jnl.date?.slice(0, 10) || "";
                       const dateObj = new Date(`${datePart}T00:00:00`);
                       const displayDate = dateObj.toLocaleDateString(undefined, {
                         month: 'short',

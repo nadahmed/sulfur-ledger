@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uuidv7 } from "uuidv7";
-import { 
-  createJournalEntry, 
-  getJournalEntriesWithLines, 
-  updateJournalEntry, 
-  deleteJournalEntry 
+import {
+  createJournalEntry,
+  getJournalEntriesWithLines,
+  updateJournalEntry,
+  deleteJournalEntry,
+  getJournalEntry
 } from "@/lib/db/journals";
-import { auth0 } from "@/lib/auth0";
+import { getOrganization } from "@/lib/db/organizations";
+import { getEffectiveStorageConfig, finalizeFile, deleteFile } from "@/lib/storage";
 
 import { checkPermission } from "@/lib/auth";
 
@@ -80,6 +82,24 @@ export async function POST(req: NextRequest) {
       orgId, id: journalId, date: finalDate, description, tags, receipt, createdAt: new Date().toISOString()
     }, parsedLines, user!.sub, user!.name);
 
+    // --- Receipt Finalization ---
+    if (receipt && receipt.key) {
+      try {
+        const org = await getOrganization(orgId);
+        if (org) {
+          const config = getEffectiveStorageConfig(org);
+          const finalKey = await finalizeFile(config, receipt.key);
+
+          // Update DB with final key if it changed
+          if (finalKey !== receipt.key) {
+            await updateJournalEntry(orgId, journalId, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name);
+          }
+        }
+      } catch (err) {
+        console.error("Receipt finalization failed:", err);
+      }
+    }
+
     return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -115,7 +135,39 @@ export async function PATCH(req: NextRequest) {
       { orgId, journalId: id, accountId: fromAccountId, amount: -parsedAmount, date: finalDate }
     ];
 
+    // Fetch old entry to check for receipt changes
+    const oldEntry = await getJournalEntry(orgId, id, oldDate);
+    const oldReceipt = oldEntry?.receipt;
+
     await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, tags, receipt }, parsedLines, user!.sub, user!.name);
+
+    // --- Receipt Side Effects ---
+    const org = await getOrganization(orgId);
+    if (org) {
+      const config = getEffectiveStorageConfig(org);
+
+      // 1. Delete old receipt if it was replaced or removed
+      if (oldReceipt && oldReceipt.key && (!receipt || receipt.key !== oldReceipt.key)) {
+        try {
+          await deleteFile(config, oldReceipt.key);
+        } catch (err) {
+          console.error("Failed to delete old receipt:", err);
+        }
+      }
+
+      // 2. Finalize new receipt if provided
+      if (receipt && receipt.key && (!oldReceipt || receipt.key !== oldReceipt.key)) {
+        try {
+          const finalKey = await finalizeFile(config, receipt.key);
+          if (finalKey !== receipt.key) {
+            await updateJournalEntry(orgId, id, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name);
+          }
+        } catch (err) {
+          console.error("Failed to finalize new receipt:", err);
+        }
+      }
+    }
+
     return NextResponse.json({ message: "Journal updated" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -139,7 +191,21 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    await deleteJournalEntry(orgId, id, date, user!.sub, user!.name);
+    const deletedEntry = await deleteJournalEntry(orgId, id, date, user!.sub, user!.name);
+
+    // --- Receipt Cleanup ---
+    if (deletedEntry?.receipt?.key) {
+      try {
+        const org = await getOrganization(orgId);
+        if (org) {
+          const config = getEffectiveStorageConfig(org);
+          await deleteFile(config, deletedEntry.receipt.key);
+        }
+      } catch (err) {
+        console.error("Failed to cleanup deleted journal receipt:", err);
+      }
+    }
+
     return NextResponse.json({ message: "Journal deleted" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

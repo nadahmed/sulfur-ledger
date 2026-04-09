@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v2 as cloudinary } from "cloudinary";
 import { Organization } from "./db/organizations";
@@ -161,6 +161,97 @@ export async function getDownloadUrl(config: StorageConfig, key: string) {
     // If the image is private, we'd need a signed URL. 
     // Assuming default is public but isolated by random IDs in key.
     return cloudinary.url(key, { secure: true });
+  }
+
+  throw new Error("Unsupported storage provider");
+}
+
+/**
+ * Finalizes a file by moving it from a temporary location to its permanent location.
+ * This is the 'Move on Save' pattern.
+ */
+export async function finalizeFile(config: StorageConfig, key: string): Promise<string> {
+  // If the key doesn't start with tmp/, it's already permanent or doesn't follow the pattern
+  if (!key.includes("/tmp/")) return key;
+
+  const permanentKey = key.replace("/tmp/", "/");
+
+  if (config.provider === "s3" && config.s3) {
+    const s3 = new S3Client({
+      endpoint: config.s3.endpoint,
+      region: config.s3.region,
+      credentials: {
+        accessKeyId: config.s3.accessKeyId,
+        secretAccessKey: config.s3.secretAccessKey,
+      },
+      forcePathStyle: true,
+    });
+
+    // 1. Copy to permanent location
+    await s3.send(new CopyObjectCommand({
+      Bucket: config.s3.bucketName,
+      CopySource: `${config.s3.bucketName}/${key}`,
+      Key: permanentKey,
+    }));
+
+    // 2. Delete temporary version
+    await s3.send(new DeleteObjectCommand({
+      Bucket: config.s3.bucketName,
+      Key: key,
+    }));
+
+    return permanentKey;
+  }
+
+  if (config.provider === "cloudinary" && config.cloudinary) {
+    cloudinary.config({
+      cloud_name: config.cloudinary.cloudName,
+      api_key: config.cloudinary.apiKey,
+      api_secret: config.cloudinary.apiSecret,
+      secure: true,
+    });
+
+    // Cloudinary rename works with public IDs. 
+    // We need to extract them from the keys.
+    const result = await cloudinary.uploader.rename(key, permanentKey);
+    return result.public_id;
+  }
+
+  throw new Error("Unsupported storage provider");
+}
+
+/**
+ * Deletes a file from storage.
+ */
+export async function deleteFile(config: StorageConfig, key: string): Promise<void> {
+  if (config.provider === "s3" && config.s3) {
+    const s3 = new S3Client({
+      endpoint: config.s3.endpoint,
+      region: config.s3.region,
+      credentials: {
+        accessKeyId: config.s3.accessKeyId,
+        secretAccessKey: config.s3.secretAccessKey,
+      },
+      forcePathStyle: true,
+    });
+
+    await s3.send(new DeleteObjectCommand({
+      Bucket: config.s3.bucketName,
+      Key: key,
+    }));
+    return;
+  }
+
+  if (config.provider === "cloudinary" && config.cloudinary) {
+    cloudinary.config({
+      cloud_name: config.cloudinary.cloudName,
+      api_key: config.cloudinary.apiKey,
+      api_secret: config.cloudinary.apiSecret,
+      secure: true,
+    });
+
+    await cloudinary.uploader.destroy(key);
+    return;
   }
 
   throw new Error("Unsupported storage provider");
