@@ -11,7 +11,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { JournalEntryFormValues } from "@/lib/schemas";
-import { Pencil, Trash2, MoreVertical, Search, X, Calendar as CalendarIcon } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, Search, X, Calendar as CalendarIcon, Paperclip, ExternalLink, ImageIcon, FileText } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { parseISO, format as formatISO } from "date-fns";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -43,6 +43,7 @@ interface JournalEntry {
   description: string;
   tags?: string[];
   createdAt: string;
+  receipt?: { key: string; provider: "system" | "s3" | "cloudinary"; contentType: string };
   lines: { accountId: string; amount: number; date: string }[];
 }
 
@@ -248,8 +249,20 @@ export default function JournalsPage() {
       fromAccountId: creditLine?.accountId || "",
       toAccountId: debitLine?.accountId || "",
       tags: editingEntry.tags || [],
+      receipt: editingEntry.receipt,
     };
   }, [editingEntry]);
+
+  const previewReceipt = async (receipt: any) => {
+    try {
+      const res = await fetch(`/api/receipts/view?orgId=${activeOrganizationId}&key=${encodeURIComponent(receipt.key)}`);
+      if (!res.ok) throw new Error("Failed to get preview URL");
+      const { url } = await res.json();
+      window.open(url, "_blank");
+    } catch (err: any) {
+      toast.error(`Error opening receipt: ${err.message}`);
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -372,7 +385,26 @@ export default function JournalsPage() {
                           <TableCell className="font-medium text-xs py-2 px-4" suppressHydrationWarning>
                             {displayDate}
                           </TableCell>
-                          <TableCell className="text-xs py-2 px-4 italic text-muted-foreground">{jnl.description}</TableCell>
+                          <TableCell className="text-xs py-2 px-4 italic text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              {jnl.description}
+                              {jnl.receipt && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-primary hover:bg-primary/10"
+                                  onClick={() => previewReceipt(jnl.receipt)}
+                                  title="View Receipt"
+                                >
+                                  {jnl.receipt.contentType?.includes("image") ? (
+                                    <ImageIcon className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <FileText className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-xs py-2 px-4 font-bold">
                             {formatCurrency(
                               debitLine ? debitLine.amount / 100 : 0,

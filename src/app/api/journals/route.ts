@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { date, description, amount, fromAccountId, toAccountId, tags } = body;
+    const { date, description, amount, fromAccountId, toAccountId, tags, receipt } = body;
 
     if (!date || !description || !amount || !fromAccountId || !toAccountId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     ];
 
     const result = await createJournalEntry({
-      orgId, id: journalId, date: finalDate, description, tags, createdAt: new Date().toISOString()
+      orgId, id: journalId, date: finalDate, description, tags, receipt, createdAt: new Date().toISOString()
     }, parsedLines, user!.sub, user!.name);
 
     return NextResponse.json(result, { status: 201 });
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, oldDate, date, description, amount, fromAccountId, toAccountId, tags } = body;
+    const { id, oldDate, date, description, amount, fromAccountId, toAccountId, tags, receipt } = body;
 
     if (!id || !oldDate || !date || !description || !amount || !fromAccountId || !toAccountId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -115,7 +115,7 @@ export async function PATCH(req: NextRequest) {
       { orgId, journalId: id, accountId: fromAccountId, amount: -parsedAmount, date: finalDate }
     ];
 
-    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, tags }, parsedLines, user!.sub, user!.name);
+    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, tags, receipt }, parsedLines, user!.sub, user!.name);
     return NextResponse.json({ message: "Journal updated" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

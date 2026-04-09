@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { z } from "zod";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -45,6 +46,18 @@ import {
   McpSettingsFormValues,
   McpSettingsSchema
 } from "@/lib/schemas";
+
+const GeneralOrgSchema = OrganizationSchema.pick({
+  name: true,
+  currencySymbol: true,
+  currencyPosition: true,
+  currencyHasSpace: true,
+  thousandSeparator: true,
+  decimalSeparator: true,
+  grouping: true,
+  decimalPlaces: true,
+});
+type GeneralOrgFormValues = z.infer<typeof GeneralOrgSchema>;
 
 const parseCSVLine = (line: string) => {
   const result = [];
@@ -108,7 +121,7 @@ function SettingsInner() {
   const queryClient = useQueryClient();
 
   const urlTab = searchParams.get("tab");
-  const activeTab = urlTab && ["general", "members", "email", "mcp", "data"].includes(urlTab) ? urlTab : "general";
+  const activeTab = urlTab && ["general", "members", "email", "mcp", "storage", "data"].includes(urlTab) ? urlTab : "general";
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -171,6 +184,16 @@ function SettingsInner() {
     enabled: !!activeOrganizationId && canManage,
   });
 
+  const { data: storageSettingsData, isLoading: isLoadingStorageSettings } = useQuery<{ storageSettings: any }>({
+    queryKey: ["storage-settings", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/storage-settings?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch storage settings");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
   // --- Mutations ---
 
   const leaveOrgMutation = useMutation({
@@ -228,7 +251,7 @@ function SettingsInner() {
   });
 
   const updateOrgMutation = useMutation({
-    mutationFn: async (values: OrganizationFormValues) => {
+    mutationFn: async (values: GeneralOrgFormValues) => {
       const res = await fetch("/api/organizations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -359,11 +382,28 @@ function SettingsInner() {
       const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to delete key");
+      if (!res.ok) throw new Error("Failed to delete key");
     },
     onSuccess: () => {
       toast.success("MCP API Key deleted!");
       queryClient.invalidateQueries({ queryKey: ["mcp-settings"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveStorageSettingsMutation = useMutation({
+    mutationFn: async (values: { settings: any }) => {
+      const res = await fetch("/api/organizations/storage-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: activeOrganizationId, ...values }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+    },
+    onSuccess: () => {
+      toast.success("Storage settings saved!");
+      queryClient.invalidateQueries({ queryKey: ["storage-settings", activeOrganizationId] });
+      refreshOrganizations();
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -375,8 +415,8 @@ function SettingsInner() {
     watch: watchOrg,
     formState: { isDirty: isOrgDirty },
     setValue: setOrgValue,
-  } = useForm<OrganizationFormValues>({
-    resolver: zodResolver(OrganizationSchema),
+  } = useForm<GeneralOrgFormValues>({
+    resolver: zodResolver(GeneralOrgSchema),
     defaultValues: {
       name: activeOrg?.name || "",
       currencySymbol: activeOrg?.currencySymbol || "৳",
@@ -455,6 +495,33 @@ function SettingsInner() {
     defaultValues: { ttlDays: "30" },
   });
 
+  const [storageProvider, setStorageProvider] = useState<"system" | "s3" | "cloudinary">("system");
+  const [s3Settings, setS3Settings] = useState({
+    endpoint: "",
+    region: "",
+    accessKeyId: "",
+    secretAccessKey: "",
+    bucketName: "",
+  });
+  const [cloudinarySettings, setCloudinarySettings] = useState({
+    cloudName: "",
+    apiKey: "",
+    apiSecret: "",
+  });
+  const [customFolder, setCustomFolder] = useState("");
+
+  useEffect(() => {
+    if (storageSettingsData) {
+      const s = storageSettingsData.storageSettings;
+      if (s) {
+        setStorageProvider(s.provider || "system");
+        setCustomFolder(s.customFolder || "");
+        if (s.s3) setS3Settings(s.s3);
+        if (s.cloudinary) setCloudinarySettings(s.cloudinary);
+      }
+    }
+  }, [storageSettingsData]);
+
   const watchMcpTtl = watchMcp("ttlDays");
   const [copied, setCopied] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -490,6 +557,7 @@ function SettingsInner() {
           { id: "general", label: "General" },
           { id: "members", label: "Members" },
           { id: "email", label: "Email Delivery" },
+          { id: "storage", label: "Receipts & Storage" },
           { id: "mcp", label: "MCP Server" },
           { id: "data", label: "Data Management" },
         ].map((tab) => (
@@ -514,7 +582,7 @@ function SettingsInner() {
         {activeTab === "general" && (
           <div className="space-y-6">
             <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
-              <form onSubmit={handleSubmitOrg((v: any) => updateOrgMutation.mutate(v))}>
+              <form onSubmit={handleSubmitOrg((v: GeneralOrgFormValues) => updateOrgMutation.mutate(v))}>
                 <CardHeader className="pb-2 pt-4 px-5">
                   <CardTitle className="text-lg">Organization Details</CardTitle>
                   <CardDescription className="text-xs">Manage identity and accounting format.</CardDescription>
@@ -1358,6 +1426,162 @@ function SettingsInner() {
                   </div>
                 )}
               </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "storage" && (
+          <div className="space-y-6">
+            <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+              <CardHeader className="pb-2 pt-4 px-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Receipt Configuration</CardTitle>
+                    <CardDescription className="text-xs">
+                      Receipt storage is always enabled for all transactions.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6 px-5 pb-5">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Storage Provider</Label>
+                    <Select
+                      value={storageProvider}
+                      onValueChange={(v: any) => setStorageProvider(v)}
+                      disabled={!canManage}
+                    >
+                      <SelectTrigger className="w-full max-w-md">
+                        <SelectValue>
+                          {storageProvider === "system" && "System Default"}
+                          {storageProvider === "s3" && "Custom S3 Storage"}
+                          {storageProvider === "cloudinary" && "Custom Cloudinary"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System Default</SelectItem>
+                        <SelectItem value="s3">Custom S3 Storage</SelectItem>
+                        <SelectItem value="cloudinary">Custom Cloudinary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {storageProvider !== "system" && (
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                      <Label htmlFor="custom-folder" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Storage Path / Prefix</Label>
+                      <Input
+                        id="custom-folder"
+                        value={customFolder}
+                        onChange={(e) => setCustomFolder(e.target.value)}
+                        placeholder="e.g. receipts/2024"
+                        disabled={!canManage}
+                        className="max-w-md"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Optional. Files will be organized under this path.</p>
+                    </div>
+                  )}
+
+                  {storageProvider === "s3" && (
+                    <div className="pt-4 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                       <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Endpoint</Label>
+                        <Input
+                          value={s3Settings.endpoint}
+                          onChange={(e) => setS3Settings({ ...s3Settings, endpoint: e.target.value })}
+                          placeholder="https://..."
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Region</Label>
+                        <Input
+                          value={s3Settings.region}
+                          onChange={(e) => setS3Settings({ ...s3Settings, region: e.target.value })}
+                          placeholder="us-east-1"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Access Key ID</Label>
+                        <Input
+                          value={s3Settings.accessKeyId}
+                          onChange={(e) => setS3Settings({ ...s3Settings, accessKeyId: e.target.value })}
+                          placeholder="..."
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Secret Access Key</Label>
+                        <Input
+                          type="password"
+                          value={s3Settings.secretAccessKey}
+                          onChange={(e) => setS3Settings({ ...s3Settings, secretAccessKey: e.target.value })}
+                          placeholder="..."
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Bucket Name</Label>
+                        <Input
+                          value={s3Settings.bucketName}
+                          onChange={(e) => setS3Settings({ ...s3Settings, bucketName: e.target.value })}
+                          className="h-9 text-sm max-w-md"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {storageProvider === "cloudinary" && (
+                    <div className="pt-4 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Cloud Name</Label>
+                        <Input
+                          value={cloudinarySettings.cloudName}
+                          onChange={(e) => setCloudinarySettings({ ...cloudinarySettings, cloudName: e.target.value })}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">API Key</Label>
+                        <Input
+                          value={cloudinarySettings.apiKey}
+                          onChange={(e) => setCloudinarySettings({ ...cloudinarySettings, apiKey: e.target.value })}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">API Secret</Label>
+                        <Input
+                          type="password"
+                          value={cloudinarySettings.apiSecret}
+                          onChange={(e) => setCloudinarySettings({ ...cloudinarySettings, apiSecret: e.target.value })}
+                          className="h-9 text-sm max-w-md"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              {canManage && (
+                <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5">
+                  <Button
+                    size="sm"
+                    className="h-8 px-5 bg-primary hover:bg-primary/90 shadow-sm transition-all"
+                    disabled={saveStorageSettingsMutation.isPending}
+                    onClick={() => saveStorageSettingsMutation.mutate({
+                      settings: {
+                        provider: storageProvider,
+                        customFolder,
+                        s3: storageProvider === "s3" ? s3Settings : undefined,
+                        cloudinary: storageProvider === "cloudinary" ? cloudinarySettings : undefined,
+                      }
+                    })}
+                  >
+                    {saveStorageSettingsMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 text-xs font-semibold"><Save className="w-3 h-3" /> Save Storage Settings</span>}
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           </div>
         )}

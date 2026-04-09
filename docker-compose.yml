@@ -16,5 +16,29 @@ services:
       - "1025:1025" # SMTP port
       - "8025:8025" # Web UI port
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: rustfs
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    environment:
+      - RUSTFS_ACCESS_KEY=rustfsadmin
+      - RUSTFS_SECRET_KEY=rustfsadmin
+    volumes:
+      - rustfs-data:/data
+
+  rustfs-init:
+    image: minio/mc
+    depends_on:
+      - rustfs
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local-storage http://rustfs:9000 rustfsadmin rustfsadmin;
+      mc mb local-storage/sulfurbook --ignore-existing;
+      "
+
 volumes:
   dynamodb-data:
+  rustfs-data:

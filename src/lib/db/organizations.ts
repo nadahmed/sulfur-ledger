@@ -12,6 +12,23 @@ export interface EmailSettings {
   senderName: string;
 }
 
+export interface StorageSettings {
+  provider: "system" | "s3" | "cloudinary";
+  customFolder?: string;
+  s3?: {
+    endpoint: string;
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    bucketName: string;
+  };
+  cloudinary?: {
+    cloudName: string;
+    apiKey: string;
+    apiSecret: string;
+  };
+}
+
 export interface Organization {
   id: string; // orgId
   name: string;
@@ -24,6 +41,7 @@ export interface Organization {
   grouping?: "standard" | "indian" | "none";
   decimalPlaces?: number;
   emailSettings?: EmailSettings;
+  storageSettings?: StorageSettings;
   mcpApiKey?: string;
   mcpApiKeyExpiresAt?: string;
   createdAt: string;
@@ -291,6 +309,22 @@ export async function updateOrganization(orgId: string, updates: {
       })
     );
   }
+}
+
+export async function updateOrganizationStorageSettings(orgId: string, settings: StorageSettings) {
+  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+  
+  await db.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}`,
+        SK: `METADATA`,
+      },
+      UpdateExpression: "SET storageSettings = :settings",
+      ExpressionAttributeValues: { ":settings": settings },
+    })
+  );
 }
 
 export async function updateOrganizationEmailSettings(orgId: string, settings: EmailSettings) {

@@ -30,6 +30,11 @@ export const JournalEntrySchema = z.object({
     }
     return val || [];
   }),
+  receipt: z.object({
+    key: z.string(),
+    provider: z.enum(["system", "s3", "cloudinary"]),
+    contentType: z.string(),
+  }).optional(),
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
   message: "From and To accounts cannot be the same",
   path: ["toAccountId"],
@@ -47,6 +52,22 @@ export const OrganizationSchema = z.object({
   decimalSeparator: z.enum([".", ","]),
   grouping: z.enum(["standard", "indian", "none"]),
   decimalPlaces: z.number().min(0).max(4),
+  storageSettings: z.object({
+    provider: z.enum(["system", "s3", "cloudinary"]),
+    customFolder: z.string().optional(),
+    s3: z.object({
+      endpoint: z.string().min(1),
+      region: z.string().min(1),
+      accessKeyId: z.string().min(1),
+      secretAccessKey: z.string().min(1),
+      bucketName: z.string().min(1),
+    }).optional(),
+    cloudinary: z.object({
+      cloudName: z.string().min(1),
+      apiKey: z.string().min(1),
+      apiSecret: z.string().min(1),
+    }).optional(),
+  }).optional(),
 });
 
 export type OrganizationFormValues = z.infer<typeof OrganizationSchema>;

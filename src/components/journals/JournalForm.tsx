@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AccountSelector } from "@/components/accounts/AccountSelector";
-import { ArrowRightLeft, Calendar as CalendarIcon } from "lucide-react";
-import { TagSelector } from "@/components/journals/TagSelector";
-import { DatePicker } from "@/components/ui/date-picker";
 import { parseISO, format } from "date-fns";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TagSelector } from "@/components/journals/TagSelector";
+import { ArrowRightLeft, FileUp, Paperclip, X, Loader2, FileIcon, ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 
 interface Account {
   id: string;
@@ -53,6 +54,9 @@ export function JournalForm({
     defaultValues: initialValues,
   });
 
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedReceipt, setUploadedReceipt] = useState<any>(initialValues.receipt || null);
+
   const fromAccountId = watch("fromAccountId");
   const toAccountId = watch("toAccountId");
 
@@ -63,14 +67,68 @@ export function JournalForm({
 
   const onSubmitWithReset = async (values: JournalEntryFormInput) => {
     try {
-      await onSubmit(values);
+      await onSubmit({ ...values, receipt: uploadedReceipt });
       reset({
         ...initialValues,
         date: values.date,
       });
+      setUploadedReceipt(null);
       if (onSuccess) onSuccess();
     } catch (err) {
       // Error handled by parent
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      
+      // 1. Get presigned URL
+      const res = await fetch(`/api/receipts/presigned-url?orgId=${activeOrganizationId}&fileName=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}`);
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { url, fields, fullKey, provider } = await res.json();
+
+      // 2. Upload to S3/Cloudinary
+      if (provider === "s3") {
+        const uploadRes = await fetch(url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type }
+        });
+        if (!uploadRes.ok) throw new Error("Upload failed to S3");
+      } else {
+        // Cloudinary signed upload
+        const formData = new FormData();
+        Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string));
+        formData.append("file", file);
+        
+        const uploadRes = await fetch(url, {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error("Upload failed to Cloudinary");
+      }
+
+      setUploadedReceipt({
+        key: fullKey,
+        provider,
+        contentType: file.type
+      });
+      toast.success("Receipt uploaded!");
+    } catch (err: any) {
+      toast.error(`Upload error: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = "";
     }
   };
 
@@ -186,6 +244,72 @@ export function JournalForm({
           />
         </div>
       </div>
+
+      {activeOrganizationId && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <Paperclip className="w-4 h-4 text-muted-foreground" />
+            Receipt (Image or PDF)
+          </Label>
+          <div className="flex flex-col gap-3">
+            {uploadedReceipt ? (
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-10 h-10 flex items-center justify-center bg-card rounded-md border border-border/50 shrink-0">
+                    {uploadedReceipt.contentType?.includes("image") ? (
+                      <ImageIcon className="w-5 h-5 text-primary/70" />
+                    ) : (
+                      <FileIcon className="w-5 h-5 text-primary/70" />
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold truncate max-w-[200px] sm:max-w-[400px]">
+                      {uploadedReceipt.key.split("/").pop()}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                      Stored via {uploadedReceipt.provider}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setUploadedReceipt(null)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  type="file"
+                  id="receipt-upload"
+                  className="hidden"
+                  accept="image/*,application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 border-dashed border-2 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                  onClick={() => document.getElementById("receipt-upload")?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary" />
+                  ) : (
+                    <FileUp className="w-4 h-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                  )}
+                  {isUploading ? "Uploading..." : "Click to select Receipt (Max 5MB)"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3">
         <Button type="submit" className="flex-1" disabled={isPending}>

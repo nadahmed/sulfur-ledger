@@ -5,6 +5,12 @@ import { uuidv7 } from "uuidv7";
 import { db, TABLE_NAME } from "../dynamodb";
 import { createAuditLog } from "./audit";
 
+export interface Receipt {
+  key: string;
+  provider: "system" | "s3" | "cloudinary";
+  contentType: string;
+}
+
 export interface JournalEntry {
   orgId: string;
   id: string; // UUID
@@ -12,6 +18,7 @@ export interface JournalEntry {
   description: string;
   tags?: string[];
   notes?: string;
+  receipt?: Receipt;
   createdAt: string;
 }
 

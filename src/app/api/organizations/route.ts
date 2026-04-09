@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
       thousandSeparator,
       decimalSeparator,
       grouping,
-      decimalPlaces
+      decimalPlaces,
+      storageSettings
     } = await req.json();
     if (!name) {
       return NextResponse.json({ error: "Organization name is required" }, { status: 400 });
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
       decimalSeparator: decimalSeparator || ".",
       grouping: grouping || "standard",
       decimalPlaces: decimalPlaces ?? 2,
+      storageSettings: storageSettings || { provider: "system" },
       createdAt: new Date().toISOString(),
     });
 
