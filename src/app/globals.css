@@ -187,9 +187,15 @@
   }
   html, body {
     font-family: var(--font-poppins), sans-serif !important;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Offset for fixed navbar during scroll-to-hash */
+  section[id] {
+    scroll-margin-top: 10rem;
   }
 
   /* Hide number input spinners globally */
