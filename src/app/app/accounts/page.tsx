@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 interface Account {
   id: string;
@@ -256,45 +257,43 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="w-full max-w-screen-2xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Chart of Accounts</h1>
+    <div className="w-full max-w-screen-2xl p-4 md:p-6 min-h-screen">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">Chart of Accounts</h1>
       </div>
 
       {canManage && (
-        <Card className="mb-8 font-sans">
-          <CardHeader>
-            <CardTitle>Create Account</CardTitle>
+        <Card className="mb-4 font-sans border-border shadow-sm">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-lg">Create Account</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-4 items-end flex-wrap">
-              <div className="grid w-full sm:max-w-xs items-center gap-1.5">
-                <Label htmlFor="name">Account Name</Label>
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-3 items-end flex-wrap">
+              <div className="grid w-full sm:max-w-xs items-center gap-1">
+                <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Name</Label>
                 <Input
                   id="name"
                   {...register("name")}
                   placeholder="e.g. Main Checking"
-                  className={errors.name ? "border-destructive" : ""}
+                  className={cn("h-9 text-sm", errors.name ? "border-destructive" : "")}
                 />
               </div>
-              <div className="grid w-full sm:max-w-xs items-center gap-1.5">
-                <Label htmlFor="category">Category</Label>
+              <div className="grid w-full sm:max-w-xs items-center gap-1">
+                <Label htmlFor="category" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</Label>
                 <Controller
                   name="category"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="category" className="capitalize h-10">
-                        <SelectValue placeholder="Select Category">
-                          {field.value ? field.value.charAt(0).toUpperCase() + field.value.slice(1) : undefined}
-                        </SelectValue>
+                      <SelectTrigger id="category" className="capitalize h-9 text-sm">
+                        <SelectValue placeholder="Select Category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="asset">Asset</SelectItem>
-                        <SelectItem value="liability">Liability</SelectItem>
-                        <SelectItem value="equity">Equity</SelectItem>
-                        <SelectItem value="income">Income</SelectItem>
-                        <SelectItem value="expense">Expense</SelectItem>
+                        <SelectItem value="asset" className="text-xs">Asset</SelectItem>
+                        <SelectItem value="liability" className="text-xs">Liability</SelectItem>
+                        <SelectItem value="equity" className="text-xs">Equity</SelectItem>
+                        <SelectItem value="income" className="text-xs">Income</SelectItem>
+                        <SelectItem value="expense" className="text-xs">Expense</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -314,10 +313,10 @@ export default function AccountsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <CardTitle>Accounts</CardTitle>
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+      <Card className="shadow-sm border-border">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4">
+          <CardTitle className="text-lg">Accounts</CardTitle>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <div className="flex items-center space-x-2 w-full sm:w-auto">
               <Input
                 placeholder="Search accounts..."
@@ -350,8 +349,9 @@ export default function AccountsPage() {
                     id="show-archived"
                     checked={showArchived}
                     onCheckedChange={setShowArchived}
+                    className="scale-75"
                   />
-                  <Label htmlFor="show-archived" className="text-sm">Archived</Label>
+                  <Label htmlFor="show-archived" className="text-xs text-muted-foreground uppercase font-bold">Archived</Label>
                 </>
               ) : (
                 <div className="w-24 h-6 bg-muted animate-pulse rounded-full" />
@@ -366,17 +366,17 @@ export default function AccountsPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Created</TableHead>
-                    {canManage && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="h-8 text-xs">Name</TableHead>
+                    <TableHead className="h-8 text-xs">Category</TableHead>
+                    <TableHead className="h-8 text-xs">Created</TableHead>
+                    {canManage && <TableHead className="w-[80px] text-right h-8 text-xs">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {accounts.map((acc) => (
-                    <TableRow key={acc.id} className={acc.status === "archived" ? "opacity-50 line-through" : ""}>
-                      <TableCell className="font-medium">
+                    <TableRow key={acc.id} className={cn("group hover:bg-muted/10 transition-colors", acc.status === "archived" ? "opacity-40 italic" : "")}>
+                      <TableCell className="font-medium text-xs py-2">
                         {editingId === acc.id ? (
                           <div className="flex items-center gap-2">
                             <Input
@@ -425,10 +425,10 @@ export default function AccountsPage() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="capitalize">{acc.category}</TableCell>
-                      <TableCell>{new Date(acc.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="capitalize text-xs py-2">{acc.category}</TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground py-2">{new Date(acc.createdAt).toLocaleDateString()}</TableCell>
                       {canManage && (
-                        <TableCell className="text-right">
+                        <TableCell className="text-right py-1">
                           {acc.status === "archived" ? (
                             <Button
                               variant="ghost"

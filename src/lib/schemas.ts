@@ -43,6 +43,10 @@ export const OrganizationSchema = z.object({
   currencySymbol: z.string().min(1, "Currency symbol is required").max(10),
   currencyPosition: z.enum(["prefix", "suffix"]),
   currencyHasSpace: z.boolean(),
+  thousandSeparator: z.enum([",", ".", " ", "'", "none"]),
+  decimalSeparator: z.enum([".", ","]),
+  grouping: z.enum(["standard", "indian", "none"]),
+  decimalPlaces: z.number().min(0).max(4),
 });
 
 export type OrganizationFormValues = z.infer<typeof OrganizationSchema>;

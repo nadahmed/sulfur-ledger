@@ -198,20 +198,19 @@ export default function ActivityPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-4 p-4 md:p-6 min-h-screen">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Organization Activity</h1>
+        <h1 className="text-xl font-bold tracking-tight">Organization Activity</h1>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="size-5" />
+        <CardHeader className="py-4 px-6">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <History className="size-5 text-primary" />
             Unified Activity Feed
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            A chronological timeline of all actions performed in this organization, 
-            either by users directly or by the AI agent. Logs are kept for a rolling 90-day period.
+          <p className="text-xs text-muted-foreground mt-1">
+            A chronological timeline of actions performed in this organization.
           </p>
         </CardHeader>
         <CardContent>
@@ -224,61 +223,55 @@ export default function ActivityPage() {
               <span className="text-muted-foreground">No recent activity found.</span>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-lg border">
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 p-3 bg-muted/20 rounded-xl border border-border/40">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground">Search</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70">Search</Label>
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
                       <Input 
                         placeholder="Search logs..." 
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="pl-9 h-9"
+                        className="pl-8 h-8 text-xs"
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground">Action</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70">Action</Label>
                     <Select value={filterAction} onValueChange={v => setFilterAction(v || "all")}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="All Actions">
-                          {filterAction === "all" ? "All Actions" : filterAction}
-                        </SelectValue>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Actions" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Actions</SelectItem>
-                        {uniqueActions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        <SelectItem value="all" className="text-xs">All Actions</SelectItem>
+                        {uniqueActions.map(a => <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground">User</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70">User</Label>
                     <Select value={filterUser} onValueChange={v => setFilterUser(v || "all")}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="All Users">
-                          {filterUser === "all" ? "All Users" : filterUser}
-                        </SelectValue>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Users" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Users</SelectItem>
-                        {uniqueUsers.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        <SelectItem value="all" className="text-xs">All Users</SelectItem>
+                        {uniqueUsers.map(u => <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground">Log Type</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70">Log Type</Label>
                     <Select value={filterType} onValueChange={v => setFilterType(v || "all")}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="All Types">
-                          {filterType === "all" ? "All Types" : filterType === "ui" ? "User Interface" : filterType === "mcp" ? "AI Agent (MCP)" : filterType}
-                        </SelectValue>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="ui">User Interface</SelectItem>
-                        <SelectItem value="mcp">AI Agent (MCP)</SelectItem>
+                        <SelectItem value="all" className="text-xs">All Types</SelectItem>
+                        <SelectItem value="ui" className="text-xs">User Interface</SelectItem>
+                        <SelectItem value="mcp" className="text-xs">AI Agent (MCP)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -286,28 +279,28 @@ export default function ActivityPage() {
                 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">From</Label>
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70 whitespace-nowrap">From</Label>
                     <DatePicker
                       date={dateFrom ? parseISO(dateFrom) : undefined}
                       setDate={(d: Date | undefined) => setDateFrom(d ? format(d, "yyyy-MM-dd") : "")}
-                      className="w-[150px] sm:w-auto h-9 text-sm"
+                      className="w-[130px] h-8 text-xs"
                       placeholder="From Date"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">To</Label>
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/70 whitespace-nowrap">To</Label>
                     <DatePicker
                       date={dateTo ? parseISO(dateTo) : undefined}
                       setDate={(d: Date | undefined) => setDateTo(d ? format(d, "yyyy-MM-dd") : "")}
-                      className="w-[150px] sm:w-auto h-9 text-sm"
+                      className="w-[130px] h-8 text-xs"
                       placeholder="To Date"
                     />
                   </div>
                   <div className="flex-1"></div>
-                  <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={() => {
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-[10px] uppercase font-semibold text-muted-foreground" onClick={() => {
                     setSearch(""); setFilterAction("all"); setFilterUser("all"); setFilterType("all"); setDateFrom(""); setDateTo("");
                   }}>
-                    <FilterX className="size-4" />
+                    <FilterX className="size-3" />
                     Reset Filters
                   </Button>
                 </div>
@@ -316,12 +309,12 @@ export default function ActivityPage() {
               <div className="rounded-md border">
                 <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[180px]">Timestamp</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Performer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Details</TableHead>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="w-[150px] h-8 text-[11px] uppercase tracking-wider font-bold">Timestamp</TableHead>
+                  <TableHead className="h-8 text-[11px] uppercase tracking-wider font-bold">Action</TableHead>
+                  <TableHead className="h-8 text-[11px] uppercase tracking-wider font-bold">Performer</TableHead>
+                  <TableHead className="h-8 text-[11px] uppercase tracking-wider font-bold">Status</TableHead>
+                  <TableHead className="text-right h-8 text-[11px] uppercase tracking-wider font-bold">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -338,28 +331,28 @@ export default function ActivityPage() {
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => toggleRow(log.id)}
                     >
-                      <TableCell className="font-medium whitespace-nowrap">
+                      <TableCell className="font-medium whitespace-nowrap text-xs py-2">
                         {format(new Date(log.timestamp), "MMM d, HH:mm:ss")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-xs py-2">
                         {renderAction(log)}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm">
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-2 text-xs">
                           {log.userName === "AI Agent" || log.userName === "MCP/AI" ? (
                             <div className="flex items-center gap-1.5 text-primary font-semibold">
-                              <Bot className="size-4" />
+                              <Bot className="size-3.5" />
                               <span>AI Agent</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 text-foreground">
-                              <User className="size-4" />
+                              <User className="size-3.5" />
                               <span>{log.userName || "Unknown User"}</span>
                             </div>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{renderStatus(log)}</TableCell>
+                      <TableCell className="py-2">{renderStatus(log)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           {expandedRow === log.id ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}

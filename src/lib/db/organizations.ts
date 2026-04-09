@@ -19,6 +19,10 @@ export interface Organization {
   currencySymbol?: string; // e.g. ৳, $, €
   currencyPosition?: "prefix" | "suffix";
   currencyHasSpace?: boolean;
+  thousandSeparator?: string;
+  decimalSeparator?: string;
+  grouping?: "standard" | "indian" | "none";
+  decimalPlaces?: number;
   emailSettings?: EmailSettings;
   mcpApiKey?: string;
   mcpApiKeyExpiresAt?: string;
@@ -37,6 +41,10 @@ export interface OrgUser {
   currencySymbol?: string;
   currencyPosition?: "prefix" | "suffix";
   currencyHasSpace?: boolean;
+  thousandSeparator?: string;
+  decimalSeparator?: string;
+  grouping?: "standard" | "indian" | "none";
+  decimalPlaces?: number;
   createdAt: string;
 }
 
@@ -175,6 +183,10 @@ export async function getUserOrganizations(userId: string): Promise<OrgUser[]> {
       updated.currencySymbol = orgMetadata.currencySymbol || "৳";
       updated.currencyPosition = orgMetadata.currencyPosition || "prefix";
       updated.currencyHasSpace = orgMetadata.currencyHasSpace || false;
+      updated.thousandSeparator = orgMetadata.thousandSeparator || ",";
+      updated.decimalSeparator = orgMetadata.decimalSeparator || ".";
+      updated.grouping = (orgMetadata.grouping as any) || "standard";
+      updated.decimalPlaces = orgMetadata.decimalPlaces ?? 2;
       if (orgMetadata.ownerId === userId) {
         updated.isOwner = true;
       }
@@ -190,7 +202,11 @@ export async function updateOrganization(orgId: string, updates: {
   name: string, 
   currencySymbol?: string, 
   currencyPosition?: "prefix" | "suffix",
-  currencyHasSpace?: boolean
+  currencyHasSpace?: boolean,
+  thousandSeparator?: string,
+  decimalSeparator?: string,
+  grouping?: "standard" | "indian" | "none",
+  decimalPlaces?: number
 }) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   
@@ -212,6 +228,26 @@ export async function updateOrganization(orgId: string, updates: {
     updateExp += ", #space = :space";
     attrNames["#space"] = "currencyHasSpace";
     attrValues[":space"] = updates.currencyHasSpace;
+  }
+  if (updates.thousandSeparator !== undefined) {
+    updateExp += ", #tSep = :tSep";
+    attrNames["#tSep"] = "thousandSeparator";
+    attrValues[":tSep"] = updates.thousandSeparator;
+  }
+  if (updates.decimalSeparator !== undefined) {
+    updateExp += ", #dSep = :dSep";
+    attrNames["#dSep"] = "decimalSeparator";
+    attrValues[":dSep"] = updates.decimalSeparator;
+  }
+  if (updates.grouping !== undefined) {
+    updateExp += ", #group = :group";
+    attrNames["#group"] = "grouping";
+    attrValues[":group"] = updates.grouping;
+  }
+  if (updates.decimalPlaces !== undefined) {
+    updateExp += ", #dPlaces = :dPlaces";
+    attrNames["#dPlaces"] = "decimalPlaces";
+    attrValues[":dPlaces"] = updates.decimalPlaces;
   }
 
   // 1. Update Metadata

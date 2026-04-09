@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Loader2, Building2, Plus, ArrowRight } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { CURRENCY_PRESETS, COMMON_SYMBOLS } from "@/lib/constants/currencies";
 
 import { Suspense } from "react";
 
@@ -88,6 +89,10 @@ function OnboardingContent() {
       currencySymbol: "৳",
       currencyPosition: "prefix",
       currencyHasSpace: false,
+      thousandSeparator: ",",
+      decimalSeparator: ".",
+      grouping: "standard",
+      decimalPlaces: 2,
     },
   });
 
@@ -121,10 +126,26 @@ function OnboardingContent() {
     mutation.mutate(values);
   };
   
-  const quickSymbols = ["৳", "$", "€", "£", "¥", "₹"];
+  const applyPreset = (symbol: string) => {
+    setValue("currencySymbol", symbol, { shouldDirty: true });
+    const preset = CURRENCY_PRESETS[symbol];
+    if (preset) {
+      setValue("currencyPosition", preset.position, { shouldDirty: true });
+      setValue("currencyHasSpace", preset.hasSpace, { shouldDirty: true });
+      setValue("thousandSeparator", preset.thousandSeparator, { shouldDirty: true });
+      setValue("decimalSeparator", preset.decimalSeparator, { shouldDirty: true });
+      setValue("grouping", preset.grouping, { shouldDirty: true });
+      setValue("decimalPlaces", preset.decimalPlaces, { shouldDirty: true });
+    }
+  };
+
   const selectedSymbol = watch("currencySymbol");
   const selectedPosition = watch("currencyPosition") || "prefix";
   const selectedHasSpace = watch("currencyHasSpace");
+  const selectedThousandSep = watch("thousandSeparator") || ",";
+  const selectedDecimalSep = watch("decimalSeparator") || ".";
+  const selectedGrouping = watch("grouping") || "standard";
+  const selectedDecimalPlaces = watch("decimalPlaces") ?? 2;
 
   const handleSelectOrg = (orgId: string) => {
     if (!orgId) return;
@@ -182,13 +203,13 @@ function OnboardingContent() {
                         className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
                       />
                       <div className="flex gap-1 items-center">
-                        {quickSymbols.slice(0, 4).map((s) => (
+                        {COMMON_SYMBOLS.slice(0, 5).map((s) => (
                           <Button
                             key={s}
                             type="button"
                             variant={selectedSymbol === s ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setValue("currencySymbol", s, { shouldDirty: true })}
+                            onClick={() => applyPreset(s)}
                             className={cn(
                               "w-8 h-8 p-0 text-[10px] transition-all shrink-0",
                               selectedSymbol === s 
@@ -249,14 +270,14 @@ function OnboardingContent() {
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Entry</span>
                           <span className="text-sm font-bold text-foreground tabular-nums leading-none">
-                            {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                            {formatCurrency(1234567.89, selectedSymbol, selectedPosition, selectedHasSpace, selectedThousandSep, selectedDecimalSep, selectedGrouping, selectedDecimalPlaces)}
                           </span>
                         </div>
                         <div className="w-px h-4 bg-border hidden lg:block" />
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Expense</span>
                           <span className="text-sm font-bold text-red-500 tabular-nums leading-none">
-                            {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
+                            {formatCurrency(-1234567.89, selectedSymbol, selectedPosition, selectedHasSpace, selectedThousandSep, selectedDecimalSep, selectedGrouping, selectedDecimalPlaces)}
                           </span>
                         </div>
                      </div>

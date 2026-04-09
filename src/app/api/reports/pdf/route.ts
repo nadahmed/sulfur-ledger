@@ -43,7 +43,11 @@ export async function GET(req: NextRequest) {
         amount / 100, 
         symbol, 
         org?.currencyPosition, 
-        org?.currencyHasSpace
+        org?.currencyHasSpace,
+        org?.thousandSeparator,
+        org?.decimalSeparator,
+        org?.grouping as any,
+        org?.decimalPlaces
       );
     };
 

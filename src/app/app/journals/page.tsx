@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { JournalEntryFormValues } from "@/lib/schemas";
@@ -257,19 +258,19 @@ export default function JournalsPage() {
   }
 
   return (
-    <div className="w-full max-w-screen-2xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Journals</h1>
+    <div className="w-full max-w-screen-2xl p-4 md:p-6 min-h-screen">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">Journals</h1>
       </div>
 
       {canCreate && (
-        <Card className="mb-8 font-sans border-border shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
+        <Card className="mb-4 font-sans border-border shadow-sm">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-lg flex items-center gap-2">
               Record Transaction
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0">
             <JournalForm
               key="create-form"
               accounts={accounts}
@@ -283,9 +284,9 @@ export default function JournalsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 sm:pb-7">
-          <CardTitle>Recent Journals</CardTitle>
+      <Card className="shadow-sm border-border">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 px-4 pt-4">
+          <CardTitle className="text-lg">Recent Journals</CardTitle>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <div className="relative flex-1 min-w-0 sm:min-w-[300px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -362,25 +363,30 @@ export default function JournalsPage() {
                       const datePart = jnl.date.slice(0, 10);
                       const dateObj = new Date(`${datePart}T00:00:00`);
                       const displayDate = dateObj.toLocaleDateString(undefined, {
-                        year: 'numeric',
                         month: 'short',
                         day: 'numeric'
                       });
 
                       return (
-                        <TableRow key={jnl.id}>
-                          <TableCell className="font-medium" suppressHydrationWarning>
+                        <TableRow key={jnl.id} className="group">
+                          <TableCell className="font-medium text-xs py-2 px-4" suppressHydrationWarning>
                             {displayDate}
                           </TableCell>
-                          <TableCell className="max-w-[200px] break-words whitespace-normal">{jnl.description}</TableCell>
-                          <TableCell>
-                            {activeOrg?.currencyPosition === "suffix" 
-                              ? `${amountDisp}${activeOrg?.currencySymbol || "৳"}` 
-                              : `${activeOrg?.currencySymbol || "৳"}${amountDisp}`
-                            }
+                          <TableCell className="text-xs py-2 px-4 italic text-muted-foreground">{jnl.description}</TableCell>
+                          <TableCell className="text-xs py-2 px-4 font-bold">
+                            {formatCurrency(
+                              debitLine ? debitLine.amount / 100 : 0,
+                              activeOrg?.currencySymbol,
+                              activeOrg?.currencyPosition,
+                              activeOrg?.currencyHasSpace,
+                              activeOrg?.thousandSeparator,
+                              activeOrg?.decimalSeparator,
+                              activeOrg?.grouping as any,
+                              activeOrg?.decimalPlaces
+                            )}
                           </TableCell>
-                          <TableCell>{fromAcc}</TableCell>
-                          <TableCell>{toAcc}</TableCell>
+                          <TableCell className="text-xs py-2 px-4">{fromAcc}</TableCell>
+                          <TableCell className="text-xs py-2 px-4">{toAcc}</TableCell>
                           <TableCell className="max-w-[180px]">
                             <div className="flex flex-wrap gap-1">
                               {jnl.tags && jnl.tags.length > 0 ? (

@@ -31,7 +31,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, currencySymbol, currencyPosition, currencyHasSpace } = await req.json();
+    const { 
+      name, 
+      currencySymbol, 
+      currencyPosition, 
+      currencyHasSpace,
+      thousandSeparator,
+      decimalSeparator,
+      grouping,
+      decimalPlaces
+    } = await req.json();
     if (!name) {
       return NextResponse.json({ error: "Organization name is required" }, { status: 400 });
     }
@@ -41,9 +50,13 @@ export async function POST(req: NextRequest) {
       id: orgId,
       name,
       ownerId: session.user.sub,
-      currencySymbol: currencySymbol || "৳", // Default to Taka
+      currencySymbol: currencySymbol || "৳", 
       currencyPosition: currencyPosition || "prefix",
       currencyHasSpace: currencyHasSpace || false,
+      thousandSeparator: thousandSeparator || ",",
+      decimalSeparator: decimalSeparator || ".",
+      grouping: grouping || "standard",
+      decimalPlaces: decimalPlaces ?? 2,
       createdAt: new Date().toISOString(),
     });
 
@@ -70,12 +83,31 @@ export async function PATCH(req: NextRequest) {
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    const { id, name, currencySymbol, currencyPosition, currencyHasSpace } = await req.json();
+    const { 
+      id, 
+      name, 
+      currencySymbol, 
+      currencyPosition, 
+      currencyHasSpace,
+      thousandSeparator,
+      decimalSeparator,
+      grouping,
+      decimalPlaces
+    } = await req.json();
     if (!id || !name) {
       return NextResponse.json({ error: "ID and Name are required" }, { status: 400 });
     }
 
-    await updateOrganization(id, { name, currencySymbol, currencyPosition, currencyHasSpace });
+    await updateOrganization(id, { 
+      name, 
+      currencySymbol, 
+      currencyPosition, 
+      currencyHasSpace,
+      thousandSeparator,
+      decimalSeparator,
+      grouping,
+      decimalPlaces
+    });
     return NextResponse.json({ message: "Organization updated" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

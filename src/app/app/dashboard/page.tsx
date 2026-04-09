@@ -139,18 +139,22 @@ export default function DashboardPage() {
       amount / 100,
       activeOrg?.currencySymbol,
       activeOrg?.currencyPosition,
-      activeOrg?.currencyHasSpace
+      activeOrg?.currencyHasSpace,
+      activeOrg?.thousandSeparator,
+      activeOrg?.decimalSeparator,
+      activeOrg?.grouping as any,
+      activeOrg?.decimalPlaces
     );
   };
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
-  if (!activeOrganizationId) return <div className="p-8 text-center mt-20">Please select an organization from the sidebar.</div>;
+  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (!activeOrganizationId) return <div className="p-6 text-center mt-20">Please select an organization from the sidebar.</div>;
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6 min-h-screen bg-transparent">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex-1 space-y-4 p-4 md:p-6 min-h-screen bg-transparent">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             Dashboard
             <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
           </h2>
@@ -218,7 +222,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
           {
             title: "Total Assets",
@@ -297,7 +301,7 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px] w-full mt-4">
+          <div className="h-[320px] w-full mt-4">
             {isMounted && trendData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData}>
@@ -376,7 +380,7 @@ export default function DashboardPage() {
             <CardDescription>Breakdown of current asset categories</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
+            <div className="h-[260px] w-full">
               {isMounted && summary && summary.assetDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -432,7 +436,7 @@ export default function DashboardPage() {
             <CardDescription>Top spending categories for the period</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
+            <div className="h-[260px] w-full">
               {isMounted && summary && summary.expenseDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -488,7 +492,7 @@ export default function DashboardPage() {
             <CardDescription>Net performance comparison</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
+            <div className="h-[260px] w-full">
               {isMounted && summary ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={summary.incomeStats} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>

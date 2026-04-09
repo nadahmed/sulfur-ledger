@@ -27,6 +27,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn, formatCurrency, slugify } from "@/lib/utils";
+import { 
+  CURRENCY_PRESETS, 
+  COMMON_SYMBOLS, 
+  CurrencyGrouping, 
+  ThousandSeparator, 
+  DecimalSeparator, 
+  CurrencyPosition 
+} from "@/lib/constants/currencies";
 import {
   OrganizationSchema,
   OrganizationFormValues,
@@ -229,7 +237,11 @@ function SettingsInner() {
           name: values.name,
           currencySymbol: values.currencySymbol,
           currencyPosition: values.currencyPosition,
-          currencyHasSpace: values.currencyHasSpace
+          currencyHasSpace: values.currencyHasSpace,
+          thousandSeparator: values.thousandSeparator,
+          decimalSeparator: values.decimalSeparator,
+          grouping: values.grouping,
+          decimalPlaces: values.decimalPlaces
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Update failed");
@@ -369,7 +381,11 @@ function SettingsInner() {
       name: activeOrg?.name || "",
       currencySymbol: activeOrg?.currencySymbol || "৳",
       currencyPosition: activeOrg?.currencyPosition || "prefix",
-      currencyHasSpace: activeOrg?.currencyHasSpace || false
+      currencyHasSpace: activeOrg?.currencyHasSpace || false,
+      thousandSeparator: (activeOrg?.thousandSeparator as any) || ",",
+      decimalSeparator: (activeOrg?.decimalSeparator as any) || ".",
+      grouping: (activeOrg?.grouping as any) || "standard",
+      decimalPlaces: activeOrg?.decimalPlaces ?? 2,
     },
   });
 
@@ -379,13 +395,34 @@ function SettingsInner() {
       setOrgValue("currencySymbol", activeOrg.currencySymbol || "৳");
       setOrgValue("currencyPosition", activeOrg.currencyPosition || "prefix");
       setOrgValue("currencyHasSpace", activeOrg.currencyHasSpace || false);
+      setOrgValue("thousandSeparator", (activeOrg.thousandSeparator as any) || ",");
+      setOrgValue("decimalSeparator", (activeOrg.decimalSeparator as any) || ".");
+      setOrgValue("grouping", (activeOrg.grouping as any) || "standard");
+      setOrgValue("decimalPlaces", activeOrg.decimalPlaces ?? 2);
     }
   }, [activeOrg, setOrgValue]);
 
-  const quickSymbols = ["৳", "$", "€", "£", "¥", "₹"];
+  const applyPreset = (symbol: string) => {
+    setOrgValue("currencySymbol", symbol, { shouldDirty: true });
+    const preset = (CURRENCY_PRESETS as any)[symbol];
+    if (preset) {
+      setOrgValue("currencyPosition", preset.position, { shouldDirty: true });
+      setOrgValue("currencyHasSpace", preset.hasSpace, { shouldDirty: true });
+      setOrgValue("thousandSeparator", preset.thousandSeparator as any, { shouldDirty: true });
+      setOrgValue("decimalSeparator", preset.decimalSeparator as any, { shouldDirty: true });
+      setOrgValue("grouping", preset.grouping as any, { shouldDirty: true });
+      setOrgValue("decimalPlaces", preset.decimalPlaces, { shouldDirty: true });
+      toast.info(`Applied formatting preset for ${symbol}`);
+    }
+  };
+
   const selectedSymbol = watchOrg("currencySymbol");
   const selectedPosition = watchOrg("currencyPosition") || "prefix";
   const selectedHasSpace = watchOrg("currencyHasSpace");
+  const selectedThousandSep = watchOrg("thousandSeparator") as ThousandSeparator || ",";
+  const selectedDecimalSep = watchOrg("decimalSeparator") as DecimalSeparator || ".";
+  const selectedGrouping = watchOrg("grouping") as CurrencyGrouping || "standard";
+  const selectedDecimalPlaces = watchOrg("decimalPlaces") ?? 2;
 
   const {
     register: registerInvite,
@@ -424,6 +461,7 @@ function SettingsInner() {
   const [isExportingJson, setIsExportingJson] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [isImportingJson, setIsImportingJson] = useState(false);
+  const [showAdvancedFormatting, setShowAdvancedFormatting] = useState(false);
 
   const watchProvider = watchEmail("provider");
 
@@ -442,12 +480,12 @@ function SettingsInner() {
   }
 
   return (
-    <main className="max-w-screen-2xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
+    <main className="max-w-screen-2xl p-4 md:p-6 min-h-screen">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">Settings</h1>
       </div>
 
-      <div className="mt-8 mb-8 flex flex-wrap items-center gap-2">
+      <div className="mt-4 mb-4 flex flex-wrap items-center gap-1.5 p-1 bg-muted/30 rounded-lg w-fit border border-border/40">
         {[
           { id: "general", label: "General" },
           { id: "members", label: "Members" },
@@ -457,9 +495,15 @@ function SettingsInner() {
         ].map((tab) => (
           <Button
             key={tab.id}
-            variant={activeTab === tab.id ? "default" : "outline"}
-            className="rounded-full shadow-none"
+            variant={activeTab === tab.id ? "secondary" : "ghost"}
+            size="sm"
             onClick={() => handleTabChange(tab.id)}
+            className={cn(
+              "text-xs px-4 h-8 transition-all rounded-md font-medium",
+              activeTab === tab.id 
+                ? "bg-card text-foreground shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
             {tab.label}
           </Button>
@@ -469,131 +513,222 @@ function SettingsInner() {
       <div className="mt-6">
         {activeTab === "general" && (
           <div className="space-y-6">
-            <Card className="shadow-lg border-border overflow-hidden">
-              <form onSubmit={handleSubmitOrg((v) => updateOrgMutation.mutate(v))}>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-xl">Organization Details</CardTitle>
-                  <CardDescription className="text-xs">Manage your organization's identity and accounting format.</CardDescription>
+            <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+              <form onSubmit={handleSubmitOrg((v: any) => updateOrgMutation.mutate(v))}>
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <CardTitle className="text-lg">Organization Details</CardTitle>
+                  <CardDescription className="text-xs">Manage identity and accounting format.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="org-name" className="text-sm font-semibold">Organization Name</Label>
+                <CardContent className="space-y-4 px-5 pb-5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="org-name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Organization Name</Label>
                     <Input
                       id="org-name"
                       {...registerOrg("name")}
                       disabled={!canManage}
-                      className="max-w-md h-10"
+                      className="max-w-md h-9 text-sm"
                     />
                   </div>
 
-                  <div className="pt-6 border-t border-border">
-                    <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-end gap-x-8 gap-y-6 p-4 bg-muted/30 rounded-2xl border border-border shadow-sm">
-                      <div className="space-y-2 flex-grow lg:flex-grow-0">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Currency Symbol</Label>
+                  <div className="pt-4 border-t border-border/30 space-y-4">
+                    <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center gap-4 p-3 bg-muted/20 rounded-xl border border-border/40 shadow-sm transition-all duration-300">
+                      <div className="space-y-1.5 min-w-[120px]">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Symbol</Label>
                         <div className="flex items-center gap-2 h-9">
                           <Input
                             id="currency-symbol"
                             placeholder="$"
                             {...registerOrg("currencySymbol")}
-                            className="h-full w-20 text-base font-bold text-center bg-card shadow-sm"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setOrgValue("currencySymbol", val, { shouldDirty: true });
+                              if (CURRENCY_PRESETS[val]) {
+                                applyPreset(val);
+                               }
+                            }}
+                            className="h-full w-20 text-sm font-bold bg-card shadow-sm border-primary/20 focus-visible:ring-primary/30"
                             disabled={!canManage}
                           />
-                          <div className="flex gap-1 items-center">
-                            {quickSymbols.slice(0, 4).map((s) => (
-                              <button
-                                key={s}
-                                type="button"
-                                disabled={!canManage}
-                                onClick={() => setOrgValue("currencySymbol", s, { shouldDirty: true })}
-                                className={cn(
-                                  "w-7 h-7 flex items-center justify-center rounded-md text-xs border transition-all shrink-0",
-                                  selectedSymbol === s
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-card border-border text-muted-foreground hover:border-accent hover:bg-accent"
-                                )}
-                              >
-                                {s}
-                              </button>
-                            ))}
-                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-2 w-full lg:w-40">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Symbol Position</Label>
-                        <div className="h-9">
-                          <Controller
-                            name="currencyPosition"
-                            control={controlOrg}
-                            render={({ field }) => (
-                              <Select
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                disabled={!canManage}
-                              >
-                                <SelectTrigger className="w-full h-full text-[13px] bg-card shadow-sm ring-offset-background">
-                                  <SelectValue placeholder="Position">
-                                    {field.value === "prefix" ? "Before Amount" : field.value === "suffix" ? "After Amount" : undefined}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="prefix">Before Amount</SelectItem>
-                                  <SelectItem value="suffix">After Amount</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
+                      <div className="space-y-1.5 flex-1 min-w-[200px]">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Presets</Label>
+                        <div className="flex flex-wrap gap-1.5 items-center h-auto lg:h-9">
+                          {COMMON_SYMBOLS.map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              disabled={!canManage}
+                              onClick={() => applyPreset(s)}
+                              className={cn(
+                                "w-8 h-8 flex items-center justify-center rounded-lg text-xs border transition-all shrink-0",
+                                selectedSymbol === s
+                                  ? "bg-primary border-primary text-white shadow-md scale-105"
+                                  : "bg-card border-border/60 text-muted-foreground hover:border-primary/40 hover:bg-primary/5"
+                              )}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="lg:border-l border-border/30 lg:pl-6 space-y-1.5 min-w-[140px]">
+                        <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-80 leading-none">Preview</Label>
+                        <div className="h-9 flex items-center">
+                          <span className="text-xl font-black text-foreground tabular-nums tracking-tight">
+                            {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace, selectedThousandSep, selectedDecimalSep, selectedGrouping, selectedDecimalPlaces)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="lg:border-l border-border/30 lg:pl-6 flex flex-col items-center justify-center space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold leading-none">Customize</Label>
+                        <div className="h-9 flex items-center">
+                          <Switch
+                            checked={showAdvancedFormatting}
+                            onCheckedChange={setShowAdvancedFormatting}
+                            className="scale-90 data-[state=checked]:bg-primary"
                           />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 shrink-0">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Use Spacing</Label>
-                        <div className="flex items-center justify-center bg-card px-3 h-9 rounded-md border border-border shadow-sm w-fit">
-                          <Controller
-                            name="currencyHasSpace"
-                            control={controlOrg}
-                            render={({ field }) => (
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                className="scale-75"
-                                disabled={!canManage}
-                              />
-                            )}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex-1 space-y-2 lg:border-l border-border lg:pl-8 lg:ml-2 min-w-[200px]">
-                        <Label className="text-[10px] uppercase tracking-widest text-primary font-black opacity-60 leading-none">Live Preview</Label>
-                        <div className="flex gap-6 items-center h-9 justify-around lg:justify-start">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Positive</span>
-                            <span className="text-sm font-bold text-foreground tabular-nums leading-none">
-                              {formatCurrency(1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
-                            </span>
-                          </div>
-                          <div className="w-px h-4 bg-border hidden lg:block" />
-                          <div className="flex items-center gap-2">
-                            <span className="text-[8px] uppercase text-muted-foreground font-bold hidden sm:inline">Negative</span>
-                            <span className="text-sm font-bold text-destructive tabular-nums leading-none">
-                              {formatCurrency(-1234.56, selectedSymbol, selectedPosition, selectedHasSpace)}
-                            </span>
-                          </div>
                         </div>
                       </div>
                     </div>
+
+                    {showAdvancedFormatting && (
+                      <div className="p-4 bg-card/30 rounded-xl border border-border/40 shadow-inner space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Symbol Position</Label>
+                            <div className="h-8">
+                              <Controller
+                                name="currencyPosition"
+                                control={controlOrg}
+                                render={({ field }) => (
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    disabled={!canManage}
+                                  >
+                                    <SelectTrigger className="w-full h-full text-xs bg-card shadow-sm border-border/60">
+                                      <SelectValue placeholder="Position" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="prefix" className="text-xs">Before Amount</SelectItem>
+                                      <SelectItem value="suffix" className="text-xs">After Amount</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 shrink-0">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Use Spacing</Label>
+                            <div className="flex items-center justify-center bg-card px-3 h-8 rounded-lg border border-border/60 shadow-sm w-fit">
+                              <Controller
+                                name="currencyHasSpace"
+                                control={controlOrg}
+                                render={({ field }) => (
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    className="scale-75"
+                                    disabled={!canManage}
+                                  />
+                                )}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-border/30 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Thousand Sep</Label>
+                            <Controller
+                              name="thousandSeparator"
+                              control={controlOrg}
+                              render={({ field }) => (
+                                <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                                  <SelectTrigger className="h-8 text-xs bg-card border-border/60">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="," className="text-xs">Comma ( , )</SelectItem>
+                                    <SelectItem value="." className="text-xs">Dot ( . )</SelectItem>
+                                    <SelectItem value=" " className="text-xs">Space ( )</SelectItem>
+                                    <SelectItem value="'" className="text-xs">Single Quote ( ' )</SelectItem>
+                                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Decimal Sep</Label>
+                            <Controller
+                              name="decimalSeparator"
+                              control={controlOrg}
+                              render={({ field }) => (
+                                <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                                  <SelectTrigger className="h-8 text-xs bg-card border-border/60">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="." className="text-xs">Dot ( . )</SelectItem>
+                                    <SelectItem value="," className="text-xs">Comma ( , )</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Grouping</Label>
+                            <Controller
+                              name="grouping"
+                              control={controlOrg}
+                              render={({ field }) => (
+                                <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                                  <SelectTrigger className="h-8 text-xs bg-card border-border/60">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="standard" className="text-xs">Standard (3-3)</SelectItem>
+                                    <SelectItem value="indian" className="text-xs">Indian (3-2)</SelectItem>
+                                    <SelectItem value="none" className="text-xs">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-black leading-none">Decimal Places</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={4}
+                              {...registerOrg("decimalPlaces", { valueAsNumber: true })}
+                              disabled={!canManage}
+                              className="h-8 text-xs bg-card font-bold border-border/60"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                     <div className="mt-4 p-3 bg-muted/30 border border-border rounded-xl text-[10px] text-muted-foreground flex items-start gap-2 max-w-2xl">
                       <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
                       <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
                     </div>
-                  </div>
                 </CardContent>
                 {canManage && (
-                  <CardFooter className="bg-muted/20 border-t border-border py-3">
-                    <Button type="submit" size="sm" className="h-9 px-6 bg-primary hover:bg-primary/90 shadow-md transition-all active:scale-95" disabled={updateOrgMutation.isPending || !isOrgDirty}>
-                      {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 font-semibold"><Save className="w-3.5 h-3.5" /> Save Changes</span>}
+                  <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5">
+                    <Button type="submit" size="sm" className="h-8 px-5 bg-primary hover:bg-primary/90 shadow-sm transition-all" disabled={updateOrgMutation.isPending || !isOrgDirty}>
+                      {updateOrgMutation.isPending ? "Saving..." : <span className="flex items-center gap-2 text-xs font-semibold"><Save className="w-3 h-3" /> Save Changes</span>}
                     </Button>
                   </CardFooter>
                 )}

@@ -12,6 +12,10 @@ interface Organization {
   currencySymbol?: string;
   currencyPosition?: "prefix" | "suffix";
   currencyHasSpace?: boolean;
+  thousandSeparator?: string;
+  decimalSeparator?: string;
+  grouping?: "standard" | "indian" | "none";
+  decimalPlaces?: number;
 }
 
 interface OrganizationContextType {
@@ -47,7 +51,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           isOwner: o.isOwner,
           currencySymbol: o.currencySymbol || "৳",
           currencyPosition: o.currencyPosition || "prefix",
-          currencyHasSpace: o.currencyHasSpace || false
+          currencyHasSpace: o.currencyHasSpace || false,
+          thousandSeparator: o.thousandSeparator || ",",
+          decimalSeparator: o.decimalSeparator || ".",
+          grouping: o.grouping || "standard",
+          decimalPlaces: o.decimalPlaces ?? 2
         })));
 
         // Derive owner status from local user info if needed

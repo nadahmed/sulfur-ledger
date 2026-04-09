@@ -133,7 +133,11 @@ function ReportsInner() {
       amount / 100, 
       activeOrg?.currencySymbol, 
       activeOrg?.currencyPosition, 
-      activeOrg?.currencyHasSpace
+      activeOrg?.currencyHasSpace,
+      activeOrg?.thousandSeparator,
+      activeOrg?.decimalSeparator,
+      activeOrg?.grouping as any,
+      activeOrg?.decimalPlaces
     );
   };
 
@@ -167,37 +171,37 @@ function ReportsInner() {
   }
 
   return (
-    <div className="max-w-screen-2xl p-4 md:p-8 space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Financial Reports</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 sm:gap-2 w-full sm:w-auto">
-          <div className="grid gap-1 w-full sm:w-auto">
-            <Label htmlFor="start" className="text-xs font-semibold text-muted-foreground">From</Label>
+    <div className="max-w-screen-2xl p-4 md:p-6 space-y-4 min-h-screen">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">Financial Reports</h1>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 w-full sm:w-auto">
+          <div className="grid gap-0.5 w-full sm:w-auto">
+            <Label htmlFor="start" className="text-[10px] uppercase font-bold text-muted-foreground/70">From</Label>
             <DatePicker 
               date={startDate ? parseISO(startDate) : undefined} 
               setDate={(d: Date | undefined) => setStartDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
-              className="h-9 w-full sm:w-40" 
+              className="h-8 w-full sm:w-36 text-xs" 
               placeholder="From Date" 
             />
           </div>
-          <div className="grid gap-1 w-full sm:w-auto">
-            <Label htmlFor="end" className="text-xs font-semibold text-muted-foreground">To</Label>
+          <div className="grid gap-0.5 w-full sm:w-auto">
+            <Label htmlFor="end" className="text-[10px] uppercase font-bold text-muted-foreground/70">To</Label>
             <DatePicker 
               date={endDate ? parseISO(endDate) : undefined} 
               setDate={(d: Date | undefined) => setEndDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
-              className="h-9 w-full sm:w-40" 
+              className="h-8 w-full sm:w-36 text-xs" 
               placeholder="To Date" 
             />
           </div>
-          <div className="grid gap-1 w-full sm:w-[200px]">
-            <Label htmlFor="tags-filter" className="text-xs">Filter by Tags</Label>
+          <div className="grid gap-0.5 w-full sm:w-[180px]">
+            <Label htmlFor="tags-filter" className="text-[10px] uppercase font-bold text-muted-foreground/70">Tags</Label>
             <TagSelector 
               value={selectedTagIds}
               onChange={setSelectedTagIds}
             />
           </div>
-          <Button variant="ghost" className="sm:mb-[2px] h-9 w-full sm:w-auto" onClick={() => { setStartDate(""); setEndDate(""); setSelectedTagIds([]); }}>
-             <RotateCcw className="mr-2 h-4 w-4" /> Reset
+          <Button variant="ghost" size="sm" className="h-8 w-full sm:w-auto text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSelectedTagIds([]); }}>
+             <RotateCcw className="mr-1 h-3 w-3" /> Reset
           </Button>
         </div>
       </div>
@@ -211,7 +215,7 @@ function ReportsInner() {
           <Button
             key={type.id}
             variant={reportType === type.id ? "default" : "outline"}
-            className="rounded-full shadow-none"
+            className="rounded-full shadow-none h-8 text-xs px-4"
             onClick={() => handleTabChange(type.id)}
           >
             {type.label}
@@ -221,10 +225,10 @@ function ReportsInner() {
 
       <div className="mt-4">
         <Card>
-            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <CardTitle className="capitalize">{reportType.replace("-", " ")}</CardTitle>
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handlePdfDownload}>
-                <Download className="h-4 w-4 mr-2" /> Print PDF
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-4 pb-2">
+              <CardTitle className="capitalize text-lg">{reportType.replace("-", " ")}</CardTitle>
+              <Button variant="outline" size="sm" className="h-8 text-xs w-full sm:w-auto" onClick={handlePdfDownload}>
+                <Download className="h-3 w-3 mr-2" /> Print PDF
               </Button>
             </CardHeader>
             <CardContent>
@@ -241,20 +245,20 @@ function ReportsInner() {
                   {reportType === "trial-balance" && data && (
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Account Name</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead className="text-right">Debit</TableHead>
-                          <TableHead className="text-right">Credit</TableHead>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="h-8 text-xs">Account Name</TableHead>
+                          <TableHead className="h-8 text-xs">Category</TableHead>
+                          <TableHead className="h-8 text-xs text-right">Debit</TableHead>
+                          <TableHead className="h-8 text-xs text-right">Credit</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {data.accounts?.map((acc) => (
-                          <TableRow key={acc.id}>
-                            <TableCell>{acc.name}</TableCell>
-                            <TableCell className="capitalize text-xs text-muted-foreground">{acc.category}</TableCell>
-                            <TableCell className="text-right">{acc.balance > 0 ? formatCurrencyValue(acc.balance) : "-"}</TableCell>
-                            <TableCell className="text-right">{acc.balance < 0 ? formatCurrencyValue(Math.abs(acc.balance)) : "-"}</TableCell>
+                          <TableRow key={acc.id} className="hover:bg-muted/10">
+                            <TableCell className="py-1.5 text-xs">{acc.name}</TableCell>
+                            <TableCell className="py-1.5 capitalize text-[10px] text-muted-foreground">{acc.category}</TableCell>
+                            <TableCell className="py-1.5 text-right text-xs">{acc.balance > 0 ? formatCurrencyValue(acc.balance) : "-"}</TableCell>
+                            <TableCell className="py-1.5 text-right text-xs">{acc.balance < 0 ? formatCurrencyValue(Math.abs(acc.balance)) : "-"}</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">

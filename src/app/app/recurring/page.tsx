@@ -20,6 +20,7 @@ import { SearchableSelect } from "@/components/accounts/SearchableSelect";
 import { TagSelector } from "@/components/journals/TagSelector";
 import { RecurringEntrySchema, RecurringEntryFormValues, RecurringEntryFormInput } from "@/lib/schemas";
 import { format, parseISO } from "date-fns";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -156,13 +157,16 @@ export default function RecurringPage() {
   const getAccountName = (id: string) => accounts.find((a: any) => a.id === id)?.name || id;
 
   const formatAmount = (amountPaisa: number) => {
-    const amountDisp = (amountPaisa / 100).toFixed(2);
-    const symbol = activeOrg?.currencySymbol || "$";
-    const space = activeOrg?.currencyHasSpace ? " " : "";
-    
-    return activeOrg?.currencyPosition === "suffix" 
-      ? `${amountDisp}${space}${symbol}` 
-      : `${symbol}${space}${amountDisp}`;
+    return formatCurrency(
+      amountPaisa / 100,
+      activeOrg?.currencySymbol,
+      activeOrg?.currencyPosition,
+      activeOrg?.currencyHasSpace,
+      activeOrg?.thousandSeparator,
+      activeOrg?.decimalSeparator,
+      activeOrg?.grouping as any,
+      activeOrg?.decimalPlaces
+    );
   };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading recurring entries...</div>;
@@ -190,7 +194,7 @@ export default function RecurringPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="grid w-full md:w-[150px] items-center gap-1.5">
-                  <Label htmlFor="amount">Amount ({activeOrg?.currencySymbol || "$"})</Label>
+                  <Label htmlFor="amount" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Amount ({activeOrg?.currencySymbol || "$"})</Label>
                   <Input 
                     id="amount" 
                     {...form.register("amount")} 
