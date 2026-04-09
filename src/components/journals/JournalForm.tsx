@@ -90,7 +90,7 @@ export function JournalForm({
 
     try {
       setIsUploading(true);
-      
+
       // 1. Get presigned URL
       const res = await fetch(`/api/receipts/presigned-url?orgId=${activeOrganizationId}&fileName=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}`);
       if (!res.ok) throw new Error("Failed to get upload URL");
@@ -103,13 +103,18 @@ export function JournalForm({
           body: file,
           headers: { "Content-Type": file.type }
         });
-        if (!uploadRes.ok) throw new Error("Upload failed to S3");
+
+        if (!uploadRes.ok) {
+          const errorText = await uploadRes.text();
+          console.error("Upload failed:", errorText);
+          throw new Error(`Upload failed to S3: ${uploadRes.statusText}`);
+        }
       } else {
         // Cloudinary signed upload
         const formData = new FormData();
         Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string));
         formData.append("file", file);
-        
+
         const uploadRes = await fetch(url, {
           method: "POST",
           body: formData,

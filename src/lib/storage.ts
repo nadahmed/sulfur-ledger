@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v2 as cloudinary } from "cloudinary";
-import { Organization, StorageSettings } from "./db/organizations";
+import { Organization } from "./db/organizations";
 
 export interface StorageConfig {
   provider: "s3" | "cloudinary";
@@ -25,7 +25,7 @@ export function getEffectiveStorageConfig(org: Organization): StorageConfig {
 
   if (!settings || settings.provider === "system") {
     const systemProvider = (process.env.SYSTEM_STORAGE_PROVIDER || "s3") as "s3" | "cloudinary";
-    
+
     if (systemProvider === "s3") {
       return {
         provider: "s3",
@@ -103,10 +103,10 @@ export async function getPresignedUploadUrl(config: StorageConfig, key: string, 
 
     const timestamp = Math.round(new Date().getTime() / 1000);
     const folder = config.folder || "receipts";
-    
+
     // Cloudinary uses public_id for naming. We strip extension if it's there as Cloudinary adds it.
     const publicId = key.replace(/\.[^/.]+$/, "");
-    
+
     const signature = cloudinary.utils.api_sign_request(
       { timestamp, folder, public_id: publicId },
       config.cloudinary.apiSecret
