@@ -1722,7 +1722,7 @@ function SettingsInner() {
 
               <Card className="shadow-lg border-border">
                 <CardHeader>
-                  <div className="flex items-center gap-2 text-purple-600 mb-1">
+                  <div className="flex items-center gap-2 text-primary mb-1">
                     <FileJson className="w-5 h-5" />
                     <span className="text-xs font-bold uppercase tracking-wider">System Backups & Migration</span>
                   </div>
@@ -1733,7 +1733,7 @@ function SettingsInner() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4 p-4 bg-muted border border-border rounded-xl">
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
                         <h4 className="font-semibold text-sm flex items-center gap-2 text-foreground">
                           <RotateCcw className="w-4 h-4 text-primary" />
@@ -1795,18 +1795,18 @@ function SettingsInner() {
                           });
                         }}
                       >
-                        {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <Upload className="w-4 h-4 mr-2" />}
+                        {isImportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary" /> : <Upload className="w-4 h-4 mr-2" />}
                         {isImportingJson ? "Restoring..." : "Restore from JSON File"}
                       </Button>
                     </div>
 
-                    <div className="space-y-4 p-4 bg-purple-50/30 rounded-xl border border-purple-100">
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
-                        <h4 className="font-semibold text-sm flex items-center gap-2 text-purple-900">
-                          <Download className="w-4 h-4 text-purple-400" />
+                        <h4 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+                          <Download className="w-4 h-4 text-primary" />
                           Generate JSON Backup
                         </h4>
-                        <p className="text-xs text-purple-700 mt-1">Export a complete, structured snapshot of your ledger.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Export a complete, structured snapshot of your ledger.</p>
                       </div>
                       <Button
                         variant="outline"
@@ -1836,7 +1836,7 @@ function SettingsInner() {
                           }
                         }}
                       >
-                        {isExportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" /> : <FileJson className="w-4 h-4 mr-2 text-purple-400" />}
+                        {isExportingJson ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-primary" /> : <FileJson className="w-4 h-4 mr-2 text-primary" />}
                         {isExportingJson ? "Generating..." : "Download Complete Backup"}
                       </Button>
                     </div>
