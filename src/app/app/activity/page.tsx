@@ -206,101 +206,103 @@ export default function ActivityPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6 min-h-screen bg-muted/10">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6 p-4 md:p-6 min-h-screen bg-muted/10 pb-24">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tighter text-foreground uppercase">Activity Trail</h1>
-          <p className="text-sm text-muted-foreground font-medium">High-fidelity audit logs and secure data tracking.</p>
+          <h1 className="text-xl font-bold text-foreground">Activity Trail</h1>
+          <p className="text-xs text-muted-foreground font-medium">Detailed audit logs and secure event tracking for your organization.</p>
         </div>
         <Button 
           variant="outline" 
           size="sm" 
-          className="gap-2 font-bold uppercase text-[10px] h-8"
+          className="gap-2 font-bold uppercase text-[10px] h-8 px-4 bg-card shadow-sm border-border/60 hover:bg-accent"
           onClick={() => fetchLogs(false)}
           disabled={loading || refreshing}
         >
           {refreshing ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-          Refresh
+          Refresh Trace
         </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar Filters */}
+        {/* Sidebar Filters */}
         <div className="lg:col-span-1 space-y-4">
-          <Card className="border-none shadow-sm bg-background/60 backdrop-blur-md">
-            <CardHeader className="py-4">
+          <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <Search className="size-4 text-primary" /> Filters
+                <Search className="size-4 text-primary" /> 
+                Refine Trace
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-5 pb-5">
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest">Global Search</Label>
+                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest leading-none">Global Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
                   <Input 
                     placeholder="Search logs..." 
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="pl-9 h-10 text-xs border-muted/20 bg-muted/10 focus-visible:ring-primary/20"
+                    className="pl-9 h-9 text-xs border-muted/30 bg-background/50 focus-visible:ring-primary/20 shadow-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest">Who</Label>
+                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest leading-none">Who</Label>
                 <Select value={filterUser} onValueChange={(val) => setFilterUser(val || "all")}>
-                  <SelectTrigger className="h-10 text-xs bg-muted/10 border-muted/20">
+                  <SelectTrigger className="h-9 text-xs bg-background/50 border-muted/30 shadow-sm">
                     <SelectValue placeholder="All Performers" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Performers</SelectItem>
-                    <SelectItem value="system">System/AI</SelectItem>
+                    <SelectItem value="all" className="text-xs">All Performers</SelectItem>
+                    <SelectItem value="system" className="text-xs">System/AI</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest">What</Label>
+                <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest leading-none">What</Label>
                 <Select value={filterType} onValueChange={(val) => setFilterType(val || "all")}>
-                  <SelectTrigger className="h-10 text-xs bg-muted/10 border-muted/20">
+                  <SelectTrigger className="h-9 text-xs bg-background/50 border-muted/30 shadow-sm">
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Activities</SelectItem>
-                    <SelectItem value="ui">User Mutations</SelectItem>
-                    <SelectItem value="mcp">AI Agent Actions</SelectItem>
+                    <SelectItem value="all" className="text-xs">All Activities</SelectItem>
+                    <SelectItem value="ui" className="text-xs">User Mutations</SelectItem>
+                    <SelectItem value="mcp" className="text-xs">AI Agent Actions</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 pt-2">
+              <div className="grid grid-cols-1 gap-4 pt-1">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest">From</Label>
+                  <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest leading-none">From Date</Label>
                   <DatePicker
                     date={dateFrom ? parseISO(dateFrom) : undefined}
                     setDate={(d) => setDateFrom(d ? format(d, "yyyy-MM-dd") : "")}
-                    className="w-full h-10 text-xs bg-muted/10 border-muted/20"
+                    className="w-full h-9 text-xs bg-background/50 border-muted/30 shadow-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest">To</Label>
+                  <Label className="text-[10px] uppercase font-black text-muted-foreground/80 tracking-widest leading-none">To Date</Label>
                   <DatePicker
                     date={dateTo ? parseISO(dateTo) : undefined}
                     setDate={(d) => setDateTo(d ? format(d, "yyyy-MM-dd") : "")}
-                    className="w-full h-10 text-xs bg-muted/10 border-muted/20"
+                    className="w-full h-9 text-xs bg-background/50 border-muted/30 shadow-sm"
                   />
                 </div>
               </div>
 
               <Button 
                 variant="ghost" 
-                className="w-full h-9 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors mt-2"
+                className="w-full h-8 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors mt-2"
                 onClick={() => {
                   setSearch(""); setFilterUser("all"); setFilterType("all"); setDateFrom(""); setDateTo("");
                 }}
               >
-                <FilterX className="size-3 mr-2" /> Reset
+                <FilterX className="size-3 mr-2" /> Reset Filters
               </Button>
             </CardContent>
           </Card>
@@ -308,16 +310,16 @@ export default function ActivityPage() {
 
         {/* Audit Feed */}
         <div className="lg:col-span-3 space-y-4">
-          <Card className="border-none shadow-sm overflow-hidden bg-background/80 backdrop-blur-lg">
+          <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
             <div className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50 border-none hover:bg-muted/50">
-                    <TableHead className="w-[180px] h-11 text-[10px] uppercase tracking-widest font-black">Timestamp</TableHead>
-                    <TableHead className="h-11 text-[10px] uppercase tracking-widest font-black">Action</TableHead>
-                    <TableHead className="h-11 text-[10px] uppercase tracking-widest font-black">Performer</TableHead>
-                    <TableHead className="h-11 text-[10px] uppercase tracking-widest font-black">Context</TableHead>
-                    <TableHead className="h-11 text-[10px] uppercase tracking-widest font-black text-right pr-6">Status</TableHead>
+                  <TableRow className="bg-muted/10 border-none hover:bg-muted/10">
+                    <TableHead className="w-[180px] h-10 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70">Timestamp</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70">Action</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70">Performer</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70">Context</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70 text-right pr-6">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

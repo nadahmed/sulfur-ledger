@@ -16,6 +16,7 @@ interface Organization {
   decimalSeparator?: string;
   grouping?: "standard" | "indian" | "none";
   decimalPlaces?: number;
+  createdAt?: string;
 }
 
 interface OrganizationContextType {
@@ -55,7 +56,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           thousandSeparator: o.thousandSeparator || ",",
           decimalSeparator: o.decimalSeparator || ".",
           grouping: o.grouping || "standard",
-          decimalPlaces: o.decimalPlaces ?? 2
+          decimalPlaces: o.decimalPlaces ?? 2,
+          createdAt: o.createdAt
         })));
 
         // Derive owner status from local user info if needed

@@ -127,3 +127,12 @@ export const RecurringEntrySchema = z.object({
 
 export type RecurringEntryFormValues = z.infer<typeof RecurringEntrySchema>;
 export type RecurringEntryFormInput = z.input<typeof RecurringEntrySchema>;
+
+export const AiSettingsSchema = z.object({
+  provider: z.enum(["system", "google", "openai", "openrouter"]),
+  apiKey: z.string().optional(),
+  model: z.string().optional(),
+  baseUrl: z.string().optional(),
+});
+
+export type AiSettingsFormValues = z.infer<typeof AiSettingsSchema>;

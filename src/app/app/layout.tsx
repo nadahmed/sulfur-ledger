@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { RefreshButton } from "@/components/refresh-button";
+import AiChatbot from "@/components/AiChatbot";
 
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 
@@ -30,6 +31,7 @@ export default function AppLayout({
         <div className="flex flex-col flex-1 overflow-y-auto">
           {children}
         </div>
+        <AiChatbot />
       </SidebarInset>
     </SidebarProvider>
   );

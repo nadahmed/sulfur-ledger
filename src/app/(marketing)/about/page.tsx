@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Github, Mail, Sparkles, Bot, Terminal, Briefcase, Zap } from "lucide-react";
+import { Mail, Sparkles, Bot, Terminal, Briefcase, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default function AboutPage() {
@@ -109,7 +109,7 @@ export default function AboutPage() {
                     <div className="flex flex-wrap gap-4 pt-4">
                       <Link href="https://github.com/nadahmed/sulfur-ledger" target="_blank">
                         <Button variant="outline" className="gap-2 border-neutral-700 hover:bg-white hover:text-black">
-                          <Github className="w-4 h-4" />
+                          <Terminal className="w-4 h-4" />
                           GitHub Project
                         </Button>
                       </Link>

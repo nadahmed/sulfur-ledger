@@ -29,6 +29,13 @@ export interface StorageSettings {
   };
 }
 
+export interface AiSettings {
+  provider: "system" | "google" | "openai" | "openrouter";
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 export interface Organization {
   id: string; // orgId
   name: string;
@@ -44,6 +51,7 @@ export interface Organization {
   storageSettings?: StorageSettings;
   mcpApiKey?: string;
   mcpApiKeyExpiresAt?: string;
+  aiSettings?: AiSettings;
   createdAt: string;
 }
 
@@ -205,6 +213,7 @@ export async function getUserOrganizations(userId: string): Promise<OrgUser[]> {
       updated.decimalSeparator = orgMetadata.decimalSeparator || ".";
       updated.grouping = (orgMetadata.grouping as any) || "standard";
       updated.decimalPlaces = orgMetadata.decimalPlaces ?? 2;
+      updated.createdAt = orgMetadata.createdAt || ou.createdAt || new Date().toISOString();
       if (orgMetadata.ownerId === userId) {
         updated.isOwner = true;
       }
@@ -358,6 +367,22 @@ export async function updateOrganizationMcpSettings(orgId: string, settings: { m
         ":key": settings.mcpApiKey || null, 
         ":expires": settings.mcpApiKeyExpiresAt || null 
       },
+    })
+  );
+}
+
+export async function updateOrganizationAiSettings(orgId: string, settings: AiSettings) {
+  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+  
+  await db.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}`,
+        SK: `METADATA`,
+      },
+      UpdateExpression: "SET aiSettings = :settings",
+      ExpressionAttributeValues: { ":settings": settings },
     })
   );
 }

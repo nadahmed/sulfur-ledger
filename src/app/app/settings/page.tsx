@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info } from "lucide-react";
+import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info, Sparkles, MessageSquare, Bot } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -28,13 +28,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn, formatCurrency, slugify } from "@/lib/utils";
-import { 
-  CURRENCY_PRESETS, 
-  COMMON_SYMBOLS, 
-  CurrencyGrouping, 
-  ThousandSeparator, 
-  DecimalSeparator, 
-  CurrencyPosition 
+import {
+  CURRENCY_PRESETS,
+  COMMON_SYMBOLS,
+  CurrencyGrouping,
+  ThousandSeparator,
+  DecimalSeparator,
+  CurrencyPosition
 } from "@/lib/constants/currencies";
 import {
   OrganizationSchema,
@@ -43,8 +43,10 @@ import {
   InvitationFormValues,
   EmailSettingsSchema,
   EmailSettingsFormValues,
+  McpSettingsSchema,
   McpSettingsFormValues,
-  McpSettingsSchema
+  AiSettingsFormValues,
+  AiSettingsSchema
 } from "@/lib/schemas";
 
 const GeneralOrgSchema = OrganizationSchema.pick({
@@ -121,7 +123,7 @@ function SettingsInner() {
   const queryClient = useQueryClient();
 
   const urlTab = searchParams.get("tab");
-  const activeTab = urlTab && ["general", "members", "email", "mcp", "storage", "data"].includes(urlTab) ? urlTab : "general";
+  const activeTab = urlTab && ["general", "members", "email", "mcp", "ai", "storage", "data"].includes(urlTab) ? urlTab : "general";
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -179,6 +181,16 @@ function SettingsInner() {
     queryFn: async () => {
       const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`);
       if (!res.ok) throw new Error("Failed to fetch MCP settings");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
+  const { data: aiSettings, isLoading: isLoadingAiSettings } = useQuery<AiSettingsFormValues>({
+    queryKey: ["ai-settings", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/ai-settings?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch AI settings");
       return res.json();
     },
     enabled: !!activeOrganizationId && canManage,
@@ -401,11 +413,44 @@ function SettingsInner() {
       if (!res.ok) throw new Error("Update failed");
     },
     onSuccess: () => {
-      toast.success("Storage settings saved!");
       queryClient.invalidateQueries({ queryKey: ["storage-settings", activeOrganizationId] });
-      refreshOrganizations();
+      toast.success("Storage settings updated successfully");
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(`Error: ${err.message}`),
+  });
+
+  const {
+    register: registerAi,
+    handleSubmit: handleSubmitAi,
+    control: controlAi,
+    watch: watchAi,
+    reset: resetAi,
+    formState: { errors: errorsAi }
+  } = useForm<AiSettingsFormValues>({
+    resolver: zodResolver(AiSettingsSchema),
+    defaultValues: { provider: "system" }
+  });
+
+  useEffect(() => {
+    if (aiSettings) resetAi(aiSettings);
+  }, [aiSettings, resetAi]);
+
+  const watchAiProvider = watchAi("provider");
+
+  const saveAiMutation = useMutation({
+    mutationFn: async (values: AiSettingsFormValues) => {
+      const res = await fetch("/api/organizations/ai-settings", {
+        method: "POST",
+        body: JSON.stringify({ orgId: activeOrganizationId, settings: values }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ai-settings", activeOrganizationId] });
+      toast.success("AI settings updated successfully");
+    },
+    onError: (err: any) => toast.error(`Error: ${err.message}`),
   });
 
   const {
@@ -547,34 +592,33 @@ function SettingsInner() {
   }
 
   return (
-    <main className="max-w-screen-2xl p-4 md:p-6 min-h-screen">
+    <main className="max-w-screen-2xl p-4 md:p-6 min-h-screen pb-24">
       <div className="mb-4">
         <h1 className="text-xl font-bold">Settings</h1>
       </div>
 
-      <div className="mt-4 mb-4 flex flex-wrap items-center gap-1.5 p-1 bg-muted/30 rounded-lg w-fit border border-border/40">
+      <div className="mt-4 mb-4 flex flex-wrap items-center gap-2">
         {[
           { id: "general", label: "General" },
           { id: "members", label: "Members" },
           { id: "email", label: "Email Delivery" },
           { id: "storage", label: "Receipts & Storage" },
+          { id: "ai", label: "AI Assistant" },
           { id: "mcp", label: "MCP Server" },
           { id: "data", label: "Data Management" },
         ].map((tab) => (
-          <Button
+          <button
             key={tab.id}
-            variant={activeTab === tab.id ? "secondary" : "ghost"}
-            size="sm"
             onClick={() => handleTabChange(tab.id)}
             className={cn(
-              "text-xs px-4 h-8 transition-all rounded-md font-medium",
+              "text-xs px-4 py-1.5 transition-all rounded-full font-semibold border shadow-sm touch-manipulation",
               activeTab === tab.id 
-                ? "bg-card text-foreground shadow-sm" 
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary border-primary text-primary-foreground shadow-primary/20 scale-105 z-10" 
+                : "bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
             )}
           >
             {tab.label}
-          </Button>
+          </button>
         ))}
       </div>
 
@@ -612,7 +656,7 @@ function SettingsInner() {
                               setOrgValue("currencySymbol", val, { shouldDirty: true });
                               if (CURRENCY_PRESETS[val]) {
                                 applyPreset(val);
-                               }
+                              }
                             }}
                             className="h-full w-20 text-sm font-bold bg-card shadow-sm border-primary/20 focus-visible:ring-primary/30"
                             disabled={!canManage}
@@ -788,10 +832,10 @@ function SettingsInner() {
                     )}
                   </div>
 
-                    <div className="mt-4 p-3 bg-muted/30 border border-border rounded-xl text-[10px] text-muted-foreground flex items-start gap-2 max-w-2xl">
-                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
-                      <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
-                    </div>
+                  <div className="mt-4 p-3 bg-muted/30 border border-border rounded-xl text-[10px] text-muted-foreground flex items-start gap-2 max-w-2xl">
+                    <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
+                    <p className="leading-relaxed">This setting only changes the <strong>display symbol</strong> across reports and exports. It does not convert historical amounts or change the underlying values in your database.</p>
+                  </div>
                 </CardContent>
                 {canManage && (
                   <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5">
@@ -805,14 +849,13 @@ function SettingsInner() {
 
             {!isOwner && (
               <Card className="border-warning/20 shadow-sm bg-warning/5 overflow-hidden mt-8">
-                <CardHeader className="pb-3 px-6 pt-6">
+                <CardHeader className="pb-2 pt-4 px-5">
                   <div className="flex items-center gap-2 text-warning">
-                    {/* <LogOut className="w-4 h-4" /> */}
                     <CardTitle className="text-lg">Leave Organization</CardTitle>
                   </div>
                   <CardDescription className="text-xs text-warning/80">You will lose all access to this organization's data and reports.</CardDescription>
                 </CardHeader>
-                <CardFooter className="bg-warning/10 border-t border-warning/20 px-6 py-4">
+                <CardFooter className="bg-warning/10 border-t border-warning/20 px-5 py-2.5">
                   <Button
                     variant="outline"
                     size="sm"
@@ -842,30 +885,30 @@ function SettingsInner() {
                   <div className="h-px flex-1 bg-destructive/10" />
                 </div>
                 <Card className="border-destructive/20 shadow-md bg-destructive/5 overflow-hidden">
-                  <CardHeader className="px-6 pt-6 pb-2">
+                  <CardHeader className="pb-2 pt-4 px-5">
                     <div className="flex items-center gap-2 text-destructive">
-                      <AlertCircle className="w-4 h-4" />
+                      <AlertCircle className="w-5 h-5" />
                       <CardTitle className="text-lg">Delete Organization</CardTitle>
                     </div>
-                    <CardDescription className="text-xs text-destructive/70">Permanently delete this organization, all its members, and every single record content.</CardDescription>
+                    <CardDescription className="text-xs text-destructive/70">Permanently delete this organization, all its members, and every record.</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-6 pb-4 space-y-4">
+                  <CardContent className="px-5 pb-5 space-y-4 font-medium">
                     <div className="space-y-2 max-w-md">
-                      <Label className="text-[10px] uppercase font-bold text-destructive/40">Confirmation Required</Label>
-                      <p className="text-xs text-destructive/80">To proceed, please type the organization name: <strong className="select-all opacity-100">"{activeOrg?.name}"</strong></p>
+                      <Label className="text-[10px] uppercase font-bold text-destructive/40 tracking-widest">Confirmation Required</Label>
+                      <p className="text-xs text-destructive/80">To proceed, please type the organization name: <strong className="select-all opacity-100 font-black">"{activeOrg?.name}"</strong></p>
                       <Input
                         value={deleteConfirm}
                         onChange={(e) => setDeleteConfirm(e.target.value)}
                         placeholder="Enter organization name..."
-                        className="h-10 border-destructive/20 focus:ring-destructive text-sm font-medium bg-background/50"
+                        className="h-9 border-destructive/20 focus:ring-destructive text-sm font-medium bg-background/50"
                       />
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-destructive/10 border-t border-destructive/20 px-6 py-4">
+                  <CardFooter className="bg-destructive/10 border-t border-destructive/20 px-5 py-2.5">
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
+                      className="h-8 px-5 font-bold flex items-center gap-2 shadow-sm transition-all"
                       disabled={deleteOrgMutation.isPending || deleteConfirm !== activeOrg?.name}
                       onClick={() => deleteOrgMutation.mutate()}
                     >
@@ -898,8 +941,10 @@ function SettingsInner() {
                   <CardTitle className="text-sm font-medium">Created On</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground/80">
-                    {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  <p className="text-sm text-muted-foreground/80 font-medium">
+                    {activeOrg?.createdAt 
+                      ? new Date(activeOrg.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+                      : new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </CardContent>
               </Card>
@@ -907,30 +952,35 @@ function SettingsInner() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-1 space-y-8">
-                <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" /> Invite Member</CardTitle>
+                <Card className="shadow-sm border-border/40">
+                  <CardHeader className="pb-2 pt-4 px-5">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-primary" /> 
+                      Invite Member
+                    </CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">Add colleagues to your organization.</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
+                  <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))}>
+                    <CardContent className="space-y-4 px-5 pb-5">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="email" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Email Address</Label>
                         <Input
                           id="email"
                           type="email"
                           placeholder="colleague@example.com"
                           {...registerInvite("email")}
                           disabled={!canManage}
-                          className={inviteErrors.email ? "border-destructive" : ""}
+                          className={cn("h-9 text-sm", inviteErrors.email ? "border-destructive" : "")}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="role">Role</Label>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="role" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</Label>
                         <Controller
                           name="role"
                           control={controlInvite}
                           render={({ field }) => (
                             <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
-                              <SelectTrigger id="role">
+                              <SelectTrigger id="role" className="h-9 text-sm">
                                 <SelectValue>
                                   {field.value === "viewer" ? "Viewer" : field.value === "member" ? "Editor" : field.value === "admin" ? "Admin" : undefined}
                                 </SelectValue>
@@ -944,16 +994,21 @@ function SettingsInner() {
                           )}
                         />
                       </div>
-                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
+                    </CardContent>
+                    <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5">
+                      <Button size="sm" className="h-8 px-5 bg-primary hover:bg-primary/90 shadow-sm transition-all text-xs font-semibold" type="submit" disabled={!canManage || inviteMutation.isPending}>
                         {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
                       </Button>
-                    </form>
-                  </CardContent>
+                    </CardFooter>
+                  </form>
                 </Card>
 
-                <Card>
-                  <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
-                  <CardContent>
+                <Card className="shadow-sm border-border/40">
+                  <CardHeader className="pb-2 pt-4 px-5">
+                    <CardTitle className="text-lg">Pending Invitations</CardTitle>
+                    <CardDescription className="text-xs">Manage sent but unaccepted invites.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5">
                     {isLoadingInvites ? (
                       <p className="text-sm text-muted-foreground italic">Loading invitations...</p>
                     ) : pendingInvites.length === 0 ? (
@@ -1004,12 +1059,12 @@ function SettingsInner() {
               </div>
 
               <div className="md:col-span-2">
-                <Card className="h-full shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Active Members</CardTitle>
-                    <CardDescription>Manage the people who have access to this organization.</CardDescription>
+                <Card className="h-full shadow-sm border-border/40 overflow-hidden">
+                  <CardHeader className="pb-2 pt-4 px-5">
+                    <CardTitle className="text-lg">Active Members</CardTitle>
+                    <CardDescription className="text-xs">Manage people who have access to this organization.</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-5 pb-5">
                     {isLoadingMembers ? (
                       <div className="flex items-center justify-center p-8 text-muted-foreground italic">
                         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading members...
@@ -1123,138 +1178,150 @@ function SettingsInner() {
 
         {activeTab === "email" && (
           <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Delivery</CardTitle>
-                <CardDescription>Configure how this organization sends emails.</CardDescription>
+            <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+              <CardHeader className="pb-2 pt-4 px-5">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary" /> 
+                  Email Delivery
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">Configure how this organization sends emails.</CardDescription>
               </CardHeader>
-              <CardContent>
-                {isLoadingEmailSettings ? (
-                  <div className="p-8 text-center text-muted-foreground italic">Loading email settings...</div>
-                ) : (
-                  <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))} className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="grid w-full items-center gap-1.5">
-                        <Label htmlFor="provider">Email Provider</Label>
-                        <Controller
-                          name="provider"
-                          control={controlEmail}
-                          render={({ field }) => (
-                            <Select
-                              value={field.value}
-                              onValueChange={field.onChange}
-                              disabled={!canManage}
-                            >
-                              <SelectTrigger id="provider">
-                                <SelectValue>
-                                  {field.value === "system" ? "System Default" : field.value === "brevo" ? "Brevo (API)" : field.value === "smtp" ? "Custom SMTP" : undefined}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="system">System Default</SelectItem>
-                                <SelectItem value="brevo">Brevo (API)</SelectItem>
-                                <SelectItem value="smtp">Custom SMTP</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-
-                      {watchProvider !== "system" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="senderName">Sender Name</Label>
-                            <Input
-                              id="senderName"
-                              {...registerEmail("senderName")}
-                              disabled={!canManage}
-                            />
-                          </div>
-                          <div className="grid gap-1.5">
-                            <Label htmlFor="senderEmail">Sender Email</Label>
-                            <Input
-                              id="senderEmail"
-                              type="email"
-                              {...registerEmail("senderEmail")}
-                              disabled={!canManage}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {watchProvider === "brevo" && (
-                        <div className="space-y-1.5">
-                          <Label htmlFor="apiKey">Brevo API Key</Label>
-                          <Input
-                            id="apiKey"
-                            type="password"
-                            placeholder="xkeysib-..."
-                            {...registerEmail("apiKey")}
-                            disabled={!canManage}
+              <form onSubmit={handleSubmitEmail((v) => saveEmailMutation.mutate(v))}>
+                <CardContent className="space-y-4 px-5 pb-5">
+                  {isLoadingEmailSettings ? (
+                    <div className="p-8 text-center text-muted-foreground italic">Loading email settings...</div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <div className="grid w-full items-center gap-1.5">
+                          <Label htmlFor="provider" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Email Provider</Label>
+                          <Controller
+                            name="provider"
+                            control={controlEmail}
+                            render={({ field }) => (
+                              <Select
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                disabled={!canManage}
+                              >
+                                <SelectTrigger id="provider" className="h-9 text-sm">
+                                  <SelectValue>
+                                    {field.value === "system" ? "System Default" : field.value === "brevo" ? "Brevo (API)" : field.value === "smtp" ? "Custom SMTP" : undefined}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="system">System Default</SelectItem>
+                                  <SelectItem value="brevo">Brevo (API)</SelectItem>
+                                  <SelectItem value="smtp">Custom SMTP</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           />
                         </div>
-                      )}
 
-                      {watchProvider === "smtp" && (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-1.5">
-                              <Label htmlFor="smtpHost">SMTP Host</Label>
-                              <Input id="smtpHost" {...registerEmail("smtpHost")} placeholder="smtp.example.com" />
-                            </div>
-                            <div className="grid gap-1.5">
-                              <Label htmlFor="smtpPort">Port</Label>
-                              <Input id="smtpPort" type="number" {...registerEmail("smtpPort", { valueAsNumber: true })} placeholder="587" />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-1.5">
-                              <Label htmlFor="smtpUser">Username</Label>
-                              <Input id="smtpUser" {...registerEmail("smtpUser")} disabled={!canManage} />
-                            </div>
-                            <div className="grid gap-1.5">
-                              <Label htmlFor="smtpPass">Password</Label>
-                              <Input id="smtpPass" type="password" {...registerEmail("smtpPass")} disabled={!canManage} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {canManage && (
-                      <div className="flex gap-4">
-                        <Button type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
-                          {saveEmailMutation.isPending ? "Saving..." : "Save Email Settings"}
-                        </Button>
                         {watchProvider !== "system" && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
-                            disabled={saveEmailMutation.isPending || testEmailMutation.isPending}
-                          >
-                            {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
-                          </Button>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="senderName" className="text-[10px] uppercase font-bold text-muted-foreground">Sender Name</Label>
+                              <Input
+                                id="senderName"
+                                {...registerEmail("senderName")}
+                                disabled={!canManage}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="senderEmail" className="text-[10px] uppercase font-bold text-muted-foreground">Sender Email</Label>
+                              <Input
+                                id="senderEmail"
+                                type="email"
+                                {...registerEmail("senderEmail")}
+                                disabled={!canManage}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {watchProvider === "brevo" && (
+                          <div className="space-y-1.5">
+                            <Label htmlFor="apiKey" className="text-[10px] uppercase font-bold text-muted-foreground">Brevo API Key</Label>
+                            <Input
+                              id="apiKey"
+                              type="password"
+                              placeholder="xkeysib-..."
+                              {...registerEmail("apiKey")}
+                              disabled={!canManage}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        )}
+
+                        {watchProvider === "smtp" && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border/30 pt-4">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="smtpHost" className="text-[10px] uppercase font-bold text-muted-foreground">SMTP Host</Label>
+                                <Input id="smtpHost" {...registerEmail("smtpHost")} placeholder="smtp.example.com" className="h-9 text-sm" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="smtpPort" className="text-[10px] uppercase font-bold text-muted-foreground">Port</Label>
+                                <Input id="smtpPort" type="number" {...registerEmail("smtpPort", { valueAsNumber: true })} placeholder="587" className="h-9 text-sm" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="smtpUser" className="text-[10px] uppercase font-bold text-muted-foreground">Username</Label>
+                                <Input id="smtpUser" {...registerEmail("smtpUser")} disabled={!canManage} className="h-9 text-sm" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="smtpPass" className="text-[10px] uppercase font-bold text-muted-foreground">Password</Label>
+                                <Input id="smtpPass" type="password" {...registerEmail("smtpPass")} disabled={!canManage} className="h-9 text-sm" />
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
+                    </div>
+                  )}
+                </CardContent>
+                {canManage && (
+                  <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5 flex flex-wrap gap-3">
+                    <Button size="sm" className="h-8 px-5 bg-primary hover:bg-primary/90 shadow-sm transition-all text-xs font-semibold" type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
+                      {saveEmailMutation.isPending ? "Saving..." : <span className="flex items-center gap-2"><Save className="w-3 h-3" /> Save Email Settings</span>}
+                    </Button>
+                    {watchProvider !== "system" && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 px-4 text-xs font-semibold shadow-sm border border-border/60"
+                        onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
+                        disabled={saveEmailMutation.isPending || testEmailMutation.isPending}
+                      >
+                        {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                      </Button>
                     )}
-                  </form>
+                  </CardFooter>
                 )}
-              </CardContent>
+              </form>
             </Card>
           </div>
         )}
 
         {activeTab === "mcp" && (
           <div className="space-y-8">
-            <Card className="shadow-lg border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5" /> MCP Server Integration</CardTitle>
-                <CardDescription>
+            <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+              <CardHeader className="pb-2 pt-4 px-5">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Key className="w-5 h-5 text-primary" /> 
+                  MCP Server Integration
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
                   Expose your ledger tools to AI agents using the Model Context Protocol (MCP).
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-6 px-5 pb-5">
                 {isLoadingMcpSettings ? (
                   <div className="p-8 text-center text-muted-foreground italic">Loading MCP settings...</div>
                 ) : mcpSettings?.mcpApiKey ? (
@@ -1334,7 +1401,7 @@ function SettingsInner() {
                     </div>
 
                     {canManage && (
-                      <div className="pt-4 border-t flex items-center justify-between">
+                      <div className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <p className="text-sm text-muted-foreground/80">Need a new key? Regenerating will invalidate the current one.</p>
                         <div className="flex gap-2">
                           <Button
@@ -1468,7 +1535,7 @@ function SettingsInner() {
 
                   {storageProvider === "s3" && (
                     <div className="pt-4 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-[10px] uppercase font-bold text-muted-foreground">Endpoint</Label>
                         <Input
                           value={s3Settings.endpoint}
@@ -1570,21 +1637,177 @@ function SettingsInner() {
           </div>
         )}
 
+        {activeTab === "ai" && (
+          <div className="space-y-8">
+            <Card className="shadow-lg border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> AI Assistant Settings</CardTitle>
+                <CardDescription>
+                  Configure the built-in AI chatbot and conversational tools.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAiSettings ? (
+                  <div className="p-8 text-center text-muted-foreground italic">Loading AI settings...</div>
+                ) : (
+                  <form onSubmit={handleSubmitAi((v) => saveAiMutation.mutate(v))} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="aiProvider">AI Provider</Label>
+                        <Controller
+                          name="provider"
+                          control={controlAi}
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger id="aiProvider">
+                                <SelectValue placeholder="Select Provider" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="system">System Default</SelectItem>
+                                <SelectItem value="google">Google Gemini</SelectItem>
+                                <SelectItem value="openai">OpenAI (Compatible)</SelectItem>
+                                <SelectItem value="openrouter">OpenRouter</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
+                      {watchAiProvider !== "system" && (
+                        <div className="space-y-4 pt-2 border-t border-border mt-4">
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="aiApiKey">API Key</Label>
+                            <Input
+                              id="aiApiKey"
+                              type="password"
+                              placeholder="sk-..."
+                              {...registerAi("apiKey")}
+                              disabled={!canManage}
+                            />
+                            <p className="text-[10px] text-muted-foreground">Your key is stored securely and never exposed to the client in plain text.</p>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="aiModel">Model Name</Label>
+                              <Input
+                                id="aiModel"
+                                {...registerAi("model")}
+                                placeholder={watchAiProvider === "google" ? "gemini-3.1-flash-lite-preview" : "gpt-4o"}
+                                disabled={!canManage}
+                              />
+                            </div>
+                            {(watchAiProvider === "openai" || watchAiProvider === "openrouter") && (
+                              <div className="grid gap-1.5">
+                                <Label htmlFor="aiBaseUrl">Base URL (Optional)</Label>
+                                <Input
+                                  id="aiBaseUrl"
+                                  {...registerAi("baseUrl")}
+                                  placeholder={watchAiProvider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1"}
+                                  disabled={!canManage}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {watchAiProvider === "system" && (
+                        <div className="p-3 sm:p-4 rounded-lg bg-primary/5 border border-primary/10 flex items-start gap-2 sm:gap-3">
+                          <Bot className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-primary">System Default Active</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                              Using the system-wide configuration (Gemini 2.0 Flash Lite). Individual organizations can bring their own keys to unlock higher rate limits and specific models.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {canManage && (
+                      <CardFooter className="bg-muted/10 border-t border-border/40 py-2.5 px-5">
+                        <Button type="submit" size="sm" disabled={saveAiMutation.isPending} className="h-8 px-5 bg-primary hover:bg-primary/90 shadow-sm transition-all">
+                          {saveAiMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3 h-4 mr-2" />
+                              Save AI Settings
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
+                    )}
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/20 bg-destructive/[0.02]">
+              <CardHeader>
+                <CardTitle className="text-destructive flex items-center gap-2 truncate"><Trash2 className="w-5 h-5" /> Danger Zone</CardTitle>
+                <CardDescription>
+                  Actions here are irreversible. Manage your organization's data with care.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border border-destructive/20 bg-background">
+                  <div>
+                    <p className="font-bold text-foreground">Clear Chat History</p>
+                    <p className="text-xs text-muted-foreground">Permanently delete all AI conversation history for this organization.</p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={!isOwner}
+                    onClick={() => {
+                      setConfirmConfig({
+                        open: true,
+                        title: "Clear All Chat History",
+                        description: "This will permanently delete all messages and tool execution logs for all users in this organization. This action cannot be undone.",
+                        variant: "destructive",
+                        onConfirm: async () => {
+                          const res = await fetch(`/api/ai/history?orgId=${activeOrganizationId}`, { method: "DELETE" });
+                          if (res.ok) {
+                            toast.success("Chat history cleared. AI will start fresh on next message.");
+                            queryClient.invalidateQueries({ queryKey: ["chat-history", activeOrganizationId] });
+                          } else {
+                            toast.error(await res.text());
+                          }
+                        }
+                      });
+                    }}
+                  >
+                    Clear History
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {activeTab === "data" && (
           <div className="space-y-8">
             <div className="grid gap-8">
-              <Card className="shadow-lg border-border">
-                <CardHeader>
+              <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="pb-2 pt-4 px-5">
                   <div className="flex items-center gap-2 text-primary mb-1">
                     <FileSpreadsheet className="w-5 h-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Spreadsheet Interoperability</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Interoperability</span>
                   </div>
-                  <CardTitle>CSV Data Management</CardTitle>
-                  <CardDescription>
-                    Best for viewing, editing in Excel/Google Sheets, or importing data from other ledger tools.
+                  <CardTitle className="text-lg">CSV Data Management</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Export your ledger to Excel or import from other tools.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 px-5 pb-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
@@ -1704,18 +1927,18 @@ function SettingsInner() {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-lg border-border">
-                <CardHeader>
+              <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="pb-2 pt-4 px-5">
                   <div className="flex items-center gap-2 text-primary mb-1">
                     <FileJson className="w-5 h-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">System Backups & Migration</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Backups & Migration</span>
                   </div>
-                  <CardTitle>JSON Data Management</CardTitle>
-                  <CardDescription>
-                    Lossless backups. Use this to transfer your entire organization's state to another account or for long-term secure archival.
+                  <CardTitle className="text-lg">JSON Data Management</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Lossless backups for secure archival or organization transfer.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 px-5 pb-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
                       <div>
@@ -1828,16 +2051,16 @@ function SettingsInner() {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-lg border-destructive/30">
-                <CardHeader>
-                  <div className="flex items-center gap-2 text-destructive mb-1">
+              <Card className="shadow-sm border-destructive/20 overflow-hidden bg-destructive/5">
+                <CardHeader className="pb-2 pt-4 px-5 text-destructive">
+                  <div className="flex items-center gap-2 mb-1">
                     <AlertCircle className="w-5 h-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Danger Zone</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Danger Zone</span>
                   </div>
-                  <CardTitle>Ledger Erasure</CardTitle>
-                  <CardDescription>Permanently clear all ledger data (accounts and journals). This action is non-reversible.</CardDescription>
+                  <CardTitle className="text-lg">Ledger Erasure</CardTitle>
+                  <CardDescription className="text-xs text-destructive/70">Permanently clear all ledger data. This action is non-reversible.</CardDescription>
                 </CardHeader>
-                <CardFooter className="bg-destructive/5 border-t border-destructive/10 rounded-b-lg p-6">
+                <CardFooter className="bg-destructive/10 border-t border-destructive/20 py-3 px-5">
                   <Button
                     variant="destructive"
                     className="h-12 px-8"

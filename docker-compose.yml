@@ -39,6 +39,19 @@ services:
       mc mb local-storage/sulfurbook --ignore-existing;
       "
 
+  soketi:
+    image: 'quay.io/soketi/soketi:latest-16-alpine'
+    container_name: soketi
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      - SOKETI_DEBUG=1
+      - SOKETI_METRICS_ENABLED=1
+      - SOKETI_DEFAULT_APP_ID=app-id
+      - SOKETI_DEFAULT_APP_KEY=app-key
+      - SOKETI_DEFAULT_APP_SECRET=app-secret
+
 volumes:
   dynamodb-data:
   rustfs-data:

@@ -7,6 +7,7 @@ import { ROLE_PERMISSIONS } from "./constants/permissions";
 export interface AuthSession {
   user: any;
   isOwner: boolean;
+  role?: string;
   error?: string;
   status?: number;
 }
@@ -51,13 +52,13 @@ export async function checkPermission(permission: string, req: NextRequest): Pro
     // 1. Owner Bypass
     if (orgUser?.isOwner) {
       console.log(`[Auth] Owner bypass (OrgUser flag)`);
-      return { user: session.user, isOwner: true };
+      return { user: session.user, isOwner: true, role: orgUser.role };
     }
 
     const org = await getOrganization(orgId);
     if (org?.ownerId === session.user.sub) {
       console.log(`[Auth] Owner bypass (Metadata ownerId)`);
-      return { user: session.user, isOwner: true };
+      return { user: session.user, isOwner: true, role: orgUser?.role || "admin" };
     }
 
     // 2. Role-based Permissions from DB
@@ -80,5 +81,6 @@ export async function checkPermission(permission: string, req: NextRequest): Pro
   }
   
   console.log(`[Auth] Permission granted: ${permission}`);
-  return { user: session.user, isOwner: false };
+  const finalRole = orgId ? (await getOrgUser(orgId, session.user.sub))?.role : undefined;
+  return { user: session.user, isOwner: false, role: finalRole };
 }

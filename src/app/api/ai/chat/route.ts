@@ -1,0 +1,140 @@
+import { NextRequest } from "next/server";
+import { streamText, stepCountIs } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { checkPermission } from "@/lib/auth";
+import { getOrganization } from "@/lib/db/organizations";
+import { saveChatMessage } from "@/lib/db/ai";
+import { createAiTools } from "@/lib/ai/tools";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { messages, orgId, localTime } = body;
+    console.log("[AI CHAT DEBUG] POST Body (Vercel AI SDK):", JSON.stringify(body, null, 2));
+
+    if (!orgId) return Response.json({ error: "orgId required" }, { status: 400 });
+
+    // 1. Auth & Context
+    const auth = await checkPermission("view:dashboard", req);
+    if (auth.error) return Response.json({ error: auth.error }, { status: auth.status });
+
+    const org = await getOrganization(orgId);
+    if (!org) return Response.json({ error: "Organization not found" }, { status: 404 });
+
+    const userId = auth.user?.sub || "unknown";
+    const userName = auth.user?.name || auth.user?.nickname || "User";
+    const lastMessage = messages[messages.length - 1];
+
+    // Calculate initials
+    const initials = userName
+      .split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
+
+    // 2. Identify Role & Owner Status
+    const isOwner = userId === org.ownerId;
+    const role = auth.role || "viewer";
+
+    // 3. Provider & Model Selection
+    const aiSettings = org.aiSettings || { provider: "system" };
+    const providerType = aiSettings.provider === "system" ? (process.env.AI_PROVIDER || "google") : aiSettings.provider;
+    const apiKey = aiSettings.provider === "system" ? process.env.AI_API_KEY : aiSettings.apiKey;
+    const modelName = aiSettings.provider === "system" ? (process.env.AI_MODEL || "gemini-1.5-flash-latest") : aiSettings.model;
+    const baseUrl = aiSettings.provider === "system" ? process.env.AI_BASE_URL : aiSettings.baseUrl;
+
+    // API Key Validation
+    if (!apiKey || apiKey === "SET_YOUR_KEY_HERE") {
+      const msg = aiSettings.provider === "system"
+        ? "System AI API Key is not configured in .env.local"
+        : "Organization AI API Key is not configured in Settings";
+      return Response.json({ error: msg }, { status: 400 });
+    }
+
+    // 4. Persistence - Save User Message
+    if (lastMessage.role === "user") {
+      await saveChatMessage({
+        orgId,
+        role: "user",
+        content: lastMessage.content,
+        userId,
+        userName,
+        userInitials: initials,
+        timestamp: new Date().toISOString(),
+      }).catch(err => console.error("[AI] Failed to save user message:", err));
+    }
+
+    // 5. System Prompt
+    const systemPrompt = `
+You are Sulfur, a world-class financial expert and CFO assistant for "${org.name}".
+Your goal is to help users manage their ledger with precision, following double-entry bookkeeping principles.
+
+CONTEXT:
+- Organization Name: ${org.name}
+- Currency: ${org.currencySymbol || "Taka"} (Position: ${org.currencyPosition || "suffix"})
+- Current Date/Time: ${localTime || new Date().toLocaleString()}
+- User: ${userName} (Role: ${role}${isOwner ? ", Owner" : ""})
+
+- FINANCE ONLY: You are strictly limited to financial, accounting, and bookkeeping topics. If the user asks about anything else (jokes, general knowledge, non-financial advice), politely explain that your expertise is focused only on financial management and the SulfurBook ledger.
+- MCP SETUP: You can help users connect their external MCP clients (like Claude Desktop or other agents) to this ledger. Advise them that the MCP API key is located in Settings > MCP Tools. The connection configuration uses the HTTP transport:
+  - URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://' + (org.name.toLowerCase().replace(/\s+/g, '-')) + '.sulfur.app'}/api/mcp
+  - Transport: http
+  - Headers: {"x-mcp-key": "REPLACE_WITH_YOUR_KEY"}
+- TAG MANAGEMENT: 
+  1. NEVER use arbitrary strings as tags in journal entries. Only use existing tag IDs.
+  2. ALWAYS check for existing tags using 'get_tags' before suggesting or creating a new tag.
+  3. You MUST ask the user for explicit confirmation BEFORE calling 'create_tag'.
+- ACCOUNT MANAGEMENT:
+  1. ALWAYS call 'get_accounts' first to check for existing accounts or duplicates.
+  2. Use lowercase, hyphen-separated IDs for new accounts (e.g., 'checking-main').
+  3. REASONABLE DOUBT: If an existing account has a similar name or overlapping purpose, do not create a new one. Instead, ask the user: "I found [Account X] which seems similar. Would you like to use that or create a new one?"
+- JOURNAL DISCIPLINE:
+  1. ALWAYS call 'get_accounts' and 'get_tags' before recording to ensure valid IDs.
+  2. Confirm the selected accounts and total amount with the user before calling 'record_journal_entry'.
+  3. Do not record duplicate entries; check 'get_journals' if you suspect one exists.
+- VIEWERS: If the user is a 'viewer', you MUST NOT execute any mutation tools (create, record).
+- PRECISION: Always use exact IDs. NEVER guess or hallucinate account or tag IDs.
+- TONE: Professional, efficient, and expert CFO assistant.
+    `.trim();
+
+    // 6. Model Selection
+    let model: any;
+    if (providerType === "google") {
+      const googleProvider = createGoogleGenerativeAI({ apiKey });
+      model = googleProvider(modelName || "gemini-1.5-flash-latest");
+    } else {
+      const openaiProvider = createOpenAI({ apiKey, baseURL: baseUrl || undefined });
+      model = openaiProvider(modelName || "gpt-4o");
+    }
+
+    // 7. Stream Text
+    const tools = createAiTools(orgId, userId, userName, role, isOwner);
+    const result = await streamText({
+      model,
+      system: systemPrompt,
+      messages,
+      tools,
+      stopWhen: stepCountIs(5), // Allow multi-turn tool calling
+      onFinish: async ({ text }) => {
+        // Save Assistant Response
+        await saveChatMessage({
+          orgId,
+          role: "assistant",
+          content: text,
+          timestamp: new Date().toISOString(),
+        }).catch(err => console.error("[AI] Failed to save assistant message:", err));
+
+
+        console.log(`[AI CHAT] Completed response for user ${userName}`);
+      },
+    });
+
+    return result.toTextStreamResponse();
+
+  } catch (error: any) {
+    console.error("[AI Chat Error]:", error);
+    return Response.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  }
+}
