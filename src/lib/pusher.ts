@@ -15,8 +15,12 @@ export const pusherServer = new PusherServer({
 });
 
 // Client-side helper (SDK: pusher-js)
+let pusherClient: PusherClient | null = null;
+
 export const getPusherClient = () => {
-  return new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+  if (pusherClient) return pusherClient;
+
+  pusherClient = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
     forceTLS: process.env.NEXT_PUBLIC_PUSHER_TLS === "true",
     enabledTransports: ["ws", "wss"],
@@ -25,4 +29,14 @@ export const getPusherClient = () => {
       wsPort: parseInt(process.env.NEXT_PUBLIC_PUSHER_PORT || "6001"),
     } : {}),
   });
+
+  return pusherClient;
+};
+
+// Helper to reset the client (useful for organization changes or logout)
+export const resetPusherClient = () => {
+  if (pusherClient) {
+    pusherClient.disconnect();
+    pusherClient = null;
+  }
 };

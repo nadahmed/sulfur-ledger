@@ -80,8 +80,9 @@ export default function AiChatbot() {
     });
 
     return () => {
+      channel.unbind_all();
       pusher.unsubscribe(`org-${activeOrganizationId}`);
-      pusher.disconnect();
+      // DO NOT disconnect here, let the singleton handle the connection lifecycle
     };
   }, [activeOrganizationId]);
 
