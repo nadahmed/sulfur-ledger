@@ -15,8 +15,8 @@ export interface ChatMessage {
   toolResults?: any;
 }
 
-export async function saveChatMessage(message: Omit<ChatMessage, "id">) {
-  const id = uuidv7();
+export async function saveChatMessage(message: Omit<ChatMessage, "id"> & { id?: string }) {
+  const id = message.id || uuidv7();
   await db.send(
     new PutCommand({
       TableName: TABLE_NAME,
