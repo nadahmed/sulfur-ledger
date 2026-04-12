@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, Save, UserPlus, Shield, Mail, Trash2, Loader2, Key, Copy, Check, RotateCcw, FileJson, FileSpreadsheet, Download, Upload, Info, Sparkles, MessageSquare, Bot } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1696,7 +1697,7 @@ function SettingsInner() {
                               <Input
                                 id="aiModel"
                                 {...registerAi("model")}
-                                placeholder={watchAiProvider === "google" ? "gemini-3.1-flash-lite-preview" : "gpt-4o"}
+                                placeholder="Enter model name..."
                                 disabled={!canManage}
                               />
                             </div>
@@ -1721,11 +1722,37 @@ function SettingsInner() {
                           <div>
                             <p className="text-sm font-semibold text-primary">System Default Active</p>
                             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                              Using the system-wide configuration (Gemini 2.0 Flash Lite). Individual organizations can bring their own keys to unlock higher rate limits and specific models.
+                              Using the system-wide configuration. Individual organizations can bring their own keys to unlock higher rate limits and specific models.
                             </p>
                           </div>
                         </div>
                       )}
+
+                      <div className="space-y-4 pt-6 mt-6 border-t border-border/60">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Bot className="w-5 h-5 text-primary" />
+                          <div>
+                            <h3 className="text-sm font-semibold">Identity & Personality</h3>
+                            <p className="text-[10px] text-muted-foreground">Standardized using AIEOS (AI Entity Object Specification)</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="aiPersonality" className="text-xs font-bold uppercase tracking-tight text-muted-foreground/80">Soul (AIEOS Document)</Label>
+                            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-mono">INTEGRATED OVERLAY</span>
+                          </div>
+                          <Textarea
+                            id="aiPersonality"
+                            {...registerAi("personality")}
+                            placeholder="Optional. Define specific traits, identity, or tone (e.g. 'Highly formal, speaks in third-person, emphasizes audit trails')."
+                            className="min-h-[120px] text-sm resize-none"
+                            disabled={!canManage}
+                          />
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            This personality will be layered over the default world-class financial expert behavior. If empty, the assistant defaults to standard professional conduct.
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     {canManage && (

@@ -34,6 +34,7 @@ export interface AiSettings {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
+  personality?: string;
 }
 
 export interface Organization {

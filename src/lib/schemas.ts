@@ -133,6 +133,7 @@ export const AiSettingsSchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().optional(),
   baseUrl: z.string().optional(),
+  personality: z.string().optional(),
 });
 
 export type AiSettingsFormValues = z.infer<typeof AiSettingsSchema>;
