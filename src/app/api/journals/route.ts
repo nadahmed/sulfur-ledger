@@ -11,6 +11,7 @@ import { getOrganization } from "@/lib/db/organizations";
 import { getEffectiveStorageConfig, finalizeFile, deleteFile } from "@/lib/storage";
 
 import { checkPermission } from "@/lib/auth";
+import { getAuditMetadata } from "@/lib/audit-utils";
 
 export async function GET(req: NextRequest) {
   const auth = await checkPermission("read:journals", req);
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const metadata = getAuditMetadata(req);
     const body = await req.json();
     const { date, description, amount, fromAccountId, toAccountId, tags, receipt } = body;
 
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     const result = await createJournalEntry({
       orgId, id: journalId, date: finalDate, description, tags, receipt, createdAt: new Date().toISOString()
-    }, parsedLines, user!.sub, user!.name);
+    }, parsedLines, user!.sub, user!.name, metadata);
 
     // --- Receipt Finalization ---
     if (receipt && receipt.key) {
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
 
           // Update DB with final key if it changed
           if (finalKey !== receipt.key) {
-            await updateJournalEntry(orgId, journalId, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name);
+            await updateJournalEntry(orgId, journalId, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name, metadata);
           }
         }
       } catch (err) {
@@ -115,6 +117,7 @@ export async function PATCH(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
   try {
+    const metadata = getAuditMetadata(req);
     const body = await req.json();
     const { id, oldDate, date, description, amount, fromAccountId, toAccountId, tags, receipt } = body;
 
@@ -139,7 +142,7 @@ export async function PATCH(req: NextRequest) {
     const oldEntry = await getJournalEntry(orgId, id, oldDate);
     const oldReceipt = oldEntry?.receipt;
 
-    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, tags, receipt }, parsedLines, user!.sub, user!.name);
+    await updateJournalEntry(orgId, id, oldDate, { date: finalDate, description, tags, receipt }, parsedLines, user!.sub, user!.name, metadata);
 
     // --- Receipt Side Effects ---
     const org = await getOrganization(orgId);
@@ -160,7 +163,7 @@ export async function PATCH(req: NextRequest) {
         try {
           const finalKey = await finalizeFile(config, receipt.key);
           if (finalKey !== receipt.key) {
-            await updateJournalEntry(orgId, id, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name);
+            await updateJournalEntry(orgId, id, finalDate, { receipt: { ...receipt, key: finalKey } }, [], user!.sub, user!.name, metadata);
           }
         } catch (err) {
           console.error("Failed to finalize new receipt:", err);
@@ -183,6 +186,7 @@ export async function DELETE(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
   try {
+    const metadata = getAuditMetadata(req);
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const date = searchParams.get("date");
@@ -191,7 +195,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const deletedEntry = await deleteJournalEntry(orgId, id, date, user!.sub, user!.name);
+    const deletedEntry = await deleteJournalEntry(orgId, id, date, user!.sub, user!.name, metadata);
 
     // --- Receipt Cleanup ---
     if (deletedEntry?.receipt?.key) {

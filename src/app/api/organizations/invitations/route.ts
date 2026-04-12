@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     await createInvitation(invitation);
 
-    const inviteLink = `${process.env.APP_BASE_URL}/auth/login?returnTo=${encodeURIComponent(`/onboarding?inviteOrgId=${orgId}`)}`;
+    const inviteLink = `${process.env.APP_BASE_URL}/auth/login?returnTo=${encodeURIComponent(`/app/onboarding?inviteOrgId=${orgId}`)}`;
     
     await sendEmail(orgId, {
       to: email,

@@ -80,7 +80,7 @@ export const InvitationSchema = z.object({
 export type InvitationFormValues = z.infer<typeof InvitationSchema>;
 
 export const EmailSettingsSchema = z.object({
-  provider: z.enum(["none", "brevo", "smtp"]),
+  provider: z.enum(["system", "brevo", "smtp"]),
   senderEmail: z.string().email("Invalid sender email").or(z.literal("")),
   senderName: z.string().min(1, "Sender name is required"),
   apiKey: z.string().optional(),

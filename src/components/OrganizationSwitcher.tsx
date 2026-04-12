@@ -24,7 +24,7 @@ export function OrganizationSwitcher() {
       value={activeOrganizationId || ""} 
       onValueChange={(value) => {
         if (value === "new") {
-          router.push("/onboarding");
+          router.push("/app/onboarding");
         } else {
           setActiveOrganizationId(value);
           // Force reload to clear any cached data or state tied to the old org

@@ -207,7 +207,7 @@ function SettingsInner() {
       refreshOrganizations();
       setActiveOrganizationId(null);
       toast.success("You have left the organization.");
-      router.push("/onboarding");
+      router.push("/app/onboarding");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -287,7 +287,7 @@ function SettingsInner() {
       refreshOrganizations();
       setActiveOrganizationId(null);
       toast.success("Organization deleted successfully");
-      router.push("/onboarding");
+      router.push("/app/onboarding");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -483,7 +483,7 @@ function SettingsInner() {
     watch: watchEmail,
   } = useForm<EmailSettingsFormValues>({
     resolver: zodResolver(EmailSettingsSchema),
-    defaultValues: emailSettings || { provider: "none", senderEmail: "", senderName: "Sulfur Book" },
+    defaultValues: emailSettings || { provider: "system", senderEmail: "", senderName: "Sulfur Book" },
   });
 
   const {
@@ -912,26 +912,6 @@ function SettingsInner() {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleSubmitInvite((v) => inviteMutation.mutate(v))} className="space-y-4">
-                      {emailSettings?.provider === "none" && (
-                        <div className="p-3 bg-warning/5 border border-warning/20 rounded-lg text-sm text-warning">
-                          <div className="flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                            <div>
-                              <p className="font-medium">Email not configured</p>
-                              <p className="text-xs opacity-90 mt-0.5">
-                                Invitations won't be sent. Please{" "}
-                                <button
-                                  type="button"
-                                  className="font-semibold underline hover:text-warning"
-                                  onClick={() => handleTabChange("email")}
-                                >
-                                  configure email delivery
-                                </button>.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       <div className="space-y-2">
                         <Label htmlFor="email">Email Address</Label>
                         <Input
@@ -964,7 +944,7 @@ function SettingsInner() {
                           )}
                         />
                       </div>
-                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending || emailSettings?.provider === "none"}>
+                      <Button className="w-full" type="submit" disabled={!canManage || inviteMutation.isPending}>
                         {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
                       </Button>
                     </form>
@@ -1167,11 +1147,11 @@ function SettingsInner() {
                             >
                               <SelectTrigger id="provider">
                                 <SelectValue>
-                                  {field.value === "none" ? "None (Disabled)" : field.value === "brevo" ? "Brevo (API)" : field.value === "smtp" ? "Custom SMTP" : undefined}
+                                  {field.value === "system" ? "System Default" : field.value === "brevo" ? "Brevo (API)" : field.value === "smtp" ? "Custom SMTP" : undefined}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="none">None (Disabled)</SelectItem>
+                                <SelectItem value="system">System Default</SelectItem>
                                 <SelectItem value="brevo">Brevo (API)</SelectItem>
                                 <SelectItem value="smtp">Custom SMTP</SelectItem>
                               </SelectContent>
@@ -1180,25 +1160,27 @@ function SettingsInner() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="senderName">Sender Name</Label>
-                          <Input
-                            id="senderName"
-                            {...registerEmail("senderName")}
-                            disabled={!canManage}
-                          />
+                      {watchProvider !== "system" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="senderName">Sender Name</Label>
+                            <Input
+                              id="senderName"
+                              {...registerEmail("senderName")}
+                              disabled={!canManage}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="senderEmail">Sender Email</Label>
+                            <Input
+                              id="senderEmail"
+                              type="email"
+                              {...registerEmail("senderEmail")}
+                              disabled={!canManage}
+                            />
+                          </div>
                         </div>
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="senderEmail">Sender Email</Label>
-                          <Input
-                            id="senderEmail"
-                            type="email"
-                            {...registerEmail("senderEmail")}
-                            disabled={!canManage}
-                          />
-                        </div>
-                      </div>
+                      )}
 
                       {watchProvider === "brevo" && (
                         <div className="space-y-1.5">
@@ -1244,14 +1226,16 @@ function SettingsInner() {
                         <Button type="submit" disabled={saveEmailMutation.isPending || testEmailMutation.isPending}>
                           {saveEmailMutation.isPending ? "Saving..." : "Save Email Settings"}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
-                          disabled={saveEmailMutation.isPending || testEmailMutation.isPending || watchProvider === "none"}
-                        >
-                          {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
-                        </Button>
+                        {watchProvider !== "system" && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleSubmitEmail((v) => testEmailMutation.mutate(v))}
+                            disabled={saveEmailMutation.isPending || testEmailMutation.isPending}
+                          >
+                            {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </form>

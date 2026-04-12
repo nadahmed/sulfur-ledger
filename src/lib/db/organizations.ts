@@ -2,7 +2,7 @@ import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { db, TABLE_NAME } from "../dynamodb";
 
 export interface EmailSettings {
-  provider: "brevo" | "smtp" | "none";
+  provider: "system" | "brevo" | "smtp";
   apiKey?: string; // For Brevo
   smtpHost?: string;
   smtpPort?: number;

@@ -55,18 +55,52 @@ async function sendRawEmail(settings: EmailSettings, options: SendEmailOptions) 
   }
 }
 
+export function getSystemEmailSettings(): EmailSettings {
+  return {
+    provider: (process.env.SYSTEM_EMAIL_PROVIDER || "smtp") as "brevo" | "smtp",
+    apiKey: process.env.SYSTEM_BREVO_API_KEY,
+    smtpHost: process.env.SYSTEM_SMTP_HOST,
+    smtpPort: parseInt(process.env.SYSTEM_SMTP_PORT || "587"),
+    smtpUser: process.env.SYSTEM_SMTP_USER,
+    smtpPass: process.env.SYSTEM_SMTP_PASS,
+    senderEmail: process.env.SYSTEM_EMAIL_SENDER_EMAIL || "no-reply@sulfurbook.com",
+    senderName: process.env.SYSTEM_EMAIL_SENDER_NAME || "Sulfur Book",
+  };
+}
+
+export function getEffectiveEmailSettings(org: { emailSettings?: EmailSettings }): EmailSettings {
+  const settings = org.emailSettings;
+
+  if (!settings || settings.provider === "system") {
+    return getSystemEmailSettings();
+  }
+
+  return settings;
+}
+
 export async function sendEmail(orgId: string, options: SendEmailOptions) {
   const org = await getOrganization(orgId);
-  if (!org || !org.emailSettings || org.emailSettings.provider === "none") {
-    console.log(`[EMAIL MOCK] No email settings for org ${orgId}. Sending to ${options.to}: ${options.subject}`);
+  if (!org) {
+    console.error(`[EMAIL ERROR] Organization ${orgId} not found`);
     return;
   }
 
-  await sendRawEmail(org.emailSettings, options);
+  const settings = getEffectiveEmailSettings(org);
+  
+  // Prefix subject with organization name
+  const orgName = org.name || "Sulfur Book";
+  const prefixedSubject = `[${orgName}] ${options.subject}`;
+
+  await sendRawEmail(settings, { 
+    ...options, 
+    subject: prefixedSubject 
+  });
 }
 
 export async function testEmail(settings: EmailSettings, to: string) {
-  await sendRawEmail(settings, {
+  const effectiveSettings = settings.provider === "system" ? getSystemEmailSettings() : settings;
+  
+  await sendRawEmail(effectiveSettings, {
     to,
     subject: "SMTP Setup Test Email",
     text: "Hello!\n\nThis is a test email from Sulfur Book to verify your SMTP settings.\n\nIf you received this, your configuration is working correctly.",

@@ -255,7 +255,14 @@ export async function GET(req: NextRequest) {
       action: "export",
       entityType: "Report",
       entityId: reportType,
-      details: JSON.stringify({ message: `Exported ${reportTitle} PDF`, startDate, endDate }),
+      details: `Exported ${reportTitle} PDF`,
+      data: { 
+        reportType, 
+        startDate, 
+        endDate, 
+        tags: tags || [], 
+        format: "pdf" 
+      },
       timestamp: new Date().toISOString()
     });
 

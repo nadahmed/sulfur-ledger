@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkPermission } from "@/lib/auth";
 import { createRecurringEntry, getRecurringEntries, getRecurringEntriesByAccount, updateRecurringEntry, deleteRecurringEntry } from "@/lib/db/recurring";
 import { uuidv7 } from "uuidv7";
+import { getAuditMetadata } from "@/lib/audit-utils";
 
 export async function GET(req: NextRequest) {
   const auth = await checkPermission("read:journals", req);
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
   try {
+    const metadata = getAuditMetadata(req);
     const body = await req.json();
     const id = uuidv7();
     const amountFloat = parseFloat(body.amount);
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       nextProcessDate: body.startDate,
       isActive: true,
-    }, user!.sub, user!.name);
+    }, user!.sub, user!.name, metadata);
 
     return NextResponse.json(entry, { status: 201 });
   } catch (err: any) {
@@ -65,6 +67,7 @@ export async function PATCH(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
   try {
+    const metadata = getAuditMetadata(req);
     const body = await req.json();
     const { id, ...updates } = body;
     
@@ -72,7 +75,7 @@ export async function PATCH(req: NextRequest) {
       updates.amount = Math.round(parseFloat(updates.amount) * 100);
     }
 
-    await updateRecurringEntry(orgId, id, updates, user!.sub, user!.name);
+    await updateRecurringEntry(orgId, id, updates, user!.sub, user!.name, metadata);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("PATCH /api/recurring error:", err);
@@ -89,6 +92,7 @@ export async function DELETE(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "No active organization" }, { status: 400 });
 
   try {
+    const metadata = getAuditMetadata(req);
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const accountId = searchParams.get("accountId");
@@ -97,14 +101,14 @@ export async function DELETE(req: NextRequest) {
       // Cleanup all recurring entries for this account
       const entries = await getRecurringEntriesByAccount(orgId, accountId);
       for (const entry of entries) {
-        await deleteRecurringEntry(orgId, entry.id, user!.sub, user!.name);
+        await deleteRecurringEntry(orgId, entry.id, user!.sub, user!.name, metadata);
       }
       return NextResponse.json({ success: true, deletedCount: entries.length });
     }
 
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    await deleteRecurringEntry(orgId, id, user!.sub, user!.name);
+    await deleteRecurringEntry(orgId, id, user!.sub, user!.name, metadata);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("DELETE /api/recurring error:", err);

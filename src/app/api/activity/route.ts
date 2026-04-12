@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActivityLogs } from "@/lib/db/audit";
+import { getActivityLogs, ActivityFilter } from "@/lib/db/audit";
 import { checkPermission } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -13,13 +13,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "orgId is required" }, { status: 400 });
   }
 
+  const limit = parseInt(searchParams.get("limit") || "50");
+  const cursor = searchParams.get("cursor") || undefined;
+  
+  const filters: ActivityFilter = {
+    action: searchParams.get("action") || undefined,
+    userId: searchParams.get("userId") || undefined,
+    entityType: searchParams.get("entityType") || undefined,
+    entityId: searchParams.get("entityId") || undefined,
+    type: (searchParams.get("type") as "ui" | "mcp") || undefined,
+    startDate: searchParams.get("from") || searchParams.get("startDate") || undefined,
+    endDate: searchParams.get("to") || searchParams.get("endDate") || undefined,
+  };
+
   try {
-    const logs = await getActivityLogs(orgId, 500);
-    return NextResponse.json(logs);
+    const result = await getActivityLogs(orgId, limit, cursor, filters);
+    return NextResponse.json(result);
   } catch (err: any) {
+    console.error("Activity API Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 
 
 

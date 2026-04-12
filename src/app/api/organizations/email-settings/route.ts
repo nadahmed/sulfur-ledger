@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const org = await getOrganization(orgId);
-    return NextResponse.json(org?.emailSettings || { provider: "none" });
+    return NextResponse.json(org?.emailSettings || { provider: "system" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

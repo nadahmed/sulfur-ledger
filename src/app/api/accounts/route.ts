@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAccount, getAccounts, AccountCategory } from "@/lib/db/accounts";
+import { getAuditMetadata } from "@/lib/audit-utils";
 
 import { checkPermission } from "@/lib/auth";
 
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const metadata = getAuditMetadata(req);
     const body = await req.json();
     const { id: providedId, name, category } = body;
 
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
       category: category as AccountCategory,
       status: "active",
       createdAt: new Date().toISOString(),
-    }, user!.sub, user!.name);
+    }, user!.sub, user!.name, metadata);
 
     return NextResponse.json(account, { status: 201 });
   } catch (err: any) {
@@ -122,6 +124,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    const metadata = getAuditMetadata(req);
     const { searchParams } = new URL(req.url);
     const accountId = searchParams.get("id");
 
@@ -138,7 +141,7 @@ export async function DELETE(req: NextRequest) {
     const recurringEntries = await getRecurringEntriesByAccount(orgId, accountId);
     if (recurringEntries.length > 0) {
       for (const entry of recurringEntries) {
-        await deleteRecurringEntry(orgId, entry.id, user!.sub, user!.name);
+        await deleteRecurringEntry(orgId, entry.id, user!.sub, user!.name, metadata);
       }
     }
 
@@ -146,14 +149,14 @@ export async function DELETE(req: NextRequest) {
 
     if (lines && lines.length > 0) {
       // Soft delete: archive
-      await archiveAccount(orgId, accountId, user!.sub, user!.name);
+      await archiveAccount(orgId, accountId, user!.sub, user!.name, metadata);
       return NextResponse.json({ 
         message: "Account archived successfully because it contains transactions.",
         recurringDeleted: recurringEntries.length
       });
     } else {
       // Hard delete
-      await deleteAccount(orgId, accountId, user!.sub, user!.name);
+      await deleteAccount(orgId, accountId, user!.sub, user!.name, metadata);
       return NextResponse.json({ 
         message: "Account deleted permanently.",
         recurringDeleted: recurringEntries.length
@@ -161,6 +164,7 @@ export async function DELETE(req: NextRequest) {
     }
 
   } catch (err: any) {
+    console.error("DELETE Account Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -175,6 +179,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    const metadata = getAuditMetadata(req);
     const { searchParams } = new URL(req.url);
     const accountId = searchParams.get("id");
     const action = searchParams.get("action");
@@ -185,7 +190,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === "unarchive") {
       const { unarchiveAccount } = require("@/lib/db/accounts");
-      await unarchiveAccount(orgId, accountId, user!.sub, user!.name);
+      await unarchiveAccount(orgId, accountId, user!.sub, user!.name, metadata);
       return NextResponse.json({ message: "Account unarchived successfully." });
     }
 
@@ -199,12 +204,13 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "An account with this name already exists" }, { status: 400 });
       }
 
-      await updateAccountName(orgId, accountId, name, user!.sub, user!.name);
+      await updateAccountName(orgId, accountId, name, user!.sub, user!.name, metadata);
       return NextResponse.json({ message: "Account name updated successfully." });
     }
 
     return NextResponse.json({ error: "Invalid action or missing name" }, { status: 400 });
   } catch (err: any) {
+    console.error("PATCH Account Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

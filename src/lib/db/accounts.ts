@@ -14,7 +14,12 @@ export interface Account {
   createdAt: string;
 }
 
-export async function createAccount(account: Account, userId?: string, userName?: string) {
+export async function createAccount(
+  account: Account, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   await db.send(
     new PutCommand({
       TableName: TABLE_NAME,
@@ -38,8 +43,10 @@ export async function createAccount(account: Account, userId?: string, userName?
       action: "create",
       entityType: "Account",
       entityId: account.id,
-      details: JSON.stringify({ name: account.name, category: account.category }),
+      details: `Created account: ${account.name}`,
+      data: account,
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 
@@ -73,17 +80,26 @@ export async function getAccount(orgId: string, accountId: string): Promise<Acco
   return (result.Item as Account) || null;
 }
 
-export async function deleteAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
+export async function deleteAccount(
+  orgId: string, 
+  accountId: string, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
+  const result = await db.send(
     new DeleteCommand({
       TableName: TABLE_NAME,
       Key: {
         PK: `ORG#${orgId}#ACCOUNT`,
         SK: `ACC#${accountId}`,
       },
+      ReturnValues: "ALL_OLD",
     })
   );
+
+  const oldAccount = result.Attributes;
 
   if (userId) {
     await createAuditLog({
@@ -94,16 +110,24 @@ export async function deleteAccount(orgId: string, accountId: string, userId?: s
       action: "delete",
       entityType: "Account",
       entityId: accountId,
-      details: "Deleted account",
+      details: `Deleted account: ${oldAccount?.name || accountId}`,
+      data: oldAccount,
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
 
 
-export async function archiveAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
+export async function archiveAccount(
+  orgId: string, 
+  accountId: string, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
+  const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: {
@@ -117,10 +141,13 @@ export async function archiveAccount(orgId: string, accountId: string, userId?: 
       ExpressionAttributeValues: {
         ":archived": "archived",
       },
+      ReturnValues: "ALL_OLD",
     })
   );
 
-  if (userId) {
+  const oldAccount = result.Attributes;
+
+  if (userId && oldAccount?.status !== "archived") {
     await createAuditLog({
       orgId,
       id: uuidv7(),
@@ -129,15 +156,25 @@ export async function archiveAccount(orgId: string, accountId: string, userId?: 
       action: "update",
       entityType: "Account",
       entityId: accountId,
-      details: "Archived account",
+      details: `Archived account: ${oldAccount?.name || accountId}`,
+      changes: {
+        status: { old: oldAccount?.status || "active", new: "archived" },
+      },
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
 
-export async function unarchiveAccount(orgId: string, accountId: string, userId?: string, userName?: string) {
+export async function unarchiveAccount(
+  orgId: string, 
+  accountId: string, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
+  const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: {
@@ -151,10 +188,13 @@ export async function unarchiveAccount(orgId: string, accountId: string, userId?
       ExpressionAttributeValues: {
         ":active": "active",
       },
+      ReturnValues: "ALL_OLD",
     })
   );
 
-  if (userId) {
+  const oldAccount = result.Attributes;
+
+  if (userId && oldAccount?.status !== "active") {
     await createAuditLog({
       orgId,
       id: uuidv7(),
@@ -163,15 +203,26 @@ export async function unarchiveAccount(orgId: string, accountId: string, userId?
       action: "update",
       entityType: "Account",
       entityId: accountId,
-      details: "Unarchived account",
+      details: `Unarchived account: ${oldAccount?.name || accountId}`,
+      changes: {
+        status: { old: oldAccount?.status || "archived", new: "active" },
+      },
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
 
-export async function updateAccountName(orgId: string, accountId: string, name: string, userId?: string, userName?: string) {
+export async function updateAccountName(
+  orgId: string, 
+  accountId: string, 
+  name: string, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
+  const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: {
@@ -185,10 +236,13 @@ export async function updateAccountName(orgId: string, accountId: string, name: 
       ExpressionAttributeValues: {
         ":name": name,
       },
+      ReturnValues: "ALL_OLD",
     })
   );
 
-  if (userId) {
+  const oldAccount = result.Attributes;
+
+  if (userId && oldAccount?.name !== name) {
     await createAuditLog({
       orgId,
       id: uuidv7(),
@@ -197,9 +251,12 @@ export async function updateAccountName(orgId: string, accountId: string, name: 
       action: "update",
       entityType: "Account",
       entityId: accountId,
-      details: JSON.stringify({ newName: name }),
+      details: `Renamed account: ${oldAccount?.name} -> ${name}`,
+      changes: {
+        name: { old: oldAccount?.name, new: name },
+      },
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
-

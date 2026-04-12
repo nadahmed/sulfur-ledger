@@ -48,7 +48,13 @@ function mergeDuplicateAccountLines(lines: JournalLine[]): JournalLine[] {
   return Array.from(merged.values()).filter(l => l.amount !== 0);
 }
 
-export async function createJournalEntry(entry: JournalEntry, lines: JournalLine[], userId: string, userName?: string) {
+export async function createJournalEntry(
+  entry: JournalEntry, 
+  lines: JournalLine[], 
+  userId: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   // Validate double entry (sum of amounts = 0)
   const total = lines.reduce((acc, line) => acc + line.amount, 0);
   if (total !== 0) {
@@ -112,8 +118,10 @@ export async function createJournalEntry(entry: JournalEntry, lines: JournalLine
     action: "create",
     entityType: "JournalEntry",
     entityId: entry.id,
-    details: JSON.stringify({ date: entry.date, description: entry.description }),
+    details: `Created journal entry: ${entry.description}`,
+    data: { entry, lines: mergedLines },
     timestamp: new Date().toISOString(),
+    ...metadata,
   });
 
   return { entry, lines };
@@ -455,7 +463,14 @@ export async function getJournalLinesForJournal(orgId: string, journalId: string
   return (result.Items as unknown as JournalLine[]) || [];
 }
 
-export async function deleteJournalEntry(orgId: string, entryId: string, date: string, userId: string, userName?: string) {
+export async function deleteJournalEntry(
+  orgId: string, 
+  entryId: string, 
+  date: string, 
+  userId: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   // 1. Fetch the entry first so we can return its data (e.g. receipt) for cleanup
   const entry = await getJournalEntry(orgId, entryId, date);
   if (!entry) return null;
@@ -514,8 +529,10 @@ export async function deleteJournalEntry(orgId: string, entryId: string, date: s
     action: "delete",
     entityType: "JournalEntry",
     entityId: entryId,
-    details: JSON.stringify({ date }),
+    details: `Deleted journal entry from ${date}`,
+    data: entry,
     timestamp: new Date().toISOString(),
+    ...metadata,
   });
 
   return entry;
@@ -528,7 +545,8 @@ export async function updateJournalEntry(
   newEntry: Partial<JournalEntry>,
   newLines: JournalLine[] = [],
   userId: string,
-  userName?: string
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
 ) {
   // 0. Fetch the old entry to get its actual SK and data
   const oldEntry = await getJournalEntry(orgId, entryId, oldDate);
@@ -650,9 +668,21 @@ export async function updateJournalEntry(
 
   const { dynamoDBClient } = require("../dynamodb");
 
-  await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
+  await dynamoDBClient.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));  // 3. Update Audit Log
+  const changes: Record<string, { old: any; new: any }> = {};
+  if (newEntry.date && newEntry.date !== oldEntry.date) {
+    changes.date = { old: oldEntry.date, new: newEntry.date };
+  }
+  if (newEntry.description && newEntry.description !== oldEntry.description) {
+    changes.description = { old: oldEntry.description, new: newEntry.description };
+  }
+  if (newEntry.notes !== undefined && newEntry.notes !== oldEntry.notes) {
+    changes.notes = { old: oldEntry.notes, new: newEntry.notes };
+  }
+  if (newLines.length > 0) {
+    changes.lines = { old: "Check historical log", new: "Multiple updates" };
+  }
 
-  // Audit Log
   await createAuditLog({
     orgId,
     id: uuidv7(),
@@ -661,13 +691,12 @@ export async function updateJournalEntry(
     action: "update",
     entityType: "JournalEntry",
     entityId: entryId,
-    details: JSON.stringify({
-      oldDate,
-      newDate: newEntry.date,
-      description: newEntry.description
-    }),
+    details: `Updated journal entry: ${newEntry.description || oldEntry.description}`,
+    changes,
     timestamp: new Date().toISOString(),
+    ...metadata,
   });
+
 
   // Return the updated entry from the DB (merged with new values)
   return getJournalEntry(orgId, entryId, newEntry.date || oldDate);

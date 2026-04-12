@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllJournalEntriesWithLines } from "@/lib/db/journals";
 import { getAccounts } from "@/lib/db/accounts";
 import { checkPermission } from "@/lib/auth";
+import { createAuditLog } from "@/lib/db/audit";
+import { uuidv7 } from "uuidv7";
 
 export async function GET(req: NextRequest) {
   try {
@@ -48,6 +50,21 @@ export async function GET(req: NextRequest) {
       });
 
       const csvString = csvRows.join("\n");
+
+      // Log the export activity
+      await createAuditLog({
+        orgId,
+        id: uuidv7(),
+        userId: user!.sub,
+        userName: user!.name || "Unknown",
+        action: "export",
+        entityType: "Organization",
+        entityId: orgId,
+        details: `Exported organization data as CSV`,
+        data: { format: "csv" },
+        timestamp: new Date().toISOString()
+      });
+
       return new NextResponse(csvString, {
         headers: {
           "Content-Type": "text/csv",
@@ -62,6 +79,20 @@ export async function GET(req: NextRequest) {
       accounts,
       journals,
     };
+
+    // Log the export activity
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId: user!.sub,
+      userName: user!.name || "Unknown",
+      action: "export",
+      entityType: "Organization",
+      entityId: orgId,
+      details: `Exported organization data as ${formatType.toUpperCase()}`,
+      data: { format: formatType },
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json(exportData);
   } catch (err: any) {

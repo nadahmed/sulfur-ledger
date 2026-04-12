@@ -24,7 +24,12 @@ export interface RecurringEntry {
   createdAt: string;
 }
 
-export async function createRecurringEntry(entry: RecurringEntry, userId?: string, userName?: string) {
+export async function createRecurringEntry(
+  entry: RecurringEntry, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   await db.send(
     new PutCommand({
       TableName: TABLE_NAME,
@@ -46,8 +51,10 @@ export async function createRecurringEntry(entry: RecurringEntry, userId?: strin
       action: "create",
       entityType: "RecurringEntry",
       entityId: entry.id,
-      details: JSON.stringify({ description: entry.description, frequency: entry.frequency }),
+      details: `Created recurring entry: ${entry.description}`,
+      data: entry,
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 
@@ -81,7 +88,14 @@ export async function getRecurringEntry(orgId: string, id: string): Promise<Recu
   return (result.Item as RecurringEntry) || null;
 }
 
-export async function updateRecurringEntry(orgId: string, id: string, updates: Partial<RecurringEntry>, userId?: string, userName?: string) {
+export async function updateRecurringEntry(
+  orgId: string, 
+  id: string, 
+  updates: Partial<RecurringEntry>, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   
   let updateExpression = "SET";
@@ -100,7 +114,7 @@ export async function updateRecurringEntry(orgId: string, id: string, updates: P
   // Remove trailing comma
   updateExpression = updateExpression.slice(0, -1);
 
-  await db.send(
+  const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: {
@@ -110,10 +124,21 @@ export async function updateRecurringEntry(orgId: string, id: string, updates: P
       UpdateExpression: updateExpression,
       ExpressionAttributeNames: expressionAttributeNames,
       ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: "ALL_OLD",
     })
   );
 
+  const oldEntry = result.Attributes;
+
   if (userId) {
+    // Determine changes
+    const changes: Record<string, { old: any; new: any }> = {};
+    Object.entries(updates).forEach(([key, value]) => {
+      if (oldEntry && oldEntry[key] !== value) {
+        changes[key] = { old: oldEntry[key], new: value };
+      }
+    });
+
     await createAuditLog({
       orgId,
       id: uuidv7(),
@@ -122,22 +147,34 @@ export async function updateRecurringEntry(orgId: string, id: string, updates: P
       action: "update",
       entityType: "RecurringEntry",
       entityId: id,
-      details: "Updated recurring entry",
+      details: `Updated recurring entry: ${id}`,
+      changes,
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
 
-export async function deleteRecurringEntry(orgId: string, id: string, userId?: string, userName?: string) {
-  await db.send(
+export async function deleteRecurringEntry(
+  orgId: string, 
+  id: string, 
+  userId?: string, 
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
+  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
+  const result = await db.send(
     new DeleteCommand({
       TableName: TABLE_NAME,
       Key: {
         PK: `ORG#${orgId}#RECURRING`,
         SK: `REC#${id}`,
       },
+      ReturnValues: "ALL_OLD",
     })
   );
+
+  const oldEntry = result.Attributes;
 
   if (userId) {
     await createAuditLog({
@@ -148,8 +185,10 @@ export async function deleteRecurringEntry(orgId: string, id: string, userId?: s
       action: "delete",
       entityType: "RecurringEntry",
       entityId: id,
-      details: "Deleted recurring entry",
+      details: `Deleted recurring entry: ${oldEntry?.description || id}`,
+      data: oldEntry,
       timestamp: new Date().toISOString(),
+      ...metadata,
     });
   }
 }
