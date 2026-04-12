@@ -40,25 +40,46 @@ export default function AiChatbot() {
     orgIdRef.current = activeOrganizationId;
   }, [activeOrganizationId]);
 
-  // Fetch history
+  const syncMessages = async () => {
+    if (!activeOrganizationId) return;
+    try {
+      const res = await fetch(`/api/ai/history?orgId=${activeOrganizationId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setMessages(data.map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            metadata: {
+              createdAt: m.timestamp,
+              userInitials: m.userInitials
+            }
+          })));
+        }
+      }
+    } catch (err) {
+      console.error("[AI CHAT] Sync failed:", err);
+    }
+  };
+
+  // Fetch history when opening
   useEffect(() => {
     if (activeOrganizationId && isOpen) {
-      fetch(`/api/ai/history?orgId=${activeOrganizationId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setMessages(data.map(m => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              metadata: {
-                createdAt: m.timestamp,
-                userInitials: m.userInitials
-              }
-            })));
-          }
-        });
+      syncMessages();
     }
+  }, [activeOrganizationId, isOpen]);
+
+  // Sync on window focus to unstick throttled states
+  useEffect(() => {
+    const handleFocus = () => {
+      if (activeOrganizationId && isOpen) {
+        console.log("[AI CHAT] Window focused, syncing state...");
+        syncMessages();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [activeOrganizationId, isOpen]);
 
   // Soketi/Pusher Subscription

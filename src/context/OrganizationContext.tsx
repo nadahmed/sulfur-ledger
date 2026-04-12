@@ -140,18 +140,25 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   const isOwnerStatus = !!activeOrg?.isOwner;
 
+  const contextValue = useMemo(() => ({ 
+    activeOrganizationId, 
+    setActiveOrganizationId: handleSetOrgId, 
+    organizations,
+    permissions,
+    isOwner: isOwnerStatus,
+    isLoading: isLoading || isUserLoading,
+    refreshOrganizations
+  }), [
+    activeOrganizationId, 
+    organizations, 
+    permissions, 
+    isOwnerStatus, 
+    isLoading, 
+    isUserLoading
+  ]);
+
   return (
-    <OrganizationContext.Provider
-      value={{ 
-        activeOrganizationId, 
-        setActiveOrganizationId: handleSetOrgId, 
-        organizations,
-        permissions,
-        isOwner: isOwnerStatus,
-        isLoading: isLoading || isUserLoading,
-        refreshOrganizations
-      }}
-    >
+    <OrganizationContext.Provider value={contextValue}>
       {children}
     </OrganizationContext.Provider>
   );
