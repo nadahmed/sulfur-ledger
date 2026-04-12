@@ -121,8 +121,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
     description: "Returns the net balance of a specific account.",
     inputSchema: z.object({
       accountId: z.string(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     }),
     execute: async ({ accountId, startDate, endDate }) => {
       const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
@@ -134,8 +134,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   get_financial_summary: tool({
     description: "Returns a high-level Profit & Loss summary for a period.",
     inputSchema: z.object({
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     }),
     execute: async ({ startDate, endDate }) => {
       const [accs, entries] = await Promise.all([
