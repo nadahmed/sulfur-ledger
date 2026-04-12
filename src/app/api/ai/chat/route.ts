@@ -88,15 +88,12 @@ export async function POST(req: NextRequest) {
     }, 8500);
 
     try {
-      const result = await processChatTurn({
+      await processChatTurn({
         ...chatOptions,
         abortSignal: controller.signal
       });
 
-      // Wait for completion (if not aborted)
-      await result.text;
       clearTimeout(timeoutId);
-      
       return Response.json({ success: true, mode: "sync" });
     } catch (err: any) {
       if (err.name === 'AbortError') {

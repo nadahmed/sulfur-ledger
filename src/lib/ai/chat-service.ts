@@ -120,34 +120,39 @@ CONTEXT:\n- Organization Name: ${org.name}
     tools,
     abortSignal,
     stopWhen: stepCountIs(5),
-    onFinish: async ({ text }) => {
-      if (abortSignal?.aborted) {
-        console.log("[AI] Task aborted, skipping broadcast.");
-        return;
-      }
-
-      // Save Assistant Response
-      const savedMsg = await saveChatMessage({
-        orgId,
-        role: "assistant",
-        content: text,
-        timestamp: new Date().toISOString(),
-      }).catch(err => {
-        console.error("[AI] Failed to save assistant message:", err);
-        return null;
-      });
-
-      // Trigger Pusher Event
-      if (savedMsg) {
-        await pusherServer.trigger(`org-${orgId}`, "ai-message", {
-          id: savedMsg.id,
-          role: "assistant",
-          content: text,
-          timestamp: savedMsg.timestamp,
-        }).catch(err => console.error("[AI] Pusher trigger for assistant failed:", err));
-      }
-    },
   });
 
-  return result;
+  // WAIT FOR COMPLETION
+  const fullText = await result.text;
+  
+  // If we were aborted during the LLM call, stop here
+  if (abortSignal?.aborted) {
+    console.log("[AI] Task aborted after text generation, skipping finalize.");
+    return null;
+  }
+
+  // 7. Finalize (Save & Broadcast Assistant Message)
+  const savedMsg = await saveChatMessage({
+    orgId,
+    role: "assistant",
+    content: fullText,
+    timestamp: new Date().toISOString(),
+  }).catch(err => {
+    console.error("[AI] Failed to save assistant message:", err);
+    return null;
+  });
+
+  if (savedMsg) {
+    await pusherServer.trigger(`org-${orgId}`, "ai-message", {
+      id: savedMsg.id,
+      role: "assistant",
+      content: fullText,
+      timestamp: savedMsg.timestamp,
+    }).catch(err => console.error("[AI] Pusher trigger for assistant failed:", err));
+  }
+
+  // Ensure user save is also done (if we were waiting for it)
+  await userSavePromise;
+
+  return savedMsg;
 }
