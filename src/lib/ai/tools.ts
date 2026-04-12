@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as journalsDb from "../db/journals";
 import * as accountsDb from "../db/accounts";
 import * as tagsDb from "../db/tags";
+import { generateReportData } from "../reports";
 
 /**
  * Helper to check mutation permissions
@@ -118,46 +119,70 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   }),
 
   get_account_balance: tool({
-    description: "Returns the net balance of a specific account.",
+    description: "Returns the net balance of a specific account using canonical reporting logic.",
     inputSchema: z.object({
       accountId: z.string(),
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     }),
     execute: async ({ accountId, startDate, endDate }) => {
-      const lines = await journalsDb.getAccountLines(orgId, accountId, startDate, endDate);
-      const balance = lines.reduce((sum, line) => sum + line.amount, 0) / 100;
-      return `Balance for '${accountId}': ${balance.toFixed(2)} Taka`;
+      // Use trial-balance to get the most accurate LTDB/PTDB balance
+      const report = (await generateReportData(orgId, "trial-balance", startDate, endDate)) as any;
+      const acc = report.accounts?.find((a: any) => a.id === accountId);
+      
+      if (!acc) return `Account '${accountId}' not found in report.`;
+      
+      const balance = acc.balance / 100;
+      return `Canonical balance for '${accountId}': ${balance.toFixed(2)} Taka`;
     },
   }),
 
   get_financial_summary: tool({
-    description: "Returns a high-level Profit & Loss summary for a period.",
+    description: "Returns a high-level Profit & Loss summary for a period using canonical reporting logic.",
     inputSchema: z.object({
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     }),
     execute: async ({ startDate, endDate }) => {
-      const [accs, entries] = await Promise.all([
-        accountsDb.getAccounts(orgId),
-        journalsDb.getJournalEntries(orgId, startDate, endDate)
-      ]);
-      const catMap = new Map(accs.map(a => [a.id, a.category]));
-      let income = 0, expenses = 0;
-      for (const entry of entries) {
-        const lines = await journalsDb.getJournalLinesForJournal(orgId, entry.id);
-        for (const line of lines) {
-          const cat = catMap.get(line.accountId);
-          if (cat === "income") income -= line.amount;
-          else if (cat === "expense") expenses += line.amount;
-        }
-      }
+      const report = (await generateReportData(orgId, "income-statement", startDate, endDate)) as any;
+      
+      const totalIncome = (report.income || []).reduce((sum: any, item: any) => sum + Math.abs(item.balance), 0);
+      const totalExpenses = (report.expenses || []).reduce((sum: any, item: any) => sum + Math.abs(item.balance), 0);
+      
       return {
-        income: income / 100,
-        expenses: expenses / 100,
-        net: (income - expenses) / 100,
+        income: totalIncome / 100,
+        expenses: totalExpenses / 100,
+        net: (totalIncome - totalExpenses) / 100,
         period: `${startDate || "start"} to ${endDate || "now"}`
       };
+    },
+  }),
+
+  get_financial_report: tool({
+    description: "Fetches full financial reports (Trial Balance, Balance Sheet, Income Statement). ALWAYS use this for report-related queries.",
+    inputSchema: z.object({
+      reportType: z.enum(["trial-balance", "balance-sheet", "income-statement"]),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
+      tagIds: z.array(z.string()).optional(),
+    }),
+    execute: async ({ reportType, startDate, endDate, tagIds }) => {
+      const report = (await generateReportData(orgId, reportType, startDate, endDate, undefined, tagIds)) as any;
+      
+      // Sanitizing for LLM context (paisa to base currency)
+      if (report.accounts) {
+        report.accounts = report.accounts.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      }
+      if (report.assets) report.assets = report.assets.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      if (report.liabilities) report.liabilities = report.liabilities.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      if (report.equity) report.equity = report.equity.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      if (report.income) report.income = report.income.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      if (report.expenses) report.expenses = report.expenses.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+      
+      if (report.totalDebits) report.totalDebits = report.totalDebits / 100;
+      if (report.totalCredits) report.totalCredits = report.totalCredits / 100;
+      
+      return report;
     },
   }),
 });

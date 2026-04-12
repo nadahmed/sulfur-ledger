@@ -2,24 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  MessageSquare, 
-  X, 
-  Send, 
-  Bot, 
-  Trash2, 
-  RotateCcw, 
-  Sparkles, 
-  ChevronDown, 
-  Loader2,
-  Terminal,
-  CheckCircle2
-} from "lucide-react";
+import { MessageSquare, X, Send, Bot, Trash2, RotateCcw, Sparkles, ChevronDown, Loader2, Terminal, CheckCircle2 } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
+import { useUser } from "@auth0/nextjs-auth0/client";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getPusherClient } from "@/lib/pusher";
+import { uuidv7 } from "uuidv7";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // LlamaIndex compatible message type
 export interface Message {
@@ -34,6 +27,7 @@ export interface Message {
 }
 
 export default function AiChatbot() {
+  const { user } = useUser();
   const { activeOrganizationId, isOwner, organizations } = useOrganization();
   const [isOpen, setIsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,6 +61,30 @@ export default function AiChatbot() {
     }
   }, [activeOrganizationId, isOpen]);
 
+  // Soketi/Pusher Subscription
+  useEffect(() => {
+    if (!activeOrganizationId) return;
+
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe(`org-${activeOrganizationId}`);
+
+    channel.bind("ai-message", (data: any) => {
+      console.log("[AI CHAT] Received real-time message:", data);
+      
+      setMessages(prev => {
+        // Avoid duplicates if message already exists (e.g. from history fetch race condition)
+        if (prev.find(m => m.id === data.id)) return prev;
+        return [...prev, data];
+      });
+      setIsLoading(false);
+    });
+
+    return () => {
+      pusher.unsubscribe(`org-${activeOrganizationId}`);
+      pusher.disconnect();
+    };
+  }, [activeOrganizationId]);
+
   // Scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -84,13 +102,30 @@ export default function AiChatbot() {
     setInput("");
     setIsLoading(true);
 
+    const org = organizations.find(o => o.id === activeOrganizationId);
+    const localTime = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    }).format(new Date());
+
+    // Calculate initials from user data
+    const userInitials = user?.name
+      ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2)
+      : (user?.nickname?.substring(0, 2).toUpperCase() || "U");
+
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: uuidv7(),
       role: "user",
       content: userText,
       timestamp: new Date().toISOString(),
       metadata: {
-        userInitials: organizations.find(o => o.id === activeOrganizationId)?.name?.[0]?.toUpperCase() || "U"
+        userInitials: userInitials
       }
     };
 
@@ -103,41 +138,29 @@ export default function AiChatbot() {
         body: JSON.stringify({
           messages: [...messages, userMessage],
           orgId: activeOrganizationId,
-          localTime: new Date().toLocaleString()
+          localTime: new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+          }).format(new Date())
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to send message");
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No reader");
-
-      const assistantId = crypto.randomUUID();
-      let assistantContent = "";
-      
-      // Initialize assistant message
-      setMessages(prev => [...prev, {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toISOString()
-      }]);
-
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        assistantContent += chunk;
-
-        setMessages(prev => prev.map(m => 
-          m.id === assistantId ? { ...m, content: assistantContent } : m
-        ));
+      if (!response.ok) {
+        setIsLoading(false);
+        throw new Error("Failed to send message");
       }
+
+      // We don't read the body stream anymore. 
+      // The AI response will arrive via Pusher.
+      console.log("[AI CHAT] Message sent successfully, waiting for Pusher event...");
+      
     } catch (err: any) {
       toast.error(`AI Error: ${err.message}`);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -229,7 +252,42 @@ export default function AiChatbot() {
                           ? "bg-primary text-primary-foreground rounded-tr-none shadow-md shadow-primary/20" 
                           : "bg-background border border-border rounded-tl-none text-foreground shadow-sm"
                       )}>
-                        <p className="whitespace-pre-wrap">{m.content}</p>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc pl-4 mb-2 mt-1 space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 mt-1 space-y-1">{children}</ol>,
+                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                            strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                            em: ({ children }) => <em className="italic opacity-90">{children}</em>,
+                            code: ({ children }) => (
+                              <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-xs border border-border/50">
+                                {children}
+                              </code>
+                            ),
+                            a: ({ children, href }) => (
+                              <a 
+                                href={href} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                              >
+                                {children}
+                              </a>
+                            ),
+                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-bold mb-1 mt-2">{children}</h3>,
+                            blockquote: ({ children }) => (
+                              <blockquote className="border-l-4 border-primary/20 pl-4 py-1 my-2 italic text-muted-foreground bg-muted/30 rounded-r-lg">
+                                {children}
+                              </blockquote>
+                            ),
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
                       </div>
 
                       {isOwner && (

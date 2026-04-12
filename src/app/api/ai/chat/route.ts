@@ -6,6 +6,7 @@ import { checkPermission } from "@/lib/auth";
 import { getOrganization } from "@/lib/db/organizations";
 import { saveChatMessage } from "@/lib/db/ai";
 import { createAiTools } from "@/lib/ai/tools";
+import { pusherServer } from "@/lib/pusher";
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,13 +74,14 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = `
 You are Sulfur, a world-class female financial expert and CFO assistant for "${org.name}". You use she/her pronouns.
-Your goal is to help users manage their ledger with precision, following double-entry bookkeeping principles.
-${aiSettings.personality ? `\nPERSONALITY & STYLE:\nIn addition to your core identity, you must strictly adopt the following personality traits and behavioral guidelines:\n${aiSettings.personality}\n` : ""}
-CONTEXT:
-- Organization Name: ${org.name}
+Your goal is to help users manage their ledger with precision, following double-entry bookkeeping principles.\n
+PERSONALITY & STYLE:\nIn addition to your core identity, you must strictly adopt the following personality traits and behavioral guidelines: ${aiSettings.personality || "Very rigid, efficient and to the point."}\n
+CONTEXT:\n- Organization Name: ${org.name}
 - Currency: ${org.currencySymbol || "Taka"} (Position: ${org.currencyPosition || "suffix"})
-- Current Date/Time: ${localTime || new Date().toLocaleString()}
-- DATE FORMATS: ALWAYS use YYYY-MM-DD for any date parameters in tools (both for filtering/searching and for inserting/recording entries).
+- Current Date/Time: ${localTime || new Date().toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+- DATE FORMATS: 
+  1. TOOLS: ALWAYS use YYYY-MM-DD for any date parameters in tools (both for filtering/searching and for inserting/recording entries).
+  2. RESPONSES: ALWAYS use verbose, unambiguous date formats in your responses to users (e.g., "April 12, 2026" or "12th of April 2026") to avoid regional confusion. NEVER use numeric-only formats like 04/12/26 or 12/04/26 in conversation.
 - User: ${userName} (Role: ${role}${isOwner ? ", Owner" : ""})
 
 - FINANCE ONLY: You are strictly limited to financial, accounting, and bookkeeping topics. If the user asks about anything else (jokes, general knowledge, non-financial advice), politely explain that your expertise is focused only on financial management and the SulfurBook ledger.
@@ -99,9 +101,12 @@ CONTEXT:
   1. ALWAYS call 'get_accounts' and 'get_tags' before recording to ensure valid IDs.
   2. Confirm the selected accounts and total amount with the user before calling 'record_journal_entry'.
   3. Do not record duplicate entries; check 'get_journals' if you suspect one exists.
-- VIEWERS: If the user is a 'viewer', you MUST NOT execute any mutation tools (create, record).
-- PRECISION: Always use exact IDs. NEVER guess or hallucinate account or tag IDs.
-- TONE: Professional, efficient, and expert CFO assistant.
+- NO TABLES/CHARTS: NEVER use markdown tables, charts, or drawings in your responses. Instead, describe the relevant data in clear text and point the user to the appropriate reference or screen in the SulfurBook interface (e.g., "As seen in your Accounts list...").
+- FINANCIAL SOURCE OF TRUTH:
+  1. NEVER calculate multi-account balances, Net Income, or Trial Balance totals manually using raw journal entries.
+  2. ALWAYS use 'get_financial_report' for any queries about "Trial Balance", "Balance Sheet", or "Income Statement".
+  3. If the user asks for a specific account balance, use 'get_account_balance' which uses the canonical reporting logic.
+  4. Your analysis MUST match the official reports. If 'get_financial_report' shows a balanced trial balance, you MUST NOT claim it is unbalanced.
     `.trim();
 
     // 6. Model Selection
@@ -114,29 +119,48 @@ CONTEXT:
       model = openaiProvider(modelName || "gpt-4o");
     }
 
-    // 7. Stream Text
+    // 7. Generate Text (Wait for completion since we use Pusher)
     const tools = createAiTools(orgId, userId, userName, role, isOwner);
     const result = await streamText({
       model,
       system: systemPrompt,
       messages,
       tools,
-      stopWhen: stepCountIs(5), // Allow multi-turn tool calling
+      stopWhen: stepCountIs(5),
       onFinish: async ({ text }) => {
         // Save Assistant Response
-        await saveChatMessage({
+        const savedMsg = await saveChatMessage({
           orgId,
           role: "assistant",
           content: text,
           timestamp: new Date().toISOString(),
-        }).catch(err => console.error("[AI] Failed to save assistant message:", err));
+        }).catch(err => {
+          console.error("[AI] Failed to save assistant message:", err);
+          return null;
+        });
 
+        // Trigger Pusher Event
+        if (savedMsg) {
+          await pusherServer.trigger(`org-${orgId}`, "ai-message", {
+            id: savedMsg.id,
+            role: "assistant",
+            content: text,
+            timestamp: savedMsg.timestamp,
+            metadata: {
+              createdAt: savedMsg.timestamp
+            }
+          }).catch(err => console.error("[AI] Pusher trigger failed:", err));
+        }
 
         console.log(`[AI CHAT] Completed response for user ${userName}`);
       },
     });
 
-    return result.toTextStreamResponse();
+    // We still await the full stream completion here to ensure the worker doesn't die
+    // but we don't return the stream to the client.
+    await result.text;
+
+    return Response.json({ success: true });
 
   } catch (error: any) {
     console.error("[AI Chat Error]:", error);
