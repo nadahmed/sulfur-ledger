@@ -118,7 +118,11 @@ export default async (req: Request, context: Context) => {
   server.registerTool(
     "create_account",
     {
-      description: "Adds a new account to the chart of accounts.",
+      description: `Adds a new account to the chart of accounts.
+GUIDANCE:
+- If the ledger is new, suggest creating an 'Opening Balance Equity' (Equity) account.
+- For electronics/furniture (>500 Taka), suggest the 'Asset' category (Equipment).
+- Use lowercase hyphenated IDs (e.g. 'office-expense').`,
       inputSchema: {
         id: z.string().describe("Unique lowercase hyphen-separated ID"),
         name: z.string().describe("Human-readable display name"),
@@ -199,7 +203,14 @@ export default async (req: Request, context: Context) => {
   server.registerTool(
     "record_journal_entry",
     {
-      description: "Records a single transaction.",
+      description: `Records a single transaction.
+🛡️ ENFORCED RULES:
+- Both accounts must be active and distinct.
+- Amount must be positive.
+💡 SUGGESTIONS:
+- If both are Asset accounts, label as 'Transfer'.
+- For starting balances, use an 'Opening Balance Equity' account as the source.
+- For debt payments, suggest splitting Principal (Liability) and Interest (Expense).`,
       inputSchema: {
         date: z.string(),
         description: z.string(),
