@@ -15,7 +15,7 @@ const ensureCanMutate = (role: string, isOwner: boolean) => {
   throw new Error("Forbidden: Viewers cannot perform this action.");
 };
 
-export const createAiTools = (orgId: string, userId: string, userName: string, role: string, isOwner: boolean) => ({
+export const createAiTools = (orgId: string, userId: string, userName: string, role: string, isOwner: boolean, ipAddress?: string, userAgent?: string) => ({
   // --- ACCOUNTS ---
   get_accounts: tool({
     description: "Returns all accounts in the chart of accounts for this organization.",
@@ -39,7 +39,7 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
       if (existing.find((a: any) => a.id === id)) {
         throw new Error(`Account ID '${id}' already exists.`);
       }
-      await accountsDb.createAccount({ orgId, id, name, category, status: "active", createdAt: new Date().toISOString() }, userId, userName);
+      await accountsDb.createAccount({ orgId, id, name, category, status: "active", createdAt: new Date().toISOString() }, userId, userName, { ipAddress, userAgent });
       return `Account '${name}' created successfully.`;
     },
   }),
@@ -63,7 +63,7 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
     }),
     execute: async (args) => {
       ensureCanMutate(role, isOwner);
-      const tag = await tagsDb.createTag({ orgId, ...args });
+      const tag = await tagsDb.createTag({ orgId, ...args }, userId, userName, { ipAddress, userAgent });
       return `Tag '${tag.name}' created with ID ${tag.id}.`;
     },
   }),
@@ -113,7 +113,9 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
         amount,
         fromAccountId,
         toAccountId,
-        tags
+        tags,
+        ipAddress,
+        userAgent
       });
 
       return `✅ Recorded: ${description} (${res.amount.toFixed(2)} Taka)`;

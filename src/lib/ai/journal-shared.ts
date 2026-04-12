@@ -14,6 +14,8 @@ export interface SimplexJournalRecordingOptions {
   toAccountId: string;
   tags?: string[];
   prefix?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 /**
@@ -35,7 +37,9 @@ export async function recordSimplexJournalEntry({
   fromAccountId,
   toAccountId,
   tags,
-  prefix = "[AI]"
+  prefix = "[AI]",
+  ipAddress,
+  userAgent
 }: SimplexJournalRecordingOptions) {
   // 1. Fetch accounts for validation
   const accs = await accountsDb.getAccounts(orgId);
@@ -101,7 +105,7 @@ export async function recordSimplexJournalEntry({
   ];
 
   // 4. Persistence
-  await journalsDb.createJournalEntry(entry, lines, userId, userName);
+  await journalsDb.createJournalEntry(entry, lines, userId, userName, { ipAddress, userAgent });
 
   return {
     id,

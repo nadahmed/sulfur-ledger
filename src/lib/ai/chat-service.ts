@@ -16,6 +16,8 @@ export interface ChatTurnOptions {
   fullBaseUrl: string;
   abortSignal?: AbortSignal;
   skipUserSave?: boolean;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 export async function processChatTurn({
@@ -28,7 +30,9 @@ export async function processChatTurn({
   localTime,
   fullBaseUrl,
   abortSignal,
-  skipUserSave = false
+  skipUserSave = false,
+  ipAddress,
+  userAgent
 }: ChatTurnOptions) {
   const orgId = org.orgId || org.id;
   const lastMessage = messages[messages.length - 1];
@@ -111,7 +115,7 @@ CONTEXT:\n- Organization Name: ${org.name}
   }
 
   // 6. Execute AI Task
-  const tools = createAiTools(orgId, userId, userName, role, isOwner);
+  const tools = createAiTools(orgId, userId, userName, role, isOwner, ipAddress, userAgent);
   
   const result = await streamText({
     model,

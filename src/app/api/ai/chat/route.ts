@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
     const protocol = req.headers.get("x-forwarded-proto") || "http";
     const fullBaseUrl = `${protocol}://${host}`;
 
+    // Capture Real IP
+    const ipAddress = req.headers.get("x-nf-client-connection-ip") || 
+                      req.headers.get("x-forwarded-for")?.split(",")[0].trim() || 
+                      (req as any).ip || 
+                      "unknown";
+    const userAgent = "AI Agent";
+
     const chatOptions = {
       org,
       messages,
@@ -64,7 +71,9 @@ export async function POST(req: NextRequest) {
       role,
       isOwner,
       localTime,
-      fullBaseUrl
+      fullBaseUrl,
+      ipAddress,
+      userAgent
     };
 
     // 6. Execution with Failover

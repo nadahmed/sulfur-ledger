@@ -1,6 +1,7 @@
 import { QueryCommand, DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { uuidv7 } from "uuidv7";
 import { db, TABLE_NAME } from "../dynamodb";
+import { createAuditLog } from "./audit";
 
 export interface Tag {
   orgId: string;
@@ -11,7 +12,12 @@ export interface Tag {
   createdAt: string;
 }
 
-export async function createTag(tag: Omit<Tag, "id" | "createdAt">): Promise<Tag> {
+export async function createTag(
+  tag: Omit<Tag, "id" | "createdAt">,
+  userId?: string,
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+): Promise<Tag> {
   const newTag: Tag = {
     ...tag,
     id: uuidv7(),
@@ -29,6 +35,22 @@ export async function createTag(tag: Omit<Tag, "id" | "createdAt">): Promise<Tag
       },
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId: newTag.orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "create",
+      entityType: "Organization",
+      entityId: newTag.id,
+      details: `Created tag: ${newTag.name}`,
+      data: newTag,
+      timestamp: new Date().toISOString(),
+      ...metadata,
+    });
+  }
 
   return newTag;
 }
@@ -49,8 +71,6 @@ export async function getTags(orgId: string): Promise<Tag[]> {
 }
 
 export async function updateTag(orgId: string, tagId: string, updates: Partial<Omit<Tag, "id" | "orgId" | "createdAt">>) {
-  // To keep it simple in DynamoDB, we fetch and put (or use update expression)
-  // For a "Simple Ledger", a fetch-then-put is often fine if contention is low.
   const existing = await getTag(orgId, tagId);
   if (!existing) throw new Error("Tag not found");
 
@@ -89,7 +109,13 @@ export async function getTag(orgId: string, tagId: string): Promise<Tag | null> 
   return (result.Items?.[0] as unknown as Tag) || null;
 }
 
-export async function deleteTag(orgId: string, tagId: string) {
+export async function deleteTag(
+  orgId: string, 
+  tagId: string,
+  userId?: string,
+  userName?: string,
+  metadata?: { ipAddress?: string; userAgent?: string }
+) {
   await db.send(
     new DeleteCommand({
       TableName: TABLE_NAME,
@@ -99,6 +125,21 @@ export async function deleteTag(orgId: string, tagId: string) {
       },
     })
   );
+
+  if (userId) {
+    await createAuditLog({
+      orgId,
+      id: uuidv7(),
+      userId,
+      userName,
+      action: "delete",
+      entityType: "Organization",
+      entityId: tagId,
+      details: `Deleted tag: ${tagId}`,
+      timestamp: new Date().toISOString(),
+      ...metadata,
+    });
+  }
 }
 
 export async function findTagByName(orgId: string, name: string): Promise<Tag | null> {
