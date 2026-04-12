@@ -11,7 +11,10 @@ export const handler: Handler = async (event) => {
     console.log("[BACKGROUND AI] Starting processing...");
     
     // Background functions in Netlify can run for up to 15 minutes
-    await processChatTurn(chatOptions);
+    await processChatTurn({
+      ...chatOptions,
+      skipUserSave: chatOptions.skipUserSave ?? true
+    });
     
     console.log("[BACKGROUND AI] Completed successfully.");
     return {

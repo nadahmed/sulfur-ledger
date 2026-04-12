@@ -15,6 +15,7 @@ export interface ChatTurnOptions {
   localTime: string;
   fullBaseUrl: string;
   abortSignal?: AbortSignal;
+  skipUserSave?: boolean;
 }
 
 export async function processChatTurn({
@@ -26,12 +27,13 @@ export async function processChatTurn({
   isOwner,
   localTime,
   fullBaseUrl,
-  abortSignal
+  abortSignal,
+  skipUserSave = false
 }: ChatTurnOptions) {
   const orgId = org.orgId || org.id;
   const lastMessage = messages[messages.length - 1];
 
-  // 1. Calculate Initials
+  // 1. Calculate Initials (needed for broadcast)
   const initials = userName
     .split(" ")
     .map((n: string) => n[0])
@@ -41,37 +43,35 @@ export async function processChatTurn({
 
   const timestamp = new Date().toISOString();
 
-  // 2. Sync & Save User Message (if new)
-  // We check if it's already saved by looking for the ID in the last message if provided
-  if (lastMessage.role === "user") {
-    const savedUserMsg = await saveChatMessage({
-      orgId,
-      id: lastMessage.id, // Support client-side ID
-      role: "user",
-      content: lastMessage.content,
-      userId,
-      userName,
-      userInitials: initials,
-      timestamp: lastMessage.timestamp || timestamp,
-    }).catch(err => {
-      console.error("[AI] Failed to save user message:", err);
-      return null;
-    });
+  // 2. Parallelize User Message Persistence and AI Initialization
+  const userSavePromise = (!skipUserSave && lastMessage.role === "user") 
+    ? (async () => {
+        try {
+          const savedUserMsg = await saveChatMessage({
+            orgId,
+            id: lastMessage.id,
+            role: "user",
+            content: lastMessage.content,
+            userId,
+            userName,
+            userInitials: initials,
+            timestamp: lastMessage.timestamp || timestamp,
+          });
 
-    // Broadcast user message to all devices for real-time sync
-    if (savedUserMsg) {
-      await pusherServer.trigger(`org-${orgId}`, "ai-message", {
-        id: savedUserMsg.id,
-        role: "user",
-        content: savedUserMsg.content,
-        timestamp: savedUserMsg.timestamp,
-        metadata: {
-          userInitials: initials,
-          userName: userName
+          if (savedUserMsg) {
+            await pusherServer.trigger(`org-${orgId}`, "ai-message", {
+              id: savedUserMsg.id,
+              role: "user",
+              content: savedUserMsg.content,
+              timestamp: savedUserMsg.timestamp,
+              metadata: { userInitials: initials, userName }
+            });
+          }
+        } catch (err) {
+          console.error("[AI] Non-blocking user message save failure:", err);
         }
-      }).catch(err => console.error("[AI] Pusher trigger for user message failed:", err));
-    }
-  }
+      })()
+    : Promise.resolve();
 
   // 3. Provider & Model Selection
   const aiSettings = org.aiSettings || { provider: "system" };

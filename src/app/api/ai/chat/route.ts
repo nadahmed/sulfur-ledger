@@ -51,19 +51,6 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: msg }, { status: 400 });
     }
 
-    // 4. Persistence - Save User Message
-    if (lastMessage.role === "user") {
-      await saveChatMessage({
-        orgId,
-        role: "user",
-        content: lastMessage.content,
-        userId,
-        userName,
-        userInitials: initials,
-        timestamp: new Date().toISOString(),
-      }).catch(err => console.error("[AI] Failed to save user message:", err));
-    }
-
     // 5. Shared Service Options
     const host = req.headers.get("host") || "localhost:3000";
     const protocol = req.headers.get("x-forwarded-proto") || "http";
@@ -95,7 +82,7 @@ export async function POST(req: NextRequest) {
       fetch(bgUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(chatOptions)
+        body: JSON.stringify({ ...chatOptions, skipUserSave: true })
       }).catch(err => console.error("[AI] Failed to trigger background task:", err));
 
     }, 8500);

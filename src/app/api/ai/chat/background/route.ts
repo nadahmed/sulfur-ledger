@@ -7,7 +7,10 @@ export async function POST(req: NextRequest) {
     console.log("[LOCAL BACKGROUND AI] Starting processing...");
     
     // This route serves as a fallback for local development or simple environments
-    const result = await processChatTurn(chatOptions);
+    const result = await processChatTurn({
+      ...chatOptions,
+      skipUserSave: chatOptions.skipUserSave ?? true // Default to true for background if not specified
+    });
     
     // Await full completion
     await result.text;
