@@ -7,6 +7,7 @@ import * as tagsDb from "../../src/lib/db/tags";
 import * as recurringDb from "../../src/lib/db/recurring";
 import { getOrganization } from "../../src/lib/db/organizations";
 import { createMcpActivityLog } from "../../src/lib/db/audit";
+import { recordSimplexJournalEntry } from "../../src/lib/ai/journal-shared";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -570,6 +571,7 @@ MANDATORY WORKFLOW before calling this tool:
 DOs:
 - amount MUST be positive and greater than 0 (e.g. 150.75)
 - Use descriptive descriptions — they appear in reports
+- **TAGS**: Only existing Tag IDs or Names are allowed (e.g., 'marketing', 'payroll'). Free text tags will be REJECTED.
 - Add tags to group related transactions (e.g. "payroll", "marketing", "rent")
 - Provide a date in YYYY-MM-DD format; optionally add time HH:mm for ordering
 
@@ -590,59 +592,22 @@ DON'Ts:
     },
     async ({ date: dateInput, description, amount, fromAccountId, toAccountId, tags }) => {
       try {
-        // Validate accounts exist and are active
-        const accs = await accountsDb.getAccounts(orgId);
-        const accMap = new Map(accs.map((a: any) => [a.id, a]));
-        
-        const fromAcc = accMap.get(fromAccountId);
-        const toAcc = accMap.get(toAccountId);
-        
-        if (!fromAcc) {
-          return { content: [{ type: "text", text: `Error: Account '${fromAccountId}' (fromAccountId) not found. Call get_accounts to see valid account IDs.` }], isError: true };
-        }
-        if (!toAcc) {
-          return { content: [{ type: "text", text: `Error: Account '${toAccountId}' (toAccountId) not found. Call get_accounts to see valid account IDs.` }], isError: true };
-        }
-        if (fromAcc.status === "archived") {
-          return { content: [{ type: "text", text: `Error: Account '${fromAccountId}' (${fromAcc.name}) is archived and cannot be used in new entries.` }], isError: true };
-        }
-        if (toAcc.status === "archived") {
-          return { content: [{ type: "text", text: `Error: Account '${toAccountId}' (${toAcc.name}) is archived and cannot be used in new entries.` }], isError: true };
-        }
-        if (fromAccountId === toAccountId) {
-          return { content: [{ type: "text", text: `Error: fromAccountId and toAccountId cannot be the same account.` }], isError: true };
-        }
-
-        const amountPaisa = Math.round(amount * 100);
-        if (amountPaisa <= 0) {
-          return { content: [{ type: "text", text: `Error: amount must be greater than 0.` }], isError: true };
-        }
-
-        const finalDate = dateInput.slice(0, 10);
-
-        const { randomUUID } = require("crypto");
-        const id = randomUUID();
-
-        const parsedLines = [
-          { orgId, journalId: id, accountId: toAccountId, amount: amountPaisa, date: finalDate },    // Debit
-          { orgId, journalId: id, accountId: fromAccountId, amount: -amountPaisa, date: finalDate }  // Credit
-        ];
-
-        const entry = {
+        const res = await recordSimplexJournalEntry({
           orgId,
-          id,
-          date: finalDate,
-          description: `[AI] ${description}`,
-          tags,
-          createdAt: new Date().toISOString()
-        };
-
-        await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "AI Agent");
+          userId: "mcp-user",
+          userName: "AI Agent",
+          date: dateInput,
+          description,
+          amount,
+          fromAccountId,
+          toAccountId,
+          tags
+        });
 
         return {
           content: [{ 
             type: "text", 
-            text: `✅ Journal entry recorded successfully.\nID: ${id}\nDate: ${finalDate}\nDescription: ${description}\nAmount: ${amount.toFixed(2)} Taka\nFrom: ${fromAcc.name} (${fromAccountId})\nTo: ${toAcc.name} (${toAccountId})`
+            text: `✅ Journal entry recorded successfully.\nID: ${res.id}\nDate: ${res.finalDate}\nDescription: ${description}\nAmount: ${res.amount.toFixed(2)} Taka\nFrom: ${res.fromAcc.name} (${fromAccountId})\nTo: ${res.toAcc.name} (${toAccountId})`
           }]
         };
       } catch (e: any) {
@@ -674,6 +639,7 @@ MANDATORY WORKFLOW before calling this tool:
 DOs:
 - All amounts must be positive and > 0
 - Each entry must use different fromAccountId and toAccountId
+- **TAGS**: Only existing Tag IDs or Names are allowed for each entry. Free text tags will be REJECTED.
 - Use consistent tags across related entries for better reporting
 - Use the time field if ordering of same-day entries matters
 
@@ -696,48 +662,25 @@ Returns a summary of successes and any errors per entry.`,
       }
     },
     async ({ entries }) => {
-      // Pre-load accounts for validation
-      const accs = await accountsDb.getAccounts(orgId);
-      const accMap = new Map(accs.map((a: any) => [a.id, a]));
-
       const results: string[] = [];
       const errors: string[] = [];
       
       for (const entryInput of entries) {
         try {
-          const fromAcc = accMap.get(entryInput.fromAccountId);
-          const toAcc = accMap.get(entryInput.toAccountId);
-
-          if (!fromAcc) throw new Error(`fromAccountId '${entryInput.fromAccountId}' not found`);
-          if (!toAcc) throw new Error(`toAccountId '${entryInput.toAccountId}' not found`);
-          if (fromAcc.status === "archived") throw new Error(`Account '${entryInput.fromAccountId}' is archived`);
-          if (toAcc.status === "archived") throw new Error(`Account '${entryInput.toAccountId}' is archived`);
-          if (entryInput.fromAccountId === entryInput.toAccountId) throw new Error(`fromAccountId and toAccountId cannot be the same`);
-
-          const amountPaisa = Math.round(entryInput.amount * 100);
-          if (amountPaisa <= 0) throw new Error(`amount must be > 0`);
-
-          const finalDate = entryInput.date.slice(0, 10);
-
-          const { randomUUID } = require("crypto");
-          const id = randomUUID();
-          
-          const parsedLines = [
-            { orgId, journalId: id, accountId: entryInput.toAccountId, amount: amountPaisa, date: finalDate },
-            { orgId, journalId: id, accountId: entryInput.fromAccountId, amount: -amountPaisa, date: finalDate }
-          ];
-
-          const entry = {
+          const res = await recordSimplexJournalEntry({
             orgId,
-            id,
-            date: finalDate,
-            description: `[AI-Bulk] ${entryInput.description}`,
+            userId: "mcp-user",
+            userName: "AI Agent",
+            date: entryInput.date,
+            description: entryInput.description,
+            amount: entryInput.amount,
+            fromAccountId: entryInput.fromAccountId,
+            toAccountId: entryInput.toAccountId,
             tags: entryInput.tags,
-            createdAt: new Date().toISOString()
-          };
+            prefix: "[AI-Bulk]"
+          });
 
-          await journalsDb.createJournalEntry(entry, parsedLines, "mcp-user", "AI Agent");
-          results.push(`✅ ${entryInput.description} → ${entryInput.amount.toFixed(2)} Taka (${id})`);
+          results.push(`✅ ${entryInput.description} → ${entryInput.amount.toFixed(2)} Taka (${res.id})`);
         } catch (e: any) {
           errors.push(`❌ "${entryInput.description}": ${e.message}`);
         }
@@ -803,36 +746,41 @@ DON'Ts:
             };
           }
 
-          // Validate accounts
+          // Validation
           const accs = await accountsDb.getAccounts(orgId);
           const accMap = new Map(accs.map((a: any) => [a.id, a]));
           const fromAcc = accMap.get(fromAccountId);
           const toAcc = accMap.get(toAccountId);
-          
-          if (!fromAcc) return { content: [{ type: "text", text: `Error: fromAccountId '${fromAccountId}' not found.` }], isError: true };
-          if (!toAcc) return { content: [{ type: "text", text: `Error: toAccountId '${toAccountId}' not found.` }], isError: true };
-          if (fromAcc.status === "archived") return { content: [{ type: "text", text: `Error: Account '${fromAccountId}' is archived.` }], isError: true };
-          if (toAcc.status === "archived") return { content: [{ type: "text", text: `Error: Account '${toAccountId}' is archived.` }], isError: true };
-          if (fromAccountId === toAccountId) return { content: [{ type: "text", text: `Error: fromAccountId and toAccountId cannot be the same.` }], isError: true };
+
+          if (!fromAcc || !toAcc) {
+            return { content: [{ type: "text", text: "Error: One or both accounts not found." }], isError: true };
+          }
+          if (fromAcc.status === "archived" || toAcc.status === "archived") {
+            return { content: [{ type: "text", text: "Error: One or both accounts are archived." }], isError: true };
+          }
 
           const amountPaisa = Math.round(amount * 100);
-          if (amountPaisa <= 0) return { content: [{ type: "text", text: `Error: amount must be > 0.` }], isError: true };
-
           finalLines = [
             { orgId, journalId: id, accountId: toAccountId, amount: amountPaisa, date: oldDate },
             { orgId, journalId: id, accountId: fromAccountId, amount: -amountPaisa, date: oldDate }
           ];
         }
 
-        await journalsDb.updateJournalEntry(orgId, id, oldDate, updates, finalLines.length > 0 ? finalLines : undefined, "mcp-user", "AI Agent");
+        const updated = await journalsDb.updateJournalEntry(
+          orgId,
+          id,
+          oldDate,
+          updates,
+          finalLines,
+          "mcp-user",
+          "AI Agent"
+        );
+
         return {
           content: [{ type: "text", text: `✅ Journal entry ${id} updated successfully.` }]
         };
       } catch (e: any) {
-        return {
-          content: [{ type: "text", text: `Error updating entry: ${e.message}` }],
-          isError: true
-        };
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
       }
     }
   );
@@ -841,68 +789,35 @@ DON'Ts:
   server.registerTool(
     "delete_journal_entry",
     {
-      description: `Permanently deletes a journal entry and all its lines. An audit log record is created.
-
-⚠️ WARNING: This action is IRREVERSIBLE. The entry and its transaction lines will be permanently removed.
-
-DOs:
-- Call get_journals first to confirm the correct entry ID and date
-- Always confirm explicitly with the user before deleting
-
-DON'Ts:
-- Never delete without explicit user confirmation
-- Never guess the entry ID — always retrieve it from get_journals first`,
+      description: "Deletes a journal entry. REQUIRES explicit user confirmation for the specific ID.",
       inputSchema: {
-        id: z.string().describe("Journal entry ID to delete (get from get_journals)"),
-        date: z.string().describe("The date of the entry (YYYY-MM-DD)")
+        id: z.string().describe("The ID of the journal entry to delete"),
+        date: z.string().describe("The date of the entry in YYYY-MM-DD format")
       }
     },
     async ({ id, date }) => {
       try {
         await journalsDb.deleteJournalEntry(orgId, id, date, "mcp-user", "AI Agent");
-        return {
-          content: [{ type: "text", text: `✅ Journal entry ${id} has been permanently deleted. An audit log has been created.` }]
-        };
+        return { content: [{ type: "text", text: `Journal entry ${id} deleted.` }] };
       } catch (e: any) {
-        return {
-          content: [{ type: "text", text: `Error deleting entry: ${e.message}` }],
-          isError: true
-        };
+        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
       }
     }
   );
 
-  // ─── RECURRING ─────────────────────────────────────────────────────────────
+  // ─── RECURRING ────────────────────────────────────────────────────────────────
 
-  // Tool: Get Recurring Entries
+  // Tool: List Recurring Entries
   server.registerTool(
     "get_recurring_entries",
     {
-      description: `Returns all recurring journal entry schedules for this organization.
-      
-Use this to:
-- Review existing automated transaction plans
-- Check which schedules are currently 'active' or 'paused'
-- Identify if a specific recurring entry already exists before creating a duplicate`,
+      description: "Returns all recurring journal entry templates for this organization.",
       inputSchema: {}
     },
     async () => {
       const entries = await recurringDb.getRecurringEntries(orgId);
-      const simplified = entries.map(e => ({
-        id: e.id,
-        description: e.description,
-        amount: e.amount / 100, // Convert to Taka
-        frequency: e.frequency,
-        interval: e.interval,
-        startDate: e.startDate,
-        nextProcessDate: e.nextProcessDate,
-        isActive: e.isActive,
-        fromAccountId: e.fromAccountId,
-        toAccountId: e.toAccountId,
-        tags: e.tags || []
-      }));
       return {
-        content: [{ type: "text", text: JSON.stringify(simplified, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(entries, null, 2) }]
       };
     }
   );
@@ -911,66 +826,40 @@ Use this to:
   server.registerTool(
     "create_recurring_entry",
     {
-      description: `Creates a new recurring schedule for automated journal entries.
-      
-WORKFLOW before calling this tool:
-1. Call 'get_accounts' to verify that both source and destination accounts exist and are 'active'.
-2. Call 'get_recurring_entries' to ensure you are not creating a redundant schedule.
-3. Confirm the full schedule (amount, frequency, and accounts) with the user before proceeding.
+      description: `Sets up a recurring transaction (e.g. monthly rent, payroll).
 
-DOs:
-- amount MUST be positive and greater than 0 (in Taka, e.g. 1500.00)
-- startDate should be in YYYY-MM-DD format
-- frequency must be one of: daily | weekly | monthly | yearly
-- interval must be at least 1 (e.g. interval 2 with frequency 'weekly' means every 2 weeks)
-
-DON'Ts:
-- Never use same account for both from/to
-- Never use archived accounts
-- Never create a schedule without user confirmation`,
+MANDATORY WORKFLOW:
+- ALWAYS confirm the schedule and accounts with the user first.
+- Use 'monthly', 'weekly', or 'yearly' for frequency.`,
       inputSchema: {
-        description: z.string().describe("Clear description of the automated transaction"),
-        amount: z.number().positive().describe("Transaction amount in Taka"),
-        fromAccountId: z.string().describe("Source account ID (Credit)"),
-        toAccountId: z.string().describe("Destination account ID (Debit)"),
-        frequency: z.enum(["daily", "weekly", "monthly", "yearly"]).describe("Scheduling period"),
-        interval: z.number().int().min(1).describe("Number of periods between runs (default 1)"),
-        startDate: z.string().describe("When the schedule should begin (YYYY-MM-DD)"),
-        tags: z.array(z.string()).optional().describe("Optional tags to apply to generated entries")
+        name: z.string().describe("Name of the recurring profile (e.g. 'Monthly Rent')"),
+        description: z.string().describe("Description for the generated journal entries"),
+        frequency: z.enum(["weekly", "monthly", "yearly"]),
+        dayOfMonth: z.number().min(1).max(31).optional(),
+        dayOfWeek: z.number().min(0).max(6).optional(),
+        amount: z.number().positive(),
+        fromAccountId: z.string(),
+        toAccountId: z.string(),
+        tags: z.array(z.string()).optional()
       }
     },
     async (args) => {
       try {
-        // Validate accounts
-        const accs = await accountsDb.getAccounts(orgId);
-        const accMap = new Map(accs.map((a: any) => [a.id, a]));
-        const fromAcc = accMap.get(args.fromAccountId);
-        const toAcc = accMap.get(args.toAccountId);
-
-        if (!fromAcc) throw new Error(`Source account '${args.fromAccountId}' not found.`);
-        if (!toAcc) throw new Error(`Destination account '${args.toAccountId}' not found.`);
-        if (fromAcc.status === "archived") throw new Error(`Account '${args.fromAccountId}' is archived.`);
-        if (toAcc.status === "archived") throw new Error(`Account '${args.toAccountId}' is archived.`);
-
-        const entry: recurringDb.RecurringEntry = {
+        const id = randomUUID();
+        const today = new Date().toISOString().split('T')[0];
+        const entry = {
           orgId,
-          id: randomUUID(),
-          description: args.description,
-          amount: Math.round(args.amount * 100),
-          fromAccountId: args.fromAccountId,
-          toAccountId: args.toAccountId,
-          frequency: args.frequency,
-          interval: args.interval,
-          startDate: args.startDate,
-          nextProcessDate: args.startDate, // Initial run is on startDate
-          tags: args.tags,
+          id,
+          ...args,
+          interval: 1,
+          startDate: today,
+          nextProcessDate: today,
           isActive: true,
           createdAt: new Date().toISOString()
         };
-
         await recurringDb.createRecurringEntry(entry, "mcp-user", "AI Agent");
         return {
-          content: [{ type: "text", text: `✅ Recurring entry '${args.description}' created successfully.\nID: ${entry.id}\nNext run: ${entry.nextProcessDate}` }]
+          content: [{ type: "text", text: `Recurring entry '${args.name}' created with ID ${id}.` }]
         };
       } catch (e: any) {
         return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
@@ -978,198 +867,64 @@ DON'Ts:
     }
   );
 
-  // Tool: Toggle Recurring Entry
+  // ─── REPORTING ────────────────────────────────────────────────────────────────
+
+  // Tool: Get Canonical Financial Report
   server.registerTool(
-    "toggle_recurring_entry",
+    "get_financial_report",
     {
-      description: `Activates or pauses a recurring schedule.
+      description: `Fetches full financial reports (Trial Balance, Balance Sheet, Income Statement) using the system's canonical reporting logic.
       
-Use this instead of deleting if the schedule might be needed again in the future.
-ALWAYS confirm with the user before changing the status of a schedule.`,
+ALWAYS use this tool for questions like:
+- "What's our total revenue this year?"
+- "Show me our balance sheet as of today."
+- "Are we profitable this month?"
+- "Check if the trial balance is in balance."
+
+Report Types:
+- trial-balance: lists all accounts with non-zero balances
+- balance-sheet: Assets = Liabilities + Equity
+- income-statement: Income - Expenses = Net Profit/Loss
+
+The report sanitizes all figures from Paisa to Taka automatically for the AI context.`,
       inputSchema: {
-        id: z.string().describe("ID of the recurring entry (get from get_recurring_entries)"),
-        isActive: z.boolean().describe("true to activate, false to pause")
+        reportType: z.enum(["trial-balance", "balance-sheet", "income-statement"]),
+        startDate: z.string().optional().describe("Period start YYYY-MM-DD"),
+        endDate: z.string().optional().describe("Period end YYYY-MM-DD"),
+        tagIds: z.array(z.string()).optional().describe("Filter reporting by tag IDs")
       }
     },
-    async ({ id, isActive }) => {
+    async ({ reportType, startDate, endDate, tagIds }) => {
       try {
-        await recurringDb.updateRecurringEntry(orgId, id, { isActive }, "mcp-user", "AI Agent");
+        const { generateReportData } = await import("../../src/lib/reports");
+        const report = (await generateReportData(orgId, reportType, startDate, endDate, undefined, tagIds)) as any;
+        
+        // Convert paisa to Taka for canonical AI response
+        if (report.accounts) report.accounts = report.accounts.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        if (report.assets) report.assets = report.assets.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        if (report.liabilities) report.liabilities = report.liabilities.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        if (report.equity) report.equity = report.equity.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        if (report.income) report.income = report.income.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        if (report.expenses) report.expenses = report.expenses.map((a: any) => ({ ...a, balance: a.balance / 100 }));
+        
+        if (report.totalDebits) report.totalDebits = report.totalDebits / 100;
+        if (report.totalCredits) report.totalCredits = report.totalCredits / 100;
+
         return {
-          content: [{ type: "text", text: `✅ Recurring entry ${id} is now ${isActive ? 'active' : 'paused'}.` }]
+          content: [{ type: "text", text: JSON.stringify(report, null, 2) }]
         };
       } catch (e: any) {
-        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+        return { content: [{ type: "text", text: `Error generating report: ${e.message}` }], isError: true };
       }
     }
   );
 
-  // Tool: Delete Recurring Entry
-  server.registerTool(
-    "delete_recurring_entry",
-    {
-      description: `Permanently removes a recurring schedule. NO future transactions will be generated.
-      
-⚠️ WARNING: This action is permanent. Confirm with the user first.`,
-      inputSchema: {
-        id: z.string().describe("ID of the recurring entry to delete")
-      }
-    },
-    async ({ id }) => {
-      try {
-        await recurringDb.deleteRecurringEntry(orgId, id, "mcp-user", "AI Agent");
-        return {
-          content: [{ type: "text", text: `✅ Recurring entry ${id} deleted.` }]
-        };
-      } catch (e: any) {
-        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
-      }
-    }
-  );
-
-  // ─── SKILLS / WORKFLOWS (PROMPTS) ──────────────────────────────────────────────────
-
-  // Skill: Reconcile Account
-  server.registerPrompt(
-    "reconcile_account",
-    {
-      description: "Perform a step-by-step account reconciliation workflow against a provided statement or balance.",
-      argsSchema: {
-        accountId: z.string().describe("The ID of the account to reconcile"),
-        targetBalance: z.string().describe("The expected closing balance in Taka (e.g. 5000.00)"),
-        statementStartDate: z.string().describe("Statement start date (YYYY-MM-DD)"),
-        statementEndDate: z.string().describe("Statement end date (YYYY-MM-DD)")
-      }
-    },
-    ({ accountId, targetBalance, statementStartDate, statementEndDate }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please perform an account reconciliation for account '${accountId}'.
-
-Step 1: Check Account Validity
-- Target account ID: ${accountId}
-- ACTION: Call 'get_accounts' to verify that the target account exists and is not 'archived'. If it does not exist or is archived, stop and tell me.
-
-Step 2: Fetch Current System Balance
-- Target period: ${statementStartDate} to ${statementEndDate}
-- ACTION: Call 'get_account_balance' with ONLY the endDate to get the absolute closing balance as of the statement end date.
-- ACTION: Call 'get_account_balance' using both startDate and endDate to see the net movement during the statement period.
-
-Step 3: Compare and Analyze
-- Compare the system's closing balance (from Step 2) to the target balance of ${targetBalance} Taka.
-- If they match exactly, report that the account is reconciled successfully.
-- If they do NOT match, calculate the exact difference.
-
-Step 4: Investigate Discrepancies
-- If there is a difference, ACTION: Call 'get_journals' for the period ${statementStartDate} to ${statementEndDate}.
-- Review the transactions to identify potential missing, duplicated, or mis-entered transactions.
-- Present a final report of your findings.
-- Ask me if you should correct specific entries (using 'update_journal_entry' or 'record_journal_entry'). Do NOT execute write operations without my explicit confirmation.`
-          }
-        }
-      ]
-    })
-  );
-
-  // Skill: Onboard New Entity
-  server.registerPrompt(
-    "onboard_new_entity",
-    {
-      description: "A workflow for onboarding a new business, vendor, or financial category with initial opening balances.",
-      argsSchema: {
-        entityName: z.string().describe("Name of the new entity/category (e.g., 'TechCorp Solutions')"),
-        category: z.enum(["asset", "liability", "equity", "income", "expense"]).describe("The target account category"),
-        openingBalance: z.string().optional().describe("Optional opening balance in Taka. Defaults to 0."),
-        fundingAccount: z.string().optional().describe("If opening balance exists, the offsetting account ID")
-      }
-    },
-    ({ entityName, category, openingBalance, fundingAccount }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please onboard a new entity/account named '${entityName}' under the category '${category}'.
-
-Step 1: Check for Duplicates
-- ACTION: Call 'get_accounts' to list all current accounts.
-- Analyze the list for any existing account that serves the same purpose as '${entityName}'.
-- If an existing account seems like a match, stop and ask me if we should use the existing one instead.
-
-Step 2: Create Account
-- If no duplicate exists, decide on a short, lowercase, hyphen-separated ID for the new account.
-- ACTION: Call 'create_account' using the chosen ID, '${entityName}', and '${category}'.
-
-Step 3: Process Opening Balance
-- Provided opening balance: ${openingBalance || '0'}
-- Provided funding account: ${fundingAccount || 'None'}
-- If the opening balance > 0, verify the 'fundingAccount' exists and is active using the data from Step 1.
-- Determine the correct 'fromAccountId' and 'toAccountId' based on standard double-entry rules.
-- ACTION: Call 'record_journal_entry' to record the opening balance. Use a description like "Opening balance for ${entityName}" and date it to today. Note: You must explicitly confirm the accounts with me BEFORE calling 'record_journal_entry'.
-
-Step 4: Final Summary
-- Produce a formatted final summary of the new account and any balances recorded.`
-          }
-        }
-      ]
-    })
-  );
-
-  // Skill: Period-End Report
-  server.registerPrompt(
-    "period_end_report",
-    {
-      description: "Generates a period-end financial report including P&L and auditing untagged/suspicious transactions.",
-      argsSchema: {
-        startDate: z.string().describe("Start date of the reporting period (YYYY-MM-DD)"),
-        endDate: z.string().describe("End date of the reporting period (YYYY-MM-DD)")
-      }
-    },
-    ({ startDate, endDate }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please generate a comprehensive Period-End Report for the date range ${startDate} to ${endDate}.
-
-Step 1: High-Level Financial Summary
-- ACTION: Call 'get_financial_summary' with startDate: ${startDate} and endDate: ${endDate}.
-- Note the total income, expenses, and net profit/loss.
-
-Step 2: Detailed Account Review
-- ACTION: Call 'get_accounts' to retrieve the chart of accounts. Identify key high-volume accounts (such as primary checking or major expense accounts).
-- ACTION: Call 'get_account_balance' for those key accounts to see their period balances.
-
-Step 3: Audit and Clean Up
-- ACTION: Call 'get_journals' for the exact date range ${startDate} to ${endDate}.
-- Analyze the transactions for the following anomalies:
-  * Missing tags (especially for expense or income transactions).
-  * Potential duplicate entries (same amount on the same day).
-  * Vague or unclear descriptions.
-- If you find any untagged or suspicious transactions, list them out clearly.
-
-Step 4: Execute Report
-- Provide a formatted Period-End Report displaying:
-  1. The P&L Summary.
-  2. Key account movements.
-  3. The audit findings.
-- Ask me if you should correct any untagged or suspicious transactions (e.g., adding tags via 'update_journal_entry'). Do NOT execute 'update_journal_entry' without my explicit confirmation.`
-          }
-        }
-      ]
-    })
-  );
-
-  // 4. Connect Server to Transport
-  await server.connect(transport);
-  
-  // 5. Delegate request handling to the transport which returns a Response object
-  return await transport.handleRequest(req);
-};
-
-export const config = {
-  path: "/api/mcp"
+  // 3. Connect as Serverless Function
+  try {
+    const result = await server.connect(transport);
+    return transport.handleRequest(req);
+  } catch (error) {
+    console.error("MCP Server connection error:", error);
+    return new Response("Internal Server Error", { status: 500 });
+  }
 };

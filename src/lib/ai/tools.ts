@@ -4,6 +4,7 @@ import * as journalsDb from "../db/journals";
 import * as accountsDb from "../db/accounts";
 import * as tagsDb from "../db/tags";
 import { generateReportData } from "../reports";
+import { recordSimplexJournalEntry } from "./journal-shared";
 
 /**
  * Helper to check mutation permissions
@@ -103,18 +104,19 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
     }),
     execute: async ({ date, description, amount, fromAccountId, toAccountId, tags }) => {
       ensureCanMutate(role, isOwner);
-      const amountPaisa = Math.round(amount * 100);
-      const id = require("crypto").randomUUID();
-      const finalDate = date.slice(0, 10);
+      const res = await recordSimplexJournalEntry({
+        orgId,
+        userId,
+        userName,
+        date,
+        description,
+        amount,
+        fromAccountId,
+        toAccountId,
+        tags
+      });
 
-      const entry = { orgId, id, date: finalDate, description: `[AI] ${description}`, tags, createdAt: new Date().toISOString() };
-      const lines = [
-        { orgId, journalId: id, accountId: toAccountId, amount: amountPaisa, date: finalDate },
-        { orgId, journalId: id, accountId: fromAccountId, amount: -amountPaisa, date: finalDate }
-      ];
-
-      await journalsDb.createJournalEntry(entry, lines, userId, userName);
-      return `✅ Recorded: ${description} (${amount.toFixed(2)} Taka)`;
+      return `✅ Recorded: ${description} (${res.amount.toFixed(2)} Taka)`;
     },
   }),
 
