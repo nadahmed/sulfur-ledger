@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand, QueryCommandOutput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import { db, TABLE_NAME } from "../dynamodb";
 
 export interface AuditLog {
@@ -87,7 +87,7 @@ export interface ActivityFilter {
   userId?: string;
   entityType?: string;
   entityId?: string;
-  type?: "ui" | "mcp";
+  type?: "ui" | "mcp" | "all";
   startDate?: string;
   endDate?: string;
 }
@@ -143,7 +143,7 @@ export async function getActivityLogs(
     expressionAttributeValues[":type"] = filters.type === "ui" ? "AuditLog" : "McpActivityLog";
   }
 
-  const queryParams: any = {
+  const queryParams: QueryCommandInput = {
     TableName: TABLE_NAME,
     KeyConditionExpression: `PK = :pk AND ${skCondition}`,
     FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,

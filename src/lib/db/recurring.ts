@@ -96,8 +96,7 @@ export async function updateRecurringEntry(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
+
   let updateExpression = "SET";
   const expressionAttributeNames: Record<string, string> = {};
   const expressionAttributeValues: Record<string, any> = {};
@@ -162,8 +161,7 @@ export async function deleteRecurringEntry(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-  const result = await db.send(
+const result = await db.send(
     new DeleteCommand({
       TableName: TABLE_NAME,
       Key: {

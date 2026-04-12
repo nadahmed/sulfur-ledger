@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { db, TABLE_NAME } from "../dynamodb";
 import { createAuditLog } from "./audit";
 import { uuidv7 } from "uuidv7";
@@ -87,7 +87,6 @@ export async function deleteAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
   const result = await db.send(
     new DeleteCommand({
       TableName: TABLE_NAME,
@@ -126,7 +125,6 @@ export async function archiveAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
@@ -173,7 +171,6 @@ export async function unarchiveAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
@@ -221,7 +218,6 @@ export async function updateAccountName(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
   const result = await db.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
