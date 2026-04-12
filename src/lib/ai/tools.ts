@@ -1,25 +1,27 @@
 import { tool } from "ai";
-import { z } from "zod";
 import * as journalsDb from "../db/journals";
 import * as accountsDb from "../db/accounts";
 import * as tagsDb from "../db/tags";
+import * as recurringDb from "../db/recurring";
 import { generateReportData } from "../reports";
 import { recordSimplexJournalEntry } from "./journal-shared";
+import { randomUUID } from "crypto";
+import { TOOL_SPECS } from "./tool-definitions";
 
 /**
  * Helper to check mutation permissions
  */
 const ensureCanMutate = (role: string, isOwner: boolean) => {
   if (isOwner) return true;
-  if (role === "admin" || role === "member") return true; // Editor role
+  if (role === "admin" || role === "member") return true;
   throw new Error("Forbidden: Viewers cannot perform this action.");
 };
 
 export const createAiTools = (orgId: string, userId: string, userName: string, role: string, isOwner: boolean, ipAddress?: string, userAgent?: string) => ({
   // --- ACCOUNTS ---
   get_accounts: tool({
-    description: "Returns all accounts in the chart of accounts for this organization.",
-    inputSchema: z.object({}),
+    description: TOOL_SPECS.get_accounts.description,
+    inputSchema: TOOL_SPECS.get_accounts.parameters,
     execute: async () => {
       const accs = await accountsDb.getAccounts(orgId);
       return accs.map((a: any) => ({ id: a.id, name: a.name, category: a.category, status: a.status }));
@@ -27,12 +29,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   }),
 
   create_account: tool({
-    description: "Adds a new account to the chart of accounts.",
-    inputSchema: z.object({
-      id: z.string().describe("Unique lowercase hyphen-separated ID, e.g. 'checking-main'"),
-      name: z.string().describe("Human-readable display name, e.g. 'Main Checking Account'"),
-      category: z.enum(["asset", "liability", "equity", "income", "expense"]),
-    }),
+    description: TOOL_SPECS.create_account.description,
+    inputSchema: TOOL_SPECS.create_account.parameters,
     execute: async ({ id, name, category }) => {
       ensureCanMutate(role, isOwner);
       const existing = await accountsDb.getAccounts(orgId);
@@ -46,8 +44,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
 
   // --- TAGS ---
   get_tags: tool({
-    description: "Returns all formal tags for this organization.",
-    inputSchema: z.object({}),
+    description: TOOL_SPECS.get_tags.description,
+    inputSchema: TOOL_SPECS.get_tags.parameters,
     execute: async () => {
       const tags = await tagsDb.getTags(orgId);
       return tags.map((t: any) => ({ id: t.id, name: t.name, color: t.color }));
@@ -55,12 +53,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   }),
 
   create_tag: tool({
-    description: "Creates a new formal tag. REQUIRES PRIOR USER CONFIRMATION. Do not call this without explicitly asking the user first.",
-    inputSchema: z.object({
-      name: z.string(),
-      color: z.string(),
-      description: z.string().optional(),
-    }),
+    description: TOOL_SPECS.create_tag.description,
+    inputSchema: TOOL_SPECS.create_tag.parameters,
     execute: async (args) => {
       ensureCanMutate(role, isOwner);
       const tag = await tagsDb.createTag({ orgId, ...args }, userId, userName, { ipAddress, userAgent });
@@ -70,12 +64,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
 
   // --- JOURNALS ---
   get_journals: tool({
-    description: "Fetches journal entries, optionally filtered by date range and tags.",
-    inputSchema: z.object({
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
-      endDate: z.string().optional().describe("YYYY-MM-DD"),
-      tagIds: z.array(z.string()).optional(),
-    }),
+    description: TOOL_SPECS.get_journals.description,
+    inputSchema: TOOL_SPECS.get_journals.parameters,
     execute: async ({ startDate, endDate, tagIds }) => {
       const entries = await journalsDb.getJournalEntries(orgId, startDate, endDate, tagIds);
       const enriched = await Promise.all(entries.map(async (e) => {
@@ -93,15 +83,8 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   }),
 
   record_journal_entry: tool({
-    description: "Records a single financial transaction. Automatically handles debit/credit.",
-    inputSchema: z.object({
-      date: z.string().describe("YYYY-MM-DD"),
-      description: z.string(),
-      amount: z.number().positive(),
-      fromAccountId: z.string().describe("Money comes FROM here (Credit)"),
-      toAccountId: z.string().describe("Money goes TO here (Debit)"),
-      tags: z.array(z.string()).optional().describe("List of existing Tag IDs only. Do not use random text."),
-    }),
+    description: TOOL_SPECS.record_journal_entry.description,
+    inputSchema: TOOL_SPECS.record_journal_entry.parameters,
     execute: async ({ date, description, amount, fromAccountId, toAccountId, tags }) => {
       ensureCanMutate(role, isOwner);
       const res = await recordSimplexJournalEntry({
@@ -117,42 +100,48 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
         ipAddress,
         userAgent
       });
-
       return `✅ Recorded: ${description} (${res.amount.toFixed(2)} Taka)`;
     },
   }),
 
+  record_bulk_journal_entries: tool({
+    description: TOOL_SPECS.record_bulk_journal_entries.description,
+    inputSchema: TOOL_SPECS.record_bulk_journal_entries.parameters,
+    execute: async ({ entries }) => {
+      ensureCanMutate(role, isOwner);
+      const results: string[] = [];
+      for (const entry of entries) {
+        const res = await recordSimplexJournalEntry({
+          orgId, userId, userName, ...entry,
+          prefix: "[AI-Bulk]", ipAddress, userAgent
+        });
+        results.push(`✅ ${entry.description} (${res.amount.toFixed(2)})`);
+      }
+      return `Processed ${entries.length} entries:\n${results.join("\n")}`;
+    },
+  }),
+
   get_account_balance: tool({
-    description: "Returns the net balance of a specific account using canonical reporting logic.",
-    inputSchema: z.object({
-      accountId: z.string(),
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
-      endDate: z.string().optional().describe("YYYY-MM-DD"),
-    }),
+    description: TOOL_SPECS.get_account_balance.description,
+    inputSchema: TOOL_SPECS.get_account_balance.parameters,
     execute: async ({ accountId, startDate, endDate }) => {
-      // Use trial-balance to get the most accurate LTDB/PTDB balance
       const report = (await generateReportData(orgId, "trial-balance", startDate, endDate)) as any;
       const acc = report.accounts?.find((a: any) => a.id === accountId);
-      
       if (!acc) return `Account '${accountId}' not found in report.`;
-      
       const balance = acc.balance / 100;
       return `Canonical balance for '${accountId}': ${balance.toFixed(2)} Taka`;
     },
   }),
 
   get_financial_summary: tool({
-    description: "Returns a high-level Profit & Loss summary for a period using canonical reporting logic.",
-    inputSchema: z.object({
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
-      endDate: z.string().optional().describe("YYYY-MM-DD"),
-    }),
+    description: TOOL_SPECS.get_financial_summary.description,
+    inputSchema: TOOL_SPECS.get_financial_summary.parameters,
     execute: async ({ startDate, endDate }) => {
       const report = (await generateReportData(orgId, "income-statement", startDate, endDate)) as any;
-      
+
       const totalIncome = (report.income || []).reduce((sum: any, item: any) => sum + Math.abs(item.balance), 0);
       const totalExpenses = (report.expenses || []).reduce((sum: any, item: any) => sum + Math.abs(item.balance), 0);
-      
+
       return {
         income: totalIncome / 100,
         expenses: totalExpenses / 100,
@@ -163,17 +152,11 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
   }),
 
   get_financial_report: tool({
-    description: "Fetches full financial reports (Trial Balance, Balance Sheet, Income Statement). ALWAYS use this for report-related queries.",
-    inputSchema: z.object({
-      reportType: z.enum(["trial-balance", "balance-sheet", "income-statement"]),
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
-      endDate: z.string().optional().describe("YYYY-MM-DD"),
-      tagIds: z.array(z.string()).optional(),
-    }),
+    description: TOOL_SPECS.get_financial_report.description,
+    inputSchema: TOOL_SPECS.get_financial_report.parameters,
     execute: async ({ reportType, startDate, endDate, tagIds }) => {
       const report = (await generateReportData(orgId, reportType, startDate, endDate, undefined, tagIds)) as any;
-      
-      // Sanitizing for LLM context (paisa to base currency)
+
       if (report.accounts) {
         report.accounts = report.accounts.map((a: any) => ({ ...a, balance: a.balance / 100 }));
       }
@@ -182,11 +165,58 @@ export const createAiTools = (orgId: string, userId: string, userName: string, r
       if (report.equity) report.equity = report.equity.map((a: any) => ({ ...a, balance: a.balance / 100 }));
       if (report.income) report.income = report.income.map((a: any) => ({ ...a, balance: a.balance / 100 }));
       if (report.expenses) report.expenses = report.expenses.map((a: any) => ({ ...a, balance: a.balance / 100 }));
-      
       if (report.totalDebits) report.totalDebits = report.totalDebits / 100;
       if (report.totalCredits) report.totalCredits = report.totalCredits / 100;
-      
+
       return report;
+    },
+  }),
+
+  // --- RECURRING ---
+  get_recurring_entries: tool({
+    description: TOOL_SPECS.get_recurring_entries.description,
+    inputSchema: TOOL_SPECS.get_recurring_entries.parameters,
+    execute: async () => {
+      const entries = await recurringDb.getRecurringEntries(orgId);
+      return entries.map(e => ({
+        id: e.id,
+        description: e.description,
+        amount: e.amount / 100,
+        frequency: e.frequency,
+        nextDate: e.nextProcessDate,
+        isActive: e.isActive
+      }));
+    },
+  }),
+
+  create_recurring_entry: tool({
+    description: TOOL_SPECS.create_recurring_entry.description,
+    inputSchema: TOOL_SPECS.create_recurring_entry.parameters,
+    execute: async (args) => {
+      ensureCanMutate(role, isOwner);
+      const id = randomUUID();
+      const entry: recurringDb.RecurringEntry = {
+        orgId,
+        id,
+        ...args,
+        amount: Math.round(args.amount * 100),
+        interval: 1,
+        nextProcessDate: args.startDate,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      await recurringDb.createRecurringEntry(entry, userId, userName, { ipAddress, userAgent });
+      return `Recurring entry '${args.description}' created successfully.`;
+    },
+  }),
+
+  delete_recurring_entry: tool({
+    description: TOOL_SPECS.delete_recurring_entry.description,
+    inputSchema: TOOL_SPECS.delete_recurring_entry.parameters,
+    execute: async ({ id }) => {
+      ensureCanMutate(role, isOwner);
+      await recurringDb.deleteRecurringEntry(orgId, id, userId, userName, { ipAddress, userAgent });
+      return `Recurring entry deleted.`;
     },
   }),
 });

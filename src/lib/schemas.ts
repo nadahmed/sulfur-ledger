@@ -137,3 +137,10 @@ export const AiSettingsSchema = z.object({
 });
 
 export type AiSettingsFormValues = z.infer<typeof AiSettingsSchema>;
+export const ApiKeySchema = z.object({
+  name: z.string().min(1, "Label is required").max(50),
+  role: z.enum(["viewer", "member", "admin"]),
+  ttlDays: z.enum(["7", "30", "90", "never"]),
+});
+
+export type ApiKeyFormValues = z.infer<typeof ApiKeySchema>;

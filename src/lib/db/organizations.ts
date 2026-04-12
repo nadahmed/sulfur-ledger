@@ -84,6 +84,72 @@ export interface Invitation {
   createdAt: string;
 }
 
+export interface ApiKey {
+  orgId: string;
+  name: string;
+  key: string; // The full API key
+  userId: string; // The user identity this key represents
+  userName: string; // Plain text name for the identity
+  role: "admin" | "member" | "viewer";
+  createdAt: string;
+  expiresAt?: string | null;
+}
+
+export async function createApiKey(apiKey: ApiKey) {
+  await db.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        PK: `ORG#${apiKey.orgId}#APIKEY`,
+        SK: `KEY#${apiKey.key}`,
+        Type: "ApiKey",
+        ...apiKey,
+      },
+    })
+  );
+  return apiKey;
+}
+
+export async function getApiKeys(orgId: string): Promise<ApiKey[]> {
+  const result = await db.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+      ExpressionAttributeValues: {
+        ":pk": `ORG#${orgId}#APIKEY`,
+        ":skPrefix": "KEY#",
+      },
+    })
+  );
+  return (result.Items as ApiKey[]) || [];
+}
+
+export async function getApiKey(orgId: string, keyValue: string): Promise<ApiKey | null> {
+  const result = await db.send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}#APIKEY`,
+        SK: `KEY#${keyValue}`,
+      },
+    })
+  );
+  return (result.Item as ApiKey) || null;
+}
+
+export async function deleteApiKey(orgId: string, keyValue: string) {
+  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
+  await db.send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        PK: `ORG#${orgId}#APIKEY`,
+        SK: `KEY#${keyValue}`,
+      },
+    })
+  );
+}
+
 export async function createInvitation(invitation: Invitation) {
   await db.send(
     new PutCommand({

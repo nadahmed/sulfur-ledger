@@ -28,6 +28,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency, slugify } from "@/lib/utils";
 import {
   CURRENCY_PRESETS,
@@ -44,10 +54,10 @@ import {
   InvitationFormValues,
   EmailSettingsSchema,
   EmailSettingsFormValues,
-  McpSettingsSchema,
-  McpSettingsFormValues,
   AiSettingsFormValues,
-  AiSettingsSchema
+  AiSettingsSchema,
+  ApiKeyFormValues,
+  ApiKeySchema
 } from "@/lib/schemas";
 
 const GeneralOrgSchema = OrganizationSchema.pick({
@@ -177,15 +187,6 @@ function SettingsInner() {
     enabled: !!activeOrganizationId && canManage,
   });
 
-  const { data: mcpSettings, isLoading: isLoadingMcpSettings } = useQuery<McpSettingsFormValues>({
-    queryKey: ["mcp-settings", activeOrganizationId],
-    queryFn: async () => {
-      const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`);
-      if (!res.ok) throw new Error("Failed to fetch MCP settings");
-      return res.json();
-    },
-    enabled: !!activeOrganizationId && canManage,
-  });
 
   const { data: aiSettings, isLoading: isLoadingAiSettings } = useQuery<AiSettingsFormValues>({
     queryKey: ["ai-settings", activeOrganizationId],
@@ -373,36 +374,6 @@ function SettingsInner() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const generateMcpKeyMutation = useMutation({
-    mutationFn: async (ttlDays: string) => {
-      const res = await fetch("/api/organizations/mcp-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId: activeOrganizationId, ttlDays }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to generate key");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast.success("MCP API Key generated!");
-      queryClient.invalidateQueries({ queryKey: ["mcp-settings"] });
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
-
-  const deleteMcpKeyMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/organizations/mcp-settings?orgId=${activeOrganizationId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete key");
-    },
-    onSuccess: () => {
-      toast.success("MCP API Key deleted!");
-      queryClient.invalidateQueries({ queryKey: ["mcp-settings"] });
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
 
   const saveStorageSettingsMutation = useMutation({
     mutationFn: async (values: { settings: any }) => {
@@ -452,6 +423,64 @@ function SettingsInner() {
       toast.success("AI settings updated successfully");
     },
     onError: (err: any) => toast.error(`Error: ${err.message}`),
+  });
+  
+  const { data: apiKeys = [], isLoading: isLoadingKeys } = useQuery<any[]>({
+    queryKey: ["api-keys", activeOrganizationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/keys?orgId=${activeOrganizationId}`);
+      if (!res.ok) throw new Error("Failed to fetch keys");
+      return res.json();
+    },
+    enabled: !!activeOrganizationId && canManage,
+  });
+
+  const [showAddKey, setShowAddKey] = useState(false);
+  const [newKeyData, setNewKeyData] = useState<any>(null);
+  const [showConfigFor, setShowConfigFor] = useState<any>(null);
+
+  const createKeyMutation = useMutation({
+    mutationFn: async (values: ApiKeyFormValues) => {
+      const res = await fetch("/api/organizations/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, orgId: activeOrganizationId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setNewKeyData(data);
+      setShowAddKey(false);
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+      toast.success("API Key created successfully!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteKeyMutation = useMutation({
+    mutationFn: async (keyValue: string) => {
+      const res = await fetch(`/api/organizations/keys?orgId=${activeOrganizationId}&key=${keyValue}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to revoke key");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+      toast.success("API Key revoked");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const {
+    register: registerApiKey,
+    handleSubmit: handleSubmitApiKey,
+    control: controlApiKey,
+    reset: resetApiKey,
+    formState: { errors: apiKeyErrors }
+  } = useForm<ApiKeyFormValues>({
+    resolver: zodResolver(ApiKeySchema),
+    defaultValues: { name: "", role: "member", ttlDays: "30" }
   });
 
   const {
@@ -532,14 +561,6 @@ function SettingsInner() {
     defaultValues: emailSettings || { provider: "system", senderEmail: "", senderName: "Sulfur Book" },
   });
 
-  const {
-    handleSubmit: handleSubmitMcp,
-    control: controlMcp,
-    watch: watchMcp,
-  } = useForm<McpSettingsFormValues>({
-    resolver: zodResolver(McpSettingsSchema),
-    defaultValues: { ttlDays: "30" },
-  });
 
   const [storageProvider, setStorageProvider] = useState<"system" | "s3" | "cloudinary">("system");
   const [s3Settings, setS3Settings] = useState({
@@ -568,7 +589,6 @@ function SettingsInner() {
     }
   }, [storageSettingsData]);
 
-  const watchMcpTtl = watchMcp("ttlDays");
   const [copied, setCopied] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingJson, setIsExportingJson] = useState(false);
@@ -1313,172 +1333,265 @@ function SettingsInner() {
         {activeTab === "mcp" && (
           <div className="space-y-8">
             <Card className="shadow-sm border-border/40 overflow-hidden bg-card/50 backdrop-blur-sm">
-              <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Key className="w-5 h-5 text-primary" /> 
-                  MCP Server Integration
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Expose your ledger tools to AI agents using the Model Context Protocol (MCP).
-                </CardDescription>
+              <CardHeader className="pb-2 pt-4 px-5 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Key className="w-5 h-5 text-primary" /> 
+                    API Access Keys (MCP)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Create keys to connect external AI agents via the Model Context Protocol.
+                  </CardDescription>
+                </div>
+                {canManage && (
+                  <Button size="sm" onClick={() => { resetApiKey(); setShowAddKey(true); }}>
+                    <UserPlus className="w-4 h-4 mr-2" /> Add Key
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent className="space-y-6 px-5 pb-5">
-                {isLoadingMcpSettings ? (
-                  <div className="p-8 text-center text-muted-foreground italic">Loading MCP settings...</div>
-                ) : mcpSettings?.mcpApiKey ? (
-                  <div className="space-y-6">
-                    <div className="p-4 bg-muted border border-border rounded-lg">
-                      <h3 className="text-sm font-semibold text-foreground mb-2">Your MCP API Key</h3>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={mcpSettings.mcpApiKey}
-                          readOnly
-                          type="password"
-                          className="bg-muted/50 font-mono text-xs"
-                        />
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="shrink-0"
-                          onClick={() => {
-                            navigator.clipboard.writeText(mcpSettings.mcpApiKey!);
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                            toast.success("API Key copied to clipboard");
-                          }}
-                        >
-                          {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                      {mcpSettings.mcpApiKeyExpiresAt && (
-                        <p className="text-xs text-muted-foreground/80 mt-2">
-                          Expires on: {new Date(mcpSettings.mcpApiKeyExpiresAt).toLocaleDateString()}
-                        </p>
-                      )}
+              <CardContent className="px-5 pb-5 mt-4">
+                {isLoadingKeys ? (
+                  <div className="p-12 text-center text-muted-foreground italic">Loading access keys...</div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 border-2 border-dashed rounded-xl border-border/40 bg-muted/5">
+                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                      <Key className="w-6 h-6 text-muted-foreground" />
                     </div>
-
-                    <div className="space-y-3">
-                      <Label>MCP Server Configuration</Label>
-                      <div className="relative">
-                        <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto">
-                          {`{
-  "mcpServers": {
-    "${slugify(activeOrg?.name || "sulfur")}-ledger": {
-      "url": "${typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp",
-      "transport": "http",
-      "headers": {
-        "x-mcp-key": "${mcpSettings.mcpApiKey}"
-      }
-    }
-  }
-}`}
-                        </pre>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="absolute top-2 right-2 h-7 text-[10px]"
-                          onClick={() => {
-                            const config = {
-                              mcpServers: {
-                                [`${slugify(activeOrg?.name || "sulfur")}-ledger`]: {
-                                  url: `${window.location.origin}/api/mcp`,
-                                  transport: "http",
-                                  headers: {
-                                    "x-mcp-key": mcpSettings.mcpApiKey
-                                  }
-                                }
-                              }
-                            };
-                            navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-                            toast.success("Configuration copied!");
-                          }}
-                        >
-                          Copy JSON
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Add this snippet to your MCP client configuration (e.g. <code>mcp_config.json</code>) to enable AI access to this organization's data.
-                      </p>
+                    <div className="max-w-xs">
+                      <p className="text-sm font-semibold">No Keys Found</p>
+                      <p className="text-xs text-muted-foreground">Create your first key to enable AI integration for this organization.</p>
                     </div>
-
-                    {canManage && (
-                      <div className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <p className="text-sm text-muted-foreground/80">Need a new key? Regenerating will invalidate the current one.</p>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setConfirmConfig({
-                                open: true,
-                                title: "Revoke MCP Key",
-                                description: "This will immediately disable AI access for this organization. Are you sure?",
-                                variant: "destructive",
-                                onConfirm: () => deleteMcpKeyMutation.mutate(),
-                              });
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" /> Revoke
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
-                          >
-                            <RotateCcw className="w-4 h-4 mr-2" /> Regenerate
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                      <Key className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <div className="max-w-md">
-                      <h3 className="text-lg font-semibold">No MCP Key Generated</h3>
-                      <p className="text-muted-foreground text-sm mt-2">
-                        Enable AI tools for this organization. Generate a secure API key to connect your MCP-compatible agents.
-                      </p>
-                    </div>
-                    {canManage && (
-                      <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                        <div className="w-full text-left space-y-2">
-                          <Label>Key Expiration (TTL)</Label>
-                          <Controller
-                            name="ttlDays"
-                            control={controlMcp}
-                            render={({ field }) => (
-                              <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger>
-                                  <SelectValue>
-                                    {field.value === "30" ? "30 Days" : field.value === "60" ? "60 Days" : field.value === "90" ? "90 Days" : field.value === "never" ? "Never Expires" : undefined}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="30">30 Days</SelectItem>
-                                  <SelectItem value="60">60 Days</SelectItem>
-                                  <SelectItem value="90">90 Days</SelectItem>
-                                  <SelectItem value="never">Never Expires</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          />
-                        </div>
-                        <Button
-                          className="w-full"
-                          onClick={() => generateMcpKeyMutation.mutate(watchMcpTtl || "30")}
-                          disabled={generateMcpKeyMutation.isPending}
-                        >
-                          {generateMcpKeyMutation.isPending ? "Generating..." : "Generate MCP API Key"}
-                        </Button>
-                      </div>
-                    )}
+                  <div className="rounded-md border border-border/40 overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="text-[10px] uppercase font-bold">Label</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-center">Role</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-center">Expires</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {apiKeys.map((k) => (
+                          <TableRow key={k.key} className="hover:bg-muted/10 transition-colors">
+                            <TableCell>
+                              <div className="text-sm font-semibold">{k.name}</div>
+                              <div className="text-[10px] text-muted-foreground tabular-nums">ID: ...{k.key.slice(-8)}</div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={k.role === 'admin' ? 'default' : k.role === 'member' ? 'secondary' : 'outline'} className="text-[10px] font-bold uppercase">
+                                {k.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-center tabular-nums text-muted-foreground">
+                              {k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : "Never"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => setShowConfigFor(k)}
+                                  title="View Configuration"
+                                >
+                                  <FileJson className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setConfirmConfig({
+                                      open: true,
+                                      title: "Revoke API Key",
+                                      description: `This will immediately revoke access for "${k.name}". This action cannot be undone.`,
+                                      variant: "destructive",
+                                      onConfirm: () => deleteKeyMutation.mutate(k.key),
+                                    });
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Dialog: Add Key */}
+            <Dialog open={showAddKey} onOpenChange={setShowAddKey}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create API Key</DialogTitle>
+                  <DialogDescription>
+                    Generate a new key to access this organization's tools via MCP.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitApiKey((v) => createKeyMutation.mutate(v))}>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="key-name">Label / Application Name</Label>
+                      <Input
+                        id="key-name"
+                        placeholder="e.g. Claude Desktop, Zapier..."
+                        {...registerApiKey("name")}
+                      />
+                      {apiKeyErrors.name && <p className="text-[10px] text-destructive font-bold uppercase">{apiKeyErrors.name.message}</p>}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <Controller
+                          name="role"
+                          control={controlApiKey}
+                          render={({ field }) => (
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
+                                <SelectItem value="member">Member (Transactions)</SelectItem>
+                                <SelectItem value="admin">Admin (Full Access)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Expiration</Label>
+                        <Controller
+                          name="ttlDays"
+                          control={controlApiKey}
+                          render={({ field }) => (
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Expiry" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="7">7 Days</SelectItem>
+                                <SelectItem value="30">30 Days</SelectItem>
+                                <SelectItem value="90">90 Days</SelectItem>
+                                <SelectItem value="never">Never</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" type="button" onClick={() => setShowAddKey(false)}>Cancel</Button>
+                    <Button type="submit" disabled={createKeyMutation.isPending}>
+                      {createKeyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Generate Key
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog: Reveal Key (One-time) */}
+            <Dialog open={!!newKeyData} onOpenChange={(open) => !open && setNewKeyData(null)}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-primary" /> Key Created Successfully
+                  </DialogTitle>
+                  <DialogDescription className="text-destructive font-bold">
+                    WARNING: This key will only be shown ONCE. Please copy and store it securely.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="p-4 bg-muted border border-border rounded-lg space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newKeyData?.fullKey || ""}
+                      readOnly
+                      className="bg-background font-mono text-sm"
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newKeyData.fullKey);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                        toast.success("API Key copied");
+                      }}
+                    >
+                      {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => setNewKeyData(null)}>I have saved the key</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog: Config Viewer */}
+            <Dialog open={!!showConfigFor} onOpenChange={(open) => !open && setShowConfigFor(null)}>
+              <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>MCP Server Configuration</DialogTitle>
+                  <DialogDescription>
+                    Copy this configuration for use with your MCP client (e.g. Claude Desktop).
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <pre className="p-4 bg-neutral-900 text-neutral-100 rounded-lg text-xs overflow-x-auto tabular-nums">
+                      {JSON.stringify({
+                        mcpServers: {
+                          [`${slugify(activeOrg?.name || "sulfur")}-${slugify(showConfigFor?.name || "agent")}`]: {
+                            url: `${typeof window !== 'undefined' ? window.location.origin : ''}/.netlify/functions/mcp`,
+                            transport: "http",
+                            headers: {
+                              "x-mcp-key": "YOUR_SECRET_KEY_HERE"
+                            }
+                          }
+                        }
+                      }, null, 2)}
+                    </pre>
+                    <p className="text-[10px] text-muted-foreground mt-2 italic px-1">
+                      Note: Replace <code>YOUR_SECRET_KEY_HERE</code> with the secret key generated for "{showConfigFor?.name}".
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowConfigFor(null)}>Close</Button>
+                  <Button 
+                    onClick={() => {
+                      const config = {
+                        mcpServers: {
+                          [`${slugify(activeOrg?.name || "sulfur")}-${slugify(showConfigFor?.name || "agent")}`]: {
+                            url: `${window.location.origin}/.netlify/functions/mcp`,
+                            transport: "http",
+                            headers: {
+                              "x-mcp-key": "YOUR_SECRET_KEY_HERE"
+                            }
+                          }
+                        }
+                      };
+                      navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+                      toast.success("Template copied!");
+                    }}
+                  >
+                    Copy Template
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
