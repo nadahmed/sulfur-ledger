@@ -12,9 +12,11 @@ import { TOOL_SPECS } from "./tool-definitions";
  * Helper to check mutation permissions
  */
 const ensureCanMutate = (role: string, isOwner: boolean) => {
-  if (isOwner) return true;
-  if (role === "admin" || role === "member") return true;
-  throw new Error("Forbidden: Viewers cannot perform this action.");
+  if (role === "viewer") {
+    throw new Error("Forbidden: Viewers cannot perform this action.");
+  }
+  if (isOwner || role === "admin" || role === "member") return true;
+  throw new Error("Forbidden: Insufficient permissions.");
 };
 
 export const createAiTools = (orgId: string, userId: string, userName: string, role: string, isOwner: boolean, ipAddress?: string, userAgent?: string) => ({

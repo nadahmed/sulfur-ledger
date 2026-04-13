@@ -75,10 +75,13 @@ export default async (req: Request, _context: Context) => {
   }
 
   // 6. Resolve identity and permissions from key record (or org owner for legacy keys)
-  const userId   = keyRecord?.userId   || org.ownerId  || "mcp-user";
-  const userName = keyRecord?.name     || "AI Agent (MCP)";
+  const userId   = keyRecord?.userId   || `legacy:${orgId}`;
+  const userName = keyRecord?.name     || "AI Agent";
   const role     = keyRecord?.role     || "admin";
-  const isOwner  = userId === org.ownerId;
+  
+  // API Keys are organizational service accounts and NEVER count as "Owners" 
+  // for permission bypass purposes.
+  const isOwner  = false;
   const keyLabel = keyRecord?.name     || "legacy-key";
 
   // 7. Activity logging helper (non-blocking, fire-and-forget)

@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
       orgId,
       key: mcpApiKey,
       name: name || "Unnamed Key",
-      userId: auth.user.sub,
-      userName: auth.user.name || "Unknown User",
+      userId: `key:${secret}`, // Decoupled from the creator
+      userName: name || "API Key",
       role: role || "member",
       expiresAt,
       createdAt: new Date().toISOString(),
