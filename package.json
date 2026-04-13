@@ -1,7 +1,8 @@
 {
   "name": "sulfur-book",
   "version": "0.1.0",
-  "private": true,
+  "author": "Noor Al Din Ahmed",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
