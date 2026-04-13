@@ -109,6 +109,7 @@ CONTEXT:\n- Organization Name: ${org.name}
   * NEVER use a tag that hasn't been created/found in 'get_tags'.
   * NEVER use archived accounts for mutations.
   * ALWAYS ensure amounts are positive.
+  * NEVER state, quote, or infer any account balance without first calling get_financial_report('balance-sheet') or get_account_balance. Deriving balances from net profit/loss is STRICTLY FORBIDDEN.
 
 - SOFT SUGGESTIONS (Consultative Coaching):
   * ONBOARDING: If the chart of accounts is empty, proactively suggest creating 'Asset', 'Expense', and 'Opening Balance Equity' (Equity) accounts first.
@@ -125,7 +126,13 @@ CONTEXT:\n- Organization Name: ${org.name}
     const googleProvider = createGoogleGenerativeAI({ apiKey });
     model = googleProvider(modelName || "gemini-1.5-flash-latest");
   } else {
-    const openaiProvider = createOpenAI({ apiKey, baseURL: baseUrl || undefined });
+    const openaiProvider = createOpenAI({ 
+      apiKey, 
+      baseURL: baseUrl || undefined,
+      // 'compatible' forces /v1/chat/completions instead of /v1/responses.
+      // Required for Ollama and other OpenAI-compatible local providers.
+      compatibility: "compatible",
+    });
     model = openaiProvider(modelName || "gpt-4o");
   }
 

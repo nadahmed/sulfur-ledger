@@ -106,25 +106,33 @@ GUIDANCE:
 
   // --- REPORTS ---
   get_account_balance: {
-    description: "Returns the net balance of a specific account using canonical reporting logic.",
+    description: `Returns the life-to-date canonical balance of a specific account.
+⚠️ CRITICAL: NEVER state or infer any account balance without calling this tool first.
+⚠️ For Asset, Liability, and Equity accounts, balances are ALWAYS life-to-date (all-time), regardless of date filters.
+⚠️ For Income and Expense accounts, balances reflect ONLY the supplied date range.`,
     parameters: z.object({
-      accountId: z.string(),
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
-      endDate: z.string().optional().describe("YYYY-MM-DD"),
+      accountId: z.string().describe("The account ID to query"),
+      startDate: z.string().optional().describe("YYYY-MM-DD — for income/expense period filtering only, has NO effect on asset/liability/equity balances"),
+      endDate: z.string().optional().describe("YYYY-MM-DD — upper bound for the query"),
     }),
   },
   get_financial_summary: {
-    description: "Returns a high-level Profit & Loss summary for a period.",
+    description: `Returns a Profit & Loss summary for a specific period (income vs expenses).
+⚠️ This tool does NOT return account balances. For current balances, use get_financial_report('balance-sheet').`,
     parameters: z.object({
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     }),
   },
   get_financial_report: {
-    description: "Fetches full financial reports (Trial Balance, Balance Sheet, Income Statement).",
+    description: `Fetches full financial reports. USE THIS for any question about current balances.
+- 'balance-sheet': Current asset, liability, and equity account balances (always life-to-date).
+- 'income-statement': Revenue and expenses for a specific period.
+- 'trial-balance': All account balances for double-entry verification.
+⚠️ NEVER infer account balances from income/expense data — always call this tool.`,
     parameters: z.object({
       reportType: z.enum(["trial-balance", "balance-sheet", "income-statement"]),
-      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      startDate: z.string().optional().describe("YYYY-MM-DD — for income/expense filtering only; has NO effect on balance-sheet asset balances"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
       tagIds: z.array(z.string()).optional(),
     }),
