@@ -129,9 +129,6 @@ CONTEXT:\n- Organization Name: ${org.name}
     const openaiProvider = createOpenAI({ 
       apiKey, 
       baseURL: baseUrl || undefined,
-      // 'compatible' forces /v1/chat/completions instead of /v1/responses.
-      // Required for Ollama and other OpenAI-compatible local providers.
-      compatibility: "compatible",
     });
     model = openaiProvider(modelName || "gpt-4o");
   }
