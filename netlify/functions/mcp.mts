@@ -7,7 +7,7 @@ import { createMcpActivityLog } from "../../src/lib/db/audit";
 import { getChatHistory } from "../../src/lib/db/ai";
 import { processChatTurn } from "../../src/lib/ai/chat-service";
 import { z } from "zod";
-import { randomUUID } from "crypto";
+import { uuidv7 } from "uuidv7";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -76,20 +76,20 @@ export default async (req: Request, _context: Context) => {
   }
 
   // 6. Resolve identity and permissions from key record (or org owner for legacy keys)
-  const userId   = keyRecord?.userId   || `legacy:${orgId}`;
-  const userName = keyRecord?.name     || "AI Agent";
-  const role     = keyRecord?.role     || "admin";
-  
+  const userId = keyRecord?.userId || `legacy:${orgId}`;
+  const userName = keyRecord?.name || "AI Agent";
+  const role = keyRecord?.role || "admin";
+
   // API Keys are organizational service accounts and NEVER count as "Owners" 
   // for permission bypass purposes.
-  const isOwner  = false;
-  const keyLabel = keyRecord?.name     || "legacy-key";
+  const isOwner = false;
+  const keyLabel = keyRecord?.name || "legacy-key";
 
   // 7. Activity logging helper (non-blocking, fire-and-forget)
   const logActivity = (toolName: string, input: any, result: any, error?: string) => {
     createMcpActivityLog({
       orgId,
-      id: randomUUID(),
+      id: uuidv7(),
       toolName,
       input: JSON.stringify(input),
       status: error ? "error" : "success",
@@ -153,15 +153,22 @@ export default async (req: Request, _context: Context) => {
           isOwner,
           localTime: new Date().toLocaleString(),
           fullBaseUrl: deriveBaseUrl(req),
-          requestId: `mcp_${randomUUID()}`,
+          requestId: `mcp_${uuidv7()}`,
           processMode: "SYNC",
           ipAddress,
           userAgent,
         });
 
-        if (!result) throw new Error("Assistant failed to generate a response.");
+        if (result.status === "skipped") {
+          return { content: [{ type: "text" as const, text: `Request skipped: ${result.reason || "already processing"}.` }] };
+        }
 
-        return { content: [{ type: "text" as const, text: result.content }] };
+        if (result.status === "background") {
+          return { content: [{ type: "text" as const, text: "The request is too complex for a synchronous response and will continue in the background. Please check back in a moment." }] };
+        }
+
+        const text = result.message?.content || "Assistant reviewed your request but no text response was generated.";
+        return { content: [{ type: "text" as const, text }] };
       } catch (e: any) {
         return {
           content: [{ type: "text" as const, text: `Error: ${e.message}` }],
