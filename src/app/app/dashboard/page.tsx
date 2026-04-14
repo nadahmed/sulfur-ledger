@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { useQuery } from "@tanstack/react-query";
+import { useDashboardSummary, useTrendData, useRecentActivity } from "@/hooks/use-ledger";
 import { formatCurrency } from "@/lib/utils";
 import {
   TrendingUp,
@@ -52,17 +52,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-
-interface DashboardSummary {
-  totalAssets: number;
-  netIncome: number;
-  totalIncome: number;
-  totalExpenses: number;
-  cashBalance: number;
-  assetDistribution: { name: string; value: number; fill: string }[];
-  expenseDistribution: { name: string; value: number; fill: string }[];
-  incomeStats: { name: string; amount: number; fill: string }[];
-}
 
 export default function DashboardPage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -93,46 +82,9 @@ export default function DashboardPage() {
 
   const isLoading = isUserLoading || isOrgLoading;
 
-  const { data: summary, isLoading: isFetching } = useQuery<DashboardSummary>({
-    queryKey: ["dashboard-summary", activeOrganizationId, date.from, date.to],
-    queryFn: async () => {
-      const start = date.from ? format(date.from, "yyyy-MM-dd") : "";
-      const end = date.to ? format(date.to, "yyyy-MM-dd") : "";
-      const res = await fetch(`/api/reports?type=dashboard&start=${start}&end=${end}`, {
-        headers: { "x-org-id": activeOrganizationId! }
-      });
-      if (!res.ok) throw new Error("Failed to fetch dashboard data");
-      return res.json();
-    },
-    enabled: !!activeOrganizationId,
-  });
-
-  const { data: trendData, isLoading: isTrendLoading } = useQuery({
-    queryKey: ["dashboard-trend", activeOrganizationId, trendPeriod, date.from, date.to],
-    queryFn: async () => {
-      const start = date.from ? format(date.from, "yyyy-MM-dd") : "";
-      const end = date.to ? format(date.to, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
-      const res = await fetch(`/api/reports?type=trend&period=${trendPeriod}&start=${start}&end=${end}`, {
-        headers: { "x-org-id": activeOrganizationId! }
-      });
-      if (!res.ok) throw new Error("Failed to fetch trend data");
-      return res.json();
-    },
-    enabled: !!activeOrganizationId,
-  });
-  
-  const { data: recentActivity, isLoading: isActivityLoading } = useQuery<any[]>({
-    queryKey: ["dashboard-activity", activeOrganizationId],
-    queryFn: async () => {
-      const res = await fetch(`/api/activity?orgId=${activeOrganizationId}`, {
-        headers: { "x-org-id": activeOrganizationId! }
-      });
-      if (!res.ok) throw new Error("Failed to fetch activity");
-      const data = await res.json();
-      return Array.isArray(data) ? data.slice(0, 3) : [];
-    },
-    enabled: !!activeOrganizationId,
-  });
+  const { data: summary, isLoading: isFetching } = useDashboardSummary(activeOrganizationId, date.from, date.to);
+  const { data: trendData, isLoading: isTrendLoading } = useTrendData(activeOrganizationId, trendPeriod, date.from, date.to);
+  const { data: recentActivity, isLoading: isActivityLoading } = useRecentActivity(activeOrganizationId);
 
   const formatCurrencyValue = (amount: number) => {
     return formatCurrency(

@@ -1,0 +1,12 @@
+{
+    "dbcode.connections": [
+        {
+            "connectionId": "623yaGCJgUKZwlGRoqZb0",
+            "name": "SulfurLocal",
+            "driver": "dynamodb",
+            "authMethod": "local",
+            "host": "http://localhost:8000",
+            "connectionType": "host"
+        }
+    ]
+}
