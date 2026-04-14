@@ -23,6 +23,12 @@ export interface ChatTurnOptions {
   userAgent?: string;
 }
 
+export type ChatTurnResult = {
+  status: "success" | "skipped" | "background" | "error";
+  message?: any;
+  reason?: string;
+};
+
 export async function processChatTurn({
   org,
   messages,
@@ -43,15 +49,23 @@ export async function processChatTurn({
   const orgId = org.orgId || org.id;
   const lastMessage = messages[messages.length - 1];
 
-  // 1. Atomic Job Claim
+  // 1. Ensure Job Record exists (Needed for Postgres consistent updates)
+  const job = await getOrCreateJob(orgId, requestId);
+
+  // 2. Atomic Job Claim
   const canProceed = await claimJob(orgId, requestId, processMode);
   if (!canProceed) {
     console.log(`[AI] Request ${requestId} already being processed or completed. Skipping.`);
-    return null;
+    
+    // If it was already completed, try to fetch the assistant response to return it
+    if (job.status === "COMPLETED") {
+      return { status: "skipped" as const, reason: "Already processed" };
+    }
+    
+    return { status: "skipped" as const, reason: "In progress" };
   }
 
-  // 2. Re-hydration: Check for existing tool results in Job State
-  const job = await getOrCreateJob(orgId, requestId);
+  // 3. Re-hydration: Check for existing tool results in Job State
   const rehydratedMessages = [...messages];
 
   // If we have results, we need to inject them into the conversation
@@ -213,7 +227,7 @@ STRATEGY:
 
   if (abortSignal?.aborted) {
     console.log("[AI] Task aborted, state remains for background process.");
-    return null;
+    return { status: "background" };
   }
 
   // 7. Finalize
@@ -256,5 +270,5 @@ STRATEGY:
   await completeJob(orgId, requestId);
 
   await userSavePromise;
-  return savedMsg;
+  return { status: "success", message: savedMsg };
 }

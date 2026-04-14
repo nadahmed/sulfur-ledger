@@ -141,7 +141,10 @@ export async function getJournalEntries(
     include: {
       tags: true,
     },
-    orderBy: { date: "desc" },
+    orderBy: [
+      { date: "desc" },
+      { id: "desc" }
+    ],
   });
 
   return entries.map((e) => ({
@@ -209,7 +212,10 @@ export async function getJournalEntriesWithLines(
       tags: true,
       lines: true,
     },
-    orderBy: { date: "desc" },
+    orderBy: [
+      { date: "desc" },
+      { id: "desc" }
+    ],
     skip,
     take: limit,
   });
@@ -244,7 +250,10 @@ export async function getAllJournalEntriesWithLines(orgId: string) {
       tags: true,
       lines: true,
     },
-    orderBy: { date: "desc" },
+    orderBy: [
+      { date: "desc" },
+      { id: "desc" }
+    ],
   });
 
   return entries.map((e) => ({
@@ -276,7 +285,10 @@ export async function getAccountLines(orgId: string, accountId: string, startDat
         lte: new Date(endDate),
       } : undefined,
     },
-    orderBy: { date: "desc" },
+    orderBy: [
+      { date: "desc" },
+      { id: "desc" }
+    ],
   });
 
   return lines.map((l) => ({

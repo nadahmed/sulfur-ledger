@@ -109,11 +109,12 @@ export default function AiChatbot() {
   // Window focus sync
   useEffect(() => {
     const handler = () => {
-      if (activeOrganizationId && isOpen) syncMessages();
+      // Only sync if NOT currently loading a message
+      if (activeOrganizationId && isOpen && !isLoading) syncMessages();
     };
     window.addEventListener("focus", handler);
     return () => window.removeEventListener("focus", handler);
-  }, [activeOrganizationId, isOpen, syncMessages]);
+  }, [activeOrganizationId, isOpen, syncMessages, isLoading]);
 
   // Escape key to close
   useEffect(() => {
@@ -196,7 +197,32 @@ export default function AiChatbot() {
           }).format(new Date()),
         }),
       });
+
       if (!response.ok) throw new Error("Failed to send message");
+
+      const data = await response.json();
+      
+      // If server processed synchronously, we can reset loading state
+      if (data.mode === "sync" || data.status === "skipped") {
+        setIsLoading(false);
+        
+        // If we got the actual message back, add it if not already there
+        if (data.message) {
+          setMessages(prev => {
+            if (prev.find(m => m.id === data.message.id)) return prev;
+            return [...prev, {
+              id: data.message.id,
+              role: data.message.role,
+              content: data.message.content,
+              timestamp: data.message.timestamp
+            }];
+          });
+        }
+      } else if (data.mode === "background") {
+        // Still loading, background task will trigger Pusher
+        console.log("[AI] Request handed off to background. Waiting for Pusher...");
+      }
+
     } catch (err: any) {
       toast.error(`AI Error: ${err.message}`);
       setIsLoading(false);

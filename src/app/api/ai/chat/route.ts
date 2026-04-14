@@ -98,14 +98,14 @@ export async function POST(req: NextRequest) {
     }, 8500);
 
     try {
-      await processChatTurn({
+      const result = await processChatTurn({
         ...chatOptions,
         processMode: "SYNC",
         abortSignal: controller.signal
-      });
+      }) as any;
 
       clearTimeout(timeoutId);
-      return Response.json({ success: true, mode: "sync" });
+      return Response.json({ success: true, mode: "sync", ...result });
     } catch (err: any) {
       if (err.name === 'AbortError') {
         return Response.json({ success: true, mode: "background" }, { status: 202 });

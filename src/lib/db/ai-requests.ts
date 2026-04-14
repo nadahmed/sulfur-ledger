@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { uuidv7 } from "uuidv7";
 
 export type JobStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 export type JobOwner = "SYNC" | "BACKGROUND";
@@ -166,19 +167,35 @@ export async function claimStep(
   const job = await getOrCreateJob(orgId, requestId);
   
   const argsHash = Buffer.from(JSON.stringify(args)).toString("base64").substring(0, 16);
-  const providedId = `ai_${requestId.substring(0, 8)}_${argsHash}`;
-
-  if (job.results && job.results[providedId]) {
+  
+  // 3. Mapping: Check if we already have a UUIDv7 for this specific tool call in this turn
+  const mapping = (job.results as any)?.__provided_ids__ || {};
+  
+  if (mapping[argsHash]) {
+    const providedId = mapping[argsHash];
     const entry = job.results[providedId];
-    const finalResult = (typeof entry === 'object' && entry !== null && 'result' in entry) 
-      ? entry.result 
-      : entry;
-    return { result: finalResult, providedId };
+    if (entry) {
+      const finalResult = (typeof entry === 'object' && entry !== null && 'result' in entry) 
+        ? entry.result 
+        : entry;
+      return { result: finalResult, providedId };
+    }
+    return { providedId };
   }
+
+  // 4. Generate NEW UUIDv7 for this tool call
+  const providedId = uuidv7();
+  mapping[argsHash] = providedId;
+
+  const results = (job.results as Record<string, any>) || {};
+  results.__provided_ids__ = mapping;
 
   await prisma.aiJob.update({
     where: { id: requestId },
-    data: { lastActive: new Date() },
+    data: { 
+      results: results,
+      lastActive: new Date() 
+    },
   });
 
   return { providedId };
