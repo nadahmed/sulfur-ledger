@@ -4,6 +4,7 @@ import * as recurringDb from "../db/recurring";
 import { uuidv7 } from "uuidv7";
 import { TOOL_SPECS } from "./tool-definitions";
 import { recordSimplexJournalEntry } from "./journal-shared";
+import { claimStep, recordToolResult } from "../db/ai-requests";
 
 /**
  * RBAC guard — enforced at the tool level (outside the service layer).
@@ -21,6 +22,7 @@ export const createAiTools = (
   userName: string,
   role: string,
   isOwner: boolean,
+  requestId: string,
   ipAddress?: string,
   userAgent?: string
 ) => {
@@ -32,18 +34,44 @@ export const createAiTools = (
       description: TOOL_SPECS.get_accounts.description,
       inputSchema: TOOL_SPECS.get_accounts.parameters,
       execute: async () => {
+        console.log(`[AI-TOOL] STARTING EXECUTION: get_accounts for org ${orgId}`);
+        try {
+          const { result, providedId } = await claimStep(orgId, requestId, "get_accounts", {});
+        if (result) return result;
+
         const accs = await LedgerService.accounts.getAll(orgId);
-        return accs.map((a) => ({ id: a.id, name: a.name, category: a.category, status: a.status }));
+        console.log(`[AI TOOL] get_accounts for ${orgId} found ${accs.length} accounts`);
+        
+        if (accs.length === 0) {
+          return "No accounts found in this organization. The ledger is empty.";
+        }
+
+        const resList = accs
+          .map((a: any) => `- [${a.category}] ${a.name} (ID: ${a.id})`)
+          .join("\n");
+        
+        // Record the actual list so it persists through handoffs
+        await recordToolResult(orgId, requestId, providedId, resList, "get_accounts", {});
+        return resList;
+      } catch (err: any) {
+        console.error(`[AI-TOOL] ERROR in get_accounts:`, err);
+        return `Failed to retrieve accounts: ${err.message}`;
+      }
       },
     }),
 
     create_account: tool({
       description: TOOL_SPECS.create_account.description,
       inputSchema: TOOL_SPECS.create_account.parameters,
-      execute: async ({ id, name, category }: { id: string; name: string; category: any }) => {
+      execute: async (args: { id: string; name: string; category: any }) => {
         ensureCanMutate(role, isOwner);
-        await LedgerService.accounts.create(orgId, { id, name, category }, ctx);
-        return `Account '${name}' created successfully.`;
+        const { result, providedId } = await claimStep(orgId, requestId, "create_account", args);
+        if (result) return result;
+
+        await LedgerService.accounts.create(orgId, args, ctx);
+        const msg = `Account '${args.name}' created successfully.`;
+        await recordToolResult(orgId, requestId, providedId, msg, "create_account", args);
+        return msg;
       },
     }),
 
@@ -62,8 +90,13 @@ export const createAiTools = (
       inputSchema: TOOL_SPECS.create_tag.parameters,
       execute: async (args: { name: string; color: string; description?: string }) => {
         ensureCanMutate(role, isOwner);
+        const { result, providedId } = await claimStep(orgId, requestId, "create_tag", args);
+        if (result) return result;
+
         const tag = await LedgerService.tags.create(orgId, args, ctx);
-        return `Tag '${tag.name}' created with ID ${tag.id}.`;
+        const msg = `Tag '${tag.name}' created with ID ${tag.id}.`;
+        await recordToolResult(orgId, requestId, providedId, msg, "create_tag", args);
+        return msg;
       },
     }),
 
@@ -72,8 +105,7 @@ export const createAiTools = (
       description: TOOL_SPECS.get_journals.description,
       inputSchema: TOOL_SPECS.get_journals.parameters,
       execute: async ({ startDate, endDate, tagIds }: { startDate?: string; endDate?: string; tagIds?: string[] }) => {
-        const { getJournalEntries } = await import("../db/journals");
-        const { getJournalLinesForJournal } = await import("../db/journals");
+        const { getJournalEntries, getJournalLinesForJournal } = await import("../db/journals");
         const entries = await getJournalEntries(orgId, startDate, endDate, tagIds);
         const enriched = await Promise.all(
           entries.map(async (e) => {
@@ -94,30 +126,46 @@ export const createAiTools = (
     record_journal_entry: tool({
       description: TOOL_SPECS.record_journal_entry.description,
       inputSchema: TOOL_SPECS.record_journal_entry.parameters,
-      execute: async ({ date, description, amount, fromAccountId, toAccountId, tags }: any) => {
+      execute: async (args: any) => {
         ensureCanMutate(role, isOwner);
+        const { result, providedId } = await claimStep(orgId, requestId, "record_journal_entry", args);
+        console.log(`[AI TOOL] record_journal_entry call for ${requestId}. providedId: ${providedId}, args:`, JSON.stringify(args));
+        if (result) {
+          console.log(`[AI TOOL] Returning existing result for ${providedId}`);
+          return result;
+        }
+
         const res = await recordSimplexJournalEntry({
-          orgId, userId, userName, date, description, amount,
-          fromAccountId, toAccountId, tags, ipAddress, userAgent,
+          orgId, userId, userName, ...args,
+          providedId, ipAddress, userAgent,
         });
-        return `✅ Recorded: ${description} (${res.amount.toFixed(2)})`;
+        const msg = `✅ Recorded: ${args.description} (${res.amount.toFixed(2)})`;
+        await recordToolResult(orgId, requestId, providedId, msg, "record_journal_entry", args);
+        return msg;
       },
     }),
 
     record_bulk_journal_entries: tool({
       description: TOOL_SPECS.record_bulk_journal_entries.description,
       inputSchema: TOOL_SPECS.record_bulk_journal_entries.parameters,
-      execute: async ({ entries }: { entries: any[] }) => {
+      execute: async (args: { entries: any[] }) => {
         ensureCanMutate(role, isOwner);
+        const { result, providedId: bulkId } = await claimStep(orgId, requestId, "record_bulk", args);
+        if (result) return result;
+
         const results: string[] = [];
-        for (const entry of entries) {
+        for (let i = 0; i < args.entries.length; i++) {
+          const entry = args.entries[i];
+          const entryId = `${bulkId}_${i}`;
           const res = await recordSimplexJournalEntry({
             orgId, userId, userName, ...entry,
-            prefix: "[AI-Bulk]", ipAddress, userAgent,
+            providedId: entryId, prefix: "[AI-Bulk]", ipAddress, userAgent,
           });
           results.push(`✅ ${entry.description} (${res.amount.toFixed(2)})`);
         }
-        return `Processed ${entries.length} entries:\n${results.join("\n")}`;
+        const msg = `Processed ${args.entries.length} entries:\n${results.join("\n")}`;
+        await recordToolResult(orgId, requestId, bulkId, msg, "record_bulk_journal_entries", args);
+        return msg;
       },
     }),
 
@@ -189,6 +237,9 @@ export const createAiTools = (
       inputSchema: TOOL_SPECS.create_recurring_entry.parameters,
       execute: async (args: any) => {
         ensureCanMutate(role, isOwner);
+        const { result, providedId } = await claimStep(orgId, requestId, "create_recurring", args);
+        if (result) return result;
+
         const id = uuidv7();
         const entry: recurringDb.RecurringEntry = {
           orgId, id, ...args,
@@ -199,17 +250,24 @@ export const createAiTools = (
           createdAt: new Date().toISOString(),
         };
         await recurringDb.createRecurringEntry(entry, userId, userName, { ipAddress, userAgent });
-        return `Recurring entry '${args.description}' created successfully.`;
+        const msg = `Recurring entry '${args.description}' created successfully.`;
+        await recordToolResult(orgId, requestId, providedId, msg, "create_recurring_entry", args);
+        return msg;
       },
     }),
 
     delete_recurring_entry: tool({
       description: TOOL_SPECS.delete_recurring_entry.description,
       inputSchema: TOOL_SPECS.delete_recurring_entry.parameters,
-      execute: async ({ id }: { id: string }) => {
+      execute: async (args: { id: string }) => {
         ensureCanMutate(role, isOwner);
-        await recurringDb.deleteRecurringEntry(orgId, id, userId, userName, { ipAddress, userAgent });
-        return `Recurring entry deleted.`;
+        const { result, providedId } = await claimStep(orgId, requestId, "delete_recurring", args);
+        if (result) return result;
+
+        await recurringDb.deleteRecurringEntry(orgId, args.id, userId, userName, { ipAddress, userAgent });
+        const msg = `Recurring entry deleted.`;
+        await recordToolResult(orgId, requestId, providedId, msg, "delete_recurring_entry", args);
+        return msg;
       },
     }),
   };

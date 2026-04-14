@@ -34,7 +34,7 @@ export const JournalEntrySchema = z.object({
     key: z.string(),
     provider: z.enum(["system", "s3", "cloudinary"]),
     contentType: z.string(),
-  }).optional(),
+  }).nullable().optional(),
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
   message: "From and To accounts cannot be the same",
   path: ["toAccountId"],

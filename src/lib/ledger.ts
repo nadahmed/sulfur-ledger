@@ -37,6 +37,8 @@ export interface SimplexJournalInput {
   tags?: string[];
   notes?: string;
   receipt?: journalsDb.Receipt;
+  /** Optional pre-generated ID (e.g. for idempotency) */
+  id?: string;
 }
 
 export interface ReportOptions {
@@ -213,8 +215,8 @@ export const journals = {
       throw new Error(`Account '${toAcc.name}' is archived and cannot be used.`);
     }
 
-    // 3. Build entry (UUID7 generated here — never in the caller)
-    const id = uuidv7();
+    // 3. Build entry (UUID7 generated here if not provided)
+    const id = input.id || uuidv7();
     const entry: journalsDb.JournalEntry = {
       orgId,
       id,

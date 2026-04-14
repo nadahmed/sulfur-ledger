@@ -14,6 +14,8 @@ export interface SimplexJournalRecordingOptions {
   prefix?: string;
   ipAddress?: string;
   userAgent?: string;
+  toolCallId?: string;
+  providedId?: string;
 }
 
 /**
@@ -37,6 +39,8 @@ export async function recordSimplexJournalEntry({
   prefix = "[AI]",
   ipAddress,
   userAgent,
+  toolCallId,
+  providedId,
 }: SimplexJournalRecordingOptions) {
   // Validate tags against the formal tag list (AI-only requirement)
   if (tags && tags.length > 0) {
@@ -63,5 +67,6 @@ export async function recordSimplexJournalEntry({
     fromAccountId,
     toAccountId,
     tags,
+    id: providedId,
   }, ctx);
 }

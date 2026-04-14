@@ -1,6 +1,5 @@
-import { QueryCommand, DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { prisma } from "../prisma";
 import { uuidv7 } from "uuidv7";
-import { db, TABLE_NAME } from "../dynamodb";
 import { createAuditLog } from "./audit";
 
 export interface Tag {
@@ -18,95 +17,87 @@ export async function createTag(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ): Promise<Tag> {
-  const newTag: Tag = {
-    ...tag,
-    id: uuidv7(),
-    createdAt: new Date().toISOString(),
-  };
+  const newTag = await prisma.tag.create({
+    data: {
+      id: uuidv7(),
+      orgId: tag.orgId,
+      name: tag.name,
+      color: tag.color,
+      description: tag.description,
+    },
+  });
 
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${newTag.orgId}#TAG`,
-        SK: `TAG#${newTag.id}`,
-        Type: "Tag",
-        ...newTag,
-      },
-    })
-  );
+  const result: Tag = {
+    ...newTag,
+    description: newTag.description || undefined,
+    color: newTag.color || "",
+    createdAt: newTag.createdAt.toISOString(),
+  };
 
   if (userId) {
     await createAuditLog({
-      orgId: newTag.orgId,
+      orgId: result.orgId,
       id: uuidv7(),
       userId,
       userName,
       action: "create",
-      entityType: "Organization",
-      entityId: newTag.id,
-      details: `Created tag: ${newTag.name}`,
-      data: newTag,
+      entityType: "Tag",
+      entityId: result.id,
+      details: `Created tag: ${result.name}`,
+      data: result,
       timestamp: new Date().toISOString(),
       ...metadata,
     });
   }
 
-  return newTag;
+  return result;
 }
 
 export async function getTags(orgId: string): Promise<Tag[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#TAG`,
-        ":skPrefix": "TAG#",
-      },
-    })
-  );
+  const tags = await prisma.tag.findMany({
+    where: { orgId },
+    orderBy: { name: "asc" },
+  });
 
-  return (result.Items as unknown as Tag[]) || [];
+  return tags.map(t => ({
+    ...t,
+    description: t.description || undefined,
+    color: t.color || "",
+    createdAt: t.createdAt.toISOString(),
+  }));
 }
 
 export async function updateTag(orgId: string, tagId: string, updates: Partial<Omit<Tag, "id" | "orgId" | "createdAt">>) {
-  const existing = await getTag(orgId, tagId);
-  if (!existing) throw new Error("Tag not found");
+  const updatedTag = await prisma.tag.update({
+    where: { id: tagId },
+    data: {
+      name: updates.name,
+      color: updates.color,
+      description: updates.description,
+    },
+  });
 
-  const updatedTag: Tag = {
-    ...existing,
-    ...updates,
+  return {
+    ...updatedTag,
+    description: updatedTag.description || undefined,
+    color: updatedTag.color || "",
+    createdAt: updatedTag.createdAt.toISOString(),
   };
-
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${orgId}#TAG`,
-        SK: `TAG#${tagId}`,
-        Type: "Tag",
-        ...updatedTag,
-      },
-    })
-  );
-
-  return updatedTag;
 }
 
 export async function getTag(orgId: string, tagId: string): Promise<Tag | null> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND SK = :sk",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#TAG`,
-        ":sk": `TAG#${tagId}`,
-      },
-    })
-  );
+  const t = await prisma.tag.findUnique({
+    where: { id: tagId },
+  });
 
-  return (result.Items?.[0] as unknown as Tag) || null;
+  if (!t || t.orgId !== orgId) return null;
+
+  return {
+    ...t,
+    description: t.description || undefined,
+    color: t.color || "",
+    createdAt: t.createdAt.toISOString(),
+  };
 }
 
 export async function deleteTag(
@@ -116,15 +107,11 @@ export async function deleteTag(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#TAG`,
-        SK: `TAG#${tagId}`,
-      },
-    })
-  );
+  const oldTag = await getTag(orgId, tagId);
+
+  await prisma.tag.delete({
+    where: { id: tagId },
+  });
 
   if (userId) {
     await createAuditLog({
@@ -133,9 +120,9 @@ export async function deleteTag(
       userId,
       userName,
       action: "delete",
-      entityType: "Organization",
+      entityType: "Tag",
       entityId: tagId,
-      details: `Deleted tag: ${tagId}`,
+      details: `Deleted tag: ${oldTag?.name || tagId}`,
       timestamp: new Date().toISOString(),
       ...metadata,
     });
@@ -143,6 +130,18 @@ export async function deleteTag(
 }
 
 export async function findTagByName(orgId: string, name: string): Promise<Tag | null> {
-  const tags = await getTags(orgId);
-  return tags.find(t => t.name.toLowerCase() === name.toLowerCase()) || null;
+  const t = await prisma.tag.findUnique({
+    where: {
+      orgId_name: { orgId, name },
+    },
+  });
+
+  if (!t) return null;
+
+  return {
+    ...t,
+    description: t.description || undefined,
+    color: t.color || "",
+    createdAt: t.createdAt.toISOString(),
+  };
 }

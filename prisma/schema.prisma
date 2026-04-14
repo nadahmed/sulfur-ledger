@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id                 String               @id
+  name               String
+  ownerId            String
+  currencySymbol     String?              @default("৳")
+  currencyPosition   String?              @default("prefix")
+  currencyHasSpace   Boolean?             @default(false)
+  thousandSeparator  String?              @default(",")
+  decimalSeparator   String?              @default(".")
+  grouping           String?              @default("standard")
+  decimalPlaces      Int?                 @default(2)
+  emailSettings      Json?
+  storageSettings    Json?
+  mcpApiKey          String?
+  mcpApiKeyExpiresAt DateTime?
+  aiSettings         Json?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  users              OrgUser[]
+  accounts           Account[]
+  journals           JournalEntry[]
+  auditLogs          AuditLog[]
+  mcpLogs            McpActivityLog[]
+  recurringEntries   RecurringEntry[]
+  apiKeys            ApiKey[]
+  invitations        Invitation[]
+  chatMessages       ChatMessage[]
+}
+
+model User {
+  id        String    @id // Auth0 sub
+  email     String?   @unique
+  name      String?
+  picture   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  orgs      OrgUser[]
+}
+
+model OrgUser {
+  id                String       @id @default(uuid())
+  orgId             String
+  userId            String
+  role              String       @default("member") // admin, member, viewer
+  isOwner           Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+}
+
+model Account {
+  id               String           @id // The account ID (e.g. checking)
+  orgId            String
+  name             String
+  category         String // asset, liability, equity, income, expense
+  status           String           @default("active") // active, archived
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  organization     Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  journalLines     JournalLine[]
+  recurringFrom    RecurringEntry[] @relation("FromAccount")
+  recurringTo      RecurringEntry[] @relation("ToAccount")
+
+  @@unique([orgId, id])
+}
+
+model JournalEntry {
+  id           String        @id @default(uuid())
+  orgId        String
+  date         DateTime
+  description  String
+  notes        String?
+  receipt      Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  lines        JournalLine[]
+  tags         Tag[]         @relation("JournalToTag")
+
+  @@index([orgId, date])
+}
+
+model JournalLine {
+  id           String       @id @default(uuid())
+  orgId        String
+  journalId    String
+  accountId    String
+  amount       Decimal      @db.Decimal(19, 4) // Store in currency units, high precision
+  date         DateTime
+  journal      JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, accountId, date])
+}
+
+model Tag {
+  id           String         @id @default(uuid())
+  orgId        String
+  name         String
+  color        String?
+  description  String?
+  createdAt    DateTime       @default(now())
+  journals     JournalEntry[] @relation("JournalToTag")
+
+  @@unique([orgId, name])
+}
+
+model ChatMessage {
+  id           String   @id @default(uuid())
+  orgId        String
+  userId       String?
+  userName     String?
+  userInitials String?
+  role         String // user, assistant
+  content      String   @db.Text
+  timestamp    DateTime @default(now())
+  toolCalls    Json?
+  toolResults  Json?
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([orgId, timestamp])
+}
+
+model AiJob {
+  id           String   @id // requestId
+  orgId        String
+  status       String // PENDING, PROCESSING, COMPLETED, FAILED
+  owner        String? // SYNC, BACKGROUND
+  lastActive   DateTime @default(now())
+  startTime    DateTime @default(now())
+  results      Json?
+  toolCalls    Json?
+
+  @@index([orgId, lastActive])
+}
+
+model AuditLog {
+  id           String       @id @default(uuid())
+  orgId        String
+  userId       String
+  userName     String?
+  action       String
+  entityType   String
+  entityId     String
+  details      String?
+  data         Json?
+  changes      Json?
+  ipAddress    String?
+  userAgent    String?
+  timestamp    DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, timestamp])
+}
+
+model McpActivityLog {
+  id           String       @id @default(uuid())
+  orgId        String
+  toolName     String
+  input        String?      @db.Text
+  status       String
+  userName     String?
+  error        String?      @db.Text
+  timestamp    DateTime     @default(now())
+  ipAddress    String?
+  userAgent    String?
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, timestamp])
+}
+
+model RecurringEntry {
+  id                String       @id @default(uuid())
+  orgId             String
+  description       String
+  amount            Decimal      @db.Decimal(19, 4)
+  fromAccountId     String
+  toAccountId       String
+  frequency         String // daily, weekly, monthly, yearly
+  interval          Int          @default(1)
+  dayOfWeek         Int?
+  dayOfMonth        Int?
+  startDate         DateTime
+  lastProcessedDate DateTime?
+  nextProcessDate   DateTime
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  fromAccount       Account      @relation("FromAccount", fields: [fromAccountId], references: [id])
+  toAccount         Account      @relation("ToAccount", fields: [toAccountId], references: [id])
+}
+
+model ApiKey {
+  id           String       @id @default(uuid())
+  orgId        String
+  name         String
+  key          String       @unique
+  userId       String
+  userName     String
+  role         String
+  createdAt    DateTime     @default(now())
+  expiresAt    DateTime?
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id           String       @id @default(uuid())
+  orgId        String
+  email        String
+  role         String
+  orgName      String
+  invitedBy    String
+  createdAt    DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, email])
+}

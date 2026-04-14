@@ -1,5 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { db, TABLE_NAME } from "../dynamodb";
+import { prisma } from "../prisma";
 
 export interface EmailSettings {
   provider: "system" | "brevo" | "smtp";
@@ -96,200 +95,238 @@ export interface ApiKey {
 }
 
 export async function createApiKey(apiKey: ApiKey) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${apiKey.orgId}#APIKEY`,
-        SK: `KEY#${apiKey.key}`,
-        Type: "ApiKey",
-        ...apiKey,
-      },
-    })
-  );
+  await prisma.apiKey.create({
+    data: {
+      orgId: apiKey.orgId,
+      name: apiKey.name,
+      key: apiKey.key,
+      userId: apiKey.userId,
+      userName: apiKey.userName,
+      role: apiKey.role,
+      expiresAt: apiKey.expiresAt ? new Date(apiKey.expiresAt) : null,
+      createdAt: new Date(apiKey.createdAt),
+    },
+  });
   return apiKey;
 }
 
 export async function getApiKeys(orgId: string): Promise<ApiKey[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#APIKEY`,
-        ":skPrefix": "KEY#",
-      },
-    })
-  );
-  return (result.Items as ApiKey[]) || [];
+  const keys = await prisma.apiKey.findMany({
+    where: { orgId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return keys.map((k) => ({
+    orgId: k.orgId,
+    name: k.name,
+    key: k.key,
+    userId: k.userId,
+    userName: k.userName,
+    role: k.role as any,
+    createdAt: k.createdAt.toISOString(),
+    expiresAt: k.expiresAt?.toISOString() || null,
+  }));
 }
 
 export async function getApiKey(orgId: string, keyValue: string): Promise<ApiKey | null> {
-  const result = await db.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#APIKEY`,
-        SK: `KEY#${keyValue}`,
-      },
-    })
-  );
-  return (result.Item as ApiKey) || null;
+  const k = await prisma.apiKey.findUnique({
+    where: { key: keyValue },
+  });
+
+  if (!k || k.orgId !== orgId) return null;
+
+  return {
+    orgId: k.orgId,
+    name: k.name,
+    key: k.key,
+    userId: k.userId,
+    userName: k.userName,
+    role: k.role as any,
+    createdAt: k.createdAt.toISOString(),
+    expiresAt: k.expiresAt?.toISOString() || null,
+  };
 }
 
 export async function deleteApiKey(orgId: string, keyValue: string) {
-  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#APIKEY`,
-        SK: `KEY#${keyValue}`,
-      },
-    })
-  );
+  await prisma.apiKey.deleteMany({
+    where: { orgId, key: keyValue },
+  });
 }
 
 export async function createInvitation(invitation: Invitation) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${invitation.orgId}`,
-        SK: `INVITE#${invitation.email}`,
-        Type: "Invitation",
-        ...invitation,
-      },
-    })
-  );
+  await prisma.invitation.create({
+    data: {
+      orgId: invitation.orgId,
+      email: invitation.email,
+      role: invitation.role,
+      orgName: invitation.orgName,
+      invitedBy: invitation.invitedBy,
+      createdAt: new Date(invitation.createdAt),
+    },
+  });
   return invitation;
 }
 
 export async function getOrganizationInvitations(orgId: string): Promise<Invitation[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}`,
-        ":skPrefix": "INVITE#",
-      },
-    })
-  );
-  return (result.Items as Invitation[]) || [];
+  const invites = await prisma.invitation.findMany({
+    where: { orgId },
+  });
+
+  return invites.map((i) => ({
+    orgId: i.orgId,
+    email: i.email,
+    role: i.role as any,
+    orgName: i.orgName,
+    invitedBy: i.invitedBy,
+    createdAt: i.createdAt.toISOString(),
+  }));
 }
 
 export async function getInvitation(orgId: string, email: string): Promise<Invitation | null> {
-  const result = await db.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `INVITE#${email}`,
-      },
-    })
-  );
-  return (result.Item as Invitation) || null;
+  const i = await prisma.invitation.findUnique({
+    where: {
+      orgId_email: { orgId, email },
+    },
+  });
+
+  if (!i) return null;
+
+  return {
+    orgId: i.orgId,
+    email: i.email,
+    role: i.role as any,
+    orgName: i.orgName,
+    invitedBy: i.invitedBy,
+    createdAt: i.createdAt.toISOString(),
+  };
 }
 
 export async function deleteInvitation(orgId: string, email: string) {
-  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `INVITE#${email}`,
-      },
-    })
-  );
+  await prisma.invitation.delete({
+    where: {
+      orgId_email: { orgId, email },
+    },
+  });
 }
 
 export async function createOrganization(org: Organization) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${org.id}`,
-        SK: `METADATA`,
-        Type: "Organization",
-        ...org,
-      },
-    })
-  );
+  await prisma.organization.create({
+    data: {
+      id: org.id,
+      name: org.name,
+      ownerId: org.ownerId,
+      currencySymbol: org.currencySymbol,
+      currencyPosition: org.currencyPosition,
+      currencyHasSpace: org.currencyHasSpace,
+      thousandSeparator: org.thousandSeparator,
+      decimalSeparator: org.decimalSeparator,
+      grouping: org.grouping,
+      decimalPlaces: org.decimalPlaces,
+      emailSettings: org.emailSettings as any,
+      storageSettings: org.storageSettings as any,
+      mcpApiKey: org.mcpApiKey,
+      mcpApiKeyExpiresAt: org.mcpApiKeyExpiresAt ? new Date(org.mcpApiKeyExpiresAt) : null,
+      aiSettings: org.aiSettings as any,
+      createdAt: org.createdAt ? new Date(org.createdAt) : new Date(),
+    },
+  });
   return org;
 }
 
 export async function getOrganization(orgId: string): Promise<Organization | null> {
-  const result = await db.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-    })
-  );
-  return (result.Item as Organization) || null;
+  const o = await prisma.organization.findUnique({
+    where: { id: orgId },
+  });
+
+  if (!o) return null;
+
+  return {
+    id: o.id,
+    name: o.name,
+    ownerId: o.ownerId,
+    currencySymbol: o.currencySymbol || undefined,
+    currencyPosition: o.currencyPosition as any,
+    currencyHasSpace: o.currencyHasSpace || undefined,
+    thousandSeparator: o.thousandSeparator || undefined,
+    decimalSeparator: o.decimalSeparator || undefined,
+    grouping: o.grouping as any,
+    decimalPlaces: o.decimalPlaces || undefined,
+    emailSettings: o.emailSettings as any,
+    storageSettings: o.storageSettings as any,
+    mcpApiKey: o.mcpApiKey || undefined,
+    mcpApiKeyExpiresAt: o.mcpApiKeyExpiresAt?.toISOString() || undefined,
+    aiSettings: o.aiSettings as any,
+    createdAt: o.createdAt.toISOString(),
+  };
 }
 
 export async function addUserToOrg(user: OrgUser) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${user.orgId}`,
-        SK: `USER#${user.userId}`,
-        Type: "OrgUser",
-        // Enable reverse lookup (get all orgs for a user)
-        GSI1PK: `USER#${user.userId}`,
-        GSI1SK: `ORG#${user.orgId}`,
-        ...user,
+  // Ensure the User record exists first
+  await prisma.user.upsert({
+    where: { id: user.userId },
+    update: {
+      email: user.userEmail || "",
+      name: user.userName || "",
+      picture: user.userPicture || "",
+    },
+    create: {
+      id: user.userId,
+      email: user.userEmail || "",
+      name: user.userName || "",
+      picture: user.userPicture || "",
+      createdAt: new Date(),
+    },
+  });
+
+  await prisma.orgUser.upsert({
+    where: {
+      orgId_userId: {
+        orgId: user.orgId,
+        userId: user.userId,
       },
-    })
-  );
+    },
+    update: {
+      role: user.role,
+      isOwner: user.isOwner ?? false,
+    },
+    create: {
+      orgId: user.orgId,
+      userId: user.userId,
+      role: user.role,
+      isOwner: user.isOwner ?? false,
+      createdAt: new Date(user.createdAt),
+    },
+  });
   return user;
 }
 
 export async function getUserOrganizations(userId: string): Promise<OrgUser[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :pk AND begins_with(GSI1SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${userId}`,
-        ":skPrefix": "ORG#",
-      },
-    })
-  );
-  
-  const orgUsers = (result.Items as OrgUser[]) || [];
-  
-  // Fetch all metadata records to merge branding, currency, and ownership
-  const updatedOrgUsers = await Promise.all(orgUsers.map(async (ou) => {
-    const orgMetadata = await getOrganization(ou.orgId);
-    let updated = { ...ou };
+  const orgUsers = await prisma.orgUser.findMany({
+    where: { userId },
+    include: {
+      organization: true,
+      user: true,
+    },
+  });
 
-    if (orgMetadata) {
-      updated.orgName = orgMetadata.name || ou.orgName || ou.orgId;
-      updated.currencySymbol = orgMetadata.currencySymbol || "৳";
-      updated.currencyPosition = orgMetadata.currencyPosition || "prefix";
-      updated.currencyHasSpace = orgMetadata.currencyHasSpace || false;
-      updated.thousandSeparator = orgMetadata.thousandSeparator || ",";
-      updated.decimalSeparator = orgMetadata.decimalSeparator || ".";
-      updated.grouping = (orgMetadata.grouping as any) || "standard";
-      updated.decimalPlaces = orgMetadata.decimalPlaces ?? 2;
-      updated.createdAt = orgMetadata.createdAt || ou.createdAt || new Date().toISOString();
-      if (orgMetadata.ownerId === userId) {
-        updated.isOwner = true;
-      }
-    }
-
-    return updated;
+  return orgUsers.map((ou) => ({
+    orgId: ou.orgId,
+    orgName: ou.organization.name,
+    userId: ou.userId,
+    userName: ou.user.name || undefined,
+    userEmail: ou.user.email || undefined,
+    userPicture: ou.user.picture || undefined,
+    role: ou.role as any,
+    isOwner: ou.isOwner || ou.organization.ownerId === userId,
+    currencySymbol: ou.organization.currencySymbol || "৳",
+    currencyPosition: (ou.organization.currencyPosition as any) || "prefix",
+    currencyHasSpace: ou.organization.currencyHasSpace || false,
+    thousandSeparator: ou.organization.thousandSeparator || ",",
+    decimalSeparator: ou.organization.decimalSeparator || ".",
+    grouping: (ou.organization.grouping as any) || "standard",
+    decimalPlaces: ou.organization.decimalPlaces ?? 2,
+    createdAt: ou.organization.createdAt.toISOString(),
   }));
-
-  return updatedOrgUsers;
 }
 
 export async function updateOrganization(orgId: string, updates: { 
@@ -302,250 +339,91 @@ export async function updateOrganization(orgId: string, updates: {
   grouping?: "standard" | "indian" | "none",
   decimalPlaces?: number
 }) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
-  let updateExp = "SET #name = :name";
-  const attrNames: any = { "#name": "name" };
-  const attrValues: any = { ":name": updates.name };
-
-  if (updates.currencySymbol !== undefined) {
-    updateExp += ", #symbol = :symbol";
-    attrNames["#symbol"] = "currencySymbol";
-    attrValues[":symbol"] = updates.currencySymbol;
-  }
-  if (updates.currencyPosition !== undefined) {
-    updateExp += ", #pos = :pos";
-    attrNames["#pos"] = "currencyPosition";
-    attrValues[":pos"] = updates.currencyPosition;
-  }
-  if (updates.currencyHasSpace !== undefined) {
-    updateExp += ", #space = :space";
-    attrNames["#space"] = "currencyHasSpace";
-    attrValues[":space"] = updates.currencyHasSpace;
-  }
-  if (updates.thousandSeparator !== undefined) {
-    updateExp += ", #tSep = :tSep";
-    attrNames["#tSep"] = "thousandSeparator";
-    attrValues[":tSep"] = updates.thousandSeparator;
-  }
-  if (updates.decimalSeparator !== undefined) {
-    updateExp += ", #dSep = :dSep";
-    attrNames["#dSep"] = "decimalSeparator";
-    attrValues[":dSep"] = updates.decimalSeparator;
-  }
-  if (updates.grouping !== undefined) {
-    updateExp += ", #group = :group";
-    attrNames["#group"] = "grouping";
-    attrValues[":group"] = updates.grouping;
-  }
-  if (updates.decimalPlaces !== undefined) {
-    updateExp += ", #dPlaces = :dPlaces";
-    attrNames["#dPlaces"] = "decimalPlaces";
-    attrValues[":dPlaces"] = updates.decimalPlaces;
-  }
-
-  // 1. Update Metadata
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-      UpdateExpression: updateExp,
-      ExpressionAttributeNames: attrNames,
-      ExpressionAttributeValues: attrValues,
-    })
-  );
-
-  // 2. Update denormalized orgName in OrgUser records
-  // Fetch all users in this org
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}`,
-        ":skPrefix": "USER#",
-      },
-    })
-  );
-
-  const orgUsers = result.Items || [];
-  for (const ou of orgUsers) {
-    await db.send(
-      new UpdateCommand({
-        TableName: TABLE_NAME,
-        Key: {
-          PK: ou.PK,
-          SK: ou.SK,
-        },
-        UpdateExpression: "SET orgName = :name",
-        ExpressionAttributeValues: { ":name": updates.name },
-      })
-    );
-  }
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: updates,
+  });
 }
 
 export async function updateOrganizationStorageSettings(orgId: string, settings: StorageSettings) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-      UpdateExpression: "SET storageSettings = :settings",
-      ExpressionAttributeValues: { ":settings": settings },
-    })
-  );
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: {
+      storageSettings: settings as any,
+    },
+  });
 }
 
 export async function updateOrganizationEmailSettings(orgId: string, settings: EmailSettings) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-      UpdateExpression: "SET emailSettings = :settings",
-      ExpressionAttributeValues: { ":settings": settings },
-    })
-  );
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: {
+      emailSettings: settings as any,
+    },
+  });
 }
 
 export async function updateOrganizationMcpSettings(orgId: string, settings: { mcpApiKey?: string | null, mcpApiKeyExpiresAt?: string | null }) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-      UpdateExpression: "SET mcpApiKey = :key, mcpApiKeyExpiresAt = :expires",
-      ExpressionAttributeValues: { 
-        ":key": settings.mcpApiKey || null, 
-        ":expires": settings.mcpApiKeyExpiresAt || null 
-      },
-    })
-  );
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: {
+      mcpApiKey: settings.mcpApiKey,
+      mcpApiKeyExpiresAt: settings.mcpApiKeyExpiresAt ? new Date(settings.mcpApiKeyExpiresAt) : null,
+    },
+  });
 }
 
 export async function updateOrganizationAiSettings(orgId: string, settings: AiSettings) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `METADATA`,
-      },
-      UpdateExpression: "SET aiSettings = :settings",
-      ExpressionAttributeValues: { ":settings": settings },
-    })
-  );
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: {
+      aiSettings: settings as any,
+    },
+  });
 }
 
 export async function getOrganizationUsers(orgId: string): Promise<OrgUser[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}`,
-        ":skPrefix": "USER#",
-      },
-    })
-  );
-  
-  const orgUsers = (result.Items as OrgUser[]) || [];
-  const org = await getOrganization(orgId);
-  
-  return orgUsers.map(ou => ({
-    ...ou,
-    isOwner: ou.isOwner || (org?.ownerId === ou.userId)
+  const users = await prisma.orgUser.findMany({
+    where: { orgId },
+    include: {
+      user: true,
+      organization: true,
+    },
+  });
+
+  return users.map((ou) => ({
+    orgId: ou.orgId,
+    orgName: ou.organization.name,
+    userId: ou.userId,
+    userName: ou.user.name || undefined,
+    userEmail: ou.user.email || undefined,
+    userPicture: ou.user.picture || undefined,
+    role: ou.role as any,
+    isOwner: ou.isOwner || ou.organization.ownerId === ou.userId,
+    createdAt: ou.createdAt.toISOString(),
   }));
 }
 
 export async function removeUserFromOrg(orgId: string, userId: string) {
-  const { DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `USER#${userId}`,
-      },
-    })
-  );
+  await prisma.orgUser.delete({
+    where: {
+      orgId_userId: { orgId, userId },
+    },
+  });
 }
 
 export async function updateUserRole(orgId: string, userId: string, role: OrgUser["role"]) {
-  const { UpdateCommand } = require("@aws-sdk/lib-dynamodb");
-  await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}`,
-        SK: `USER#${userId}`,
-      },
-      UpdateExpression: "SET #role = :role",
-      ExpressionAttributeNames: { "#role": "role" },
-      ExpressionAttributeValues: { ":role": role },
-    })
-  );
+  await prisma.orgUser.update({
+    where: {
+      orgId_userId: { orgId, userId },
+    },
+    data: { role },
+  });
 }
 
 export async function deleteFullOrganization(orgId: string) {
-  const { clearOrganizationData } = require("./admin");
-  
-  // 1. Clear accounts and journals
-  await clearOrganizationData(orgId);
-
-  // 2. Clear org metadata and user links
-  let lastEvaluatedKey: Record<string, any> | undefined = undefined;
-  const { BatchWriteCommand } = require("@aws-sdk/lib-dynamodb");
-
-  do {
-    const queryResult: any = await db.send(
-      new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: "PK = :pk",
-        ExpressionAttributeValues: {
-          ":pk": `ORG#${orgId}`,
-        },
-        ExclusiveStartKey: lastEvaluatedKey,
-      })
-    );
-
-    const items = queryResult.Items || [];
-    if (items.length > 0) {
-      for (let i = 0; i < items.length; i += 25) {
-        const chunk = items.slice(i, i + 25);
-        await db.send(
-          new BatchWriteCommand({
-            RequestItems: {
-              [TABLE_NAME]: chunk.map((item: any) => ({
-                DeleteRequest: {
-                  Key: {
-                    PK: item.PK,
-                    SK: item.SK,
-                  },
-                },
-              })),
-            },
-          })
-        );
-      }
-    }
-    lastEvaluatedKey = queryResult.LastEvaluatedKey;
-  } while (lastEvaluatedKey);
+  // Leverage Cascade Delete in our schema
+  await prisma.organization.delete({
+    where: { id: orgId },
+  });
 }

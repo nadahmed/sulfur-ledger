@@ -124,7 +124,7 @@ export default function TermsOfServicePage() {
                   In no event shall Sulfur Book, nor its director, Noor Ahmed, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from:
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <LiabilityCard title="Server Downtime" desc="Interruptions in service due to AWS, Netlify, or DynamoDB outages." />
+                  <LiabilityCard title="Server Downtime" desc="Interruptions in service due to AWS, Netlify, or Database outages." />
                   <DataCard title="Data Inaccuracy" desc="Errors in reports resulting from incorrect manual journal entries." />
                 </div>
               </div>

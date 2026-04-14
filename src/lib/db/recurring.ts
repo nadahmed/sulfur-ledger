@@ -1,5 +1,4 @@
-import { PutCommand, QueryCommand, GetCommand, DeleteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { db, TABLE_NAME } from "../dynamodb";
+import { prisma } from "../prisma";
 import { createAuditLog } from "./audit";
 import { uuidv7 } from "uuidv7";
 
@@ -30,17 +29,25 @@ export async function createRecurringEntry(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${entry.orgId}#RECURRING`,
-        SK: `REC#${entry.id}`,
-        Type: "RecurringEntry",
-        ...entry,
-      },
-    })
-  );
+  await prisma.recurringEntry.create({
+    data: {
+      id: entry.id,
+      orgId: entry.orgId,
+      description: entry.description,
+      amount: entry.amount,
+      fromAccountId: entry.fromAccountId,
+      toAccountId: entry.toAccountId,
+      frequency: entry.frequency,
+      interval: entry.interval,
+      dayOfWeek: entry.dayOfWeek,
+      dayOfMonth: entry.dayOfMonth,
+      startDate: new Date(entry.startDate),
+      lastProcessedDate: entry.lastProcessedDate ? new Date(entry.lastProcessedDate) : null,
+      nextProcessDate: new Date(entry.nextProcessDate),
+      isActive: entry.isActive,
+      createdAt: entry.createdAt ? new Date(entry.createdAt) : new Date(),
+    },
+  });
 
   if (userId) {
     await createAuditLog({
@@ -62,30 +69,39 @@ export async function createRecurringEntry(
 }
 
 export async function getRecurringEntries(orgId: string): Promise<RecurringEntry[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#RECURRING`,
-        ":skPrefix": "REC#",
-      },
-    })
-  );
-  return (result.Items as RecurringEntry[]) || [];
+  const items = await prisma.recurringEntry.findMany({
+    where: { orgId },
+    orderBy: { createdAt: "desc" },
+  });
+  return items.map(item => ({
+    ...item,
+    amount: (item.amount as any).toNumber(),
+    startDate: item.startDate.toISOString().slice(0, 10),
+    lastProcessedDate: item.lastProcessedDate?.toISOString(),
+    nextProcessDate: item.nextProcessDate.toISOString(),
+    createdAt: item.createdAt.toISOString(),
+    frequency: item.frequency as RecurringFrequency,
+    dayOfWeek: item.dayOfWeek ?? undefined,
+    dayOfMonth: item.dayOfMonth ?? undefined,
+  }));
 }
 
 export async function getRecurringEntry(orgId: string, id: string): Promise<RecurringEntry | null> {
-  const result = await db.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#RECURRING`,
-        SK: `REC#${id}`,
-      },
-    })
-  );
-  return (result.Item as RecurringEntry) || null;
+  const item = await prisma.recurringEntry.findUnique({
+    where: { id },
+  });
+  if (!item || item.orgId !== orgId) return null;
+  return {
+    ...item,
+    amount: (item.amount as any).toNumber(),
+    startDate: item.startDate.toISOString().slice(0, 10),
+    lastProcessedDate: item.lastProcessedDate?.toISOString(),
+    nextProcessDate: item.nextProcessDate.toISOString(),
+    createdAt: item.createdAt.toISOString(),
+    frequency: item.frequency as RecurringFrequency,
+    dayOfWeek: item.dayOfWeek ?? undefined,
+    dayOfMonth: item.dayOfMonth ?? undefined,
+  };
 }
 
 export async function updateRecurringEntry(
@@ -96,45 +112,32 @@ export async function updateRecurringEntry(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
+  const oldEntry = await getRecurringEntry(orgId, id);
+  if (!oldEntry) throw new Error("Recurring entry not found");
 
-  let updateExpression = "SET";
-  const expressionAttributeNames: Record<string, string> = {};
-  const expressionAttributeValues: Record<string, any> = {};
-
-  Object.entries(updates).forEach(([key, value], index) => {
-    if (key === "orgId" || key === "id") return;
-    const attrName = `#field${index}`;
-    const attrVal = `:val${index}`;
-    updateExpression += ` ${attrName} = ${attrVal},`;
-    expressionAttributeNames[attrName] = key;
-    expressionAttributeValues[attrVal] = value;
+  await prisma.recurringEntry.update({
+    where: { id },
+    data: {
+      description: updates.description,
+      amount: updates.amount,
+      fromAccountId: updates.fromAccountId,
+      toAccountId: updates.toAccountId,
+      frequency: updates.frequency,
+      interval: updates.interval,
+      dayOfWeek: updates.dayOfWeek,
+      dayOfMonth: updates.dayOfMonth,
+      startDate: updates.startDate ? new Date(updates.startDate) : undefined,
+      lastProcessedDate: updates.lastProcessedDate ? new Date(updates.lastProcessedDate) : undefined,
+      nextProcessDate: updates.nextProcessDate ? new Date(updates.nextProcessDate) : undefined,
+      isActive: updates.isActive,
+    },
   });
 
-  // Remove trailing comma
-  updateExpression = updateExpression.slice(0, -1);
-
-  const result = await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#RECURRING`,
-        SK: `REC#${id}`,
-      },
-      UpdateExpression: updateExpression,
-      ExpressionAttributeNames: expressionAttributeNames,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  const oldEntry = result.Attributes;
-
   if (userId) {
-    // Determine changes
     const changes: Record<string, { old: any; new: any }> = {};
     Object.entries(updates).forEach(([key, value]) => {
-      if (oldEntry && oldEntry[key] !== value) {
-        changes[key] = { old: oldEntry[key], new: value };
+      if ((oldEntry as any)[key] !== value) {
+        changes[key] = { old: (oldEntry as any)[key], new: value };
       }
     });
 
@@ -161,18 +164,11 @@ export async function deleteRecurringEntry(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-const result = await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#RECURRING`,
-        SK: `REC#${id}`,
-      },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  const oldEntry = result.Attributes;
+  const oldEntry = await getRecurringEntry(orgId, id);
+  
+  await prisma.recurringEntry.delete({
+    where: { id },
+  });
 
   if (userId) {
     await createAuditLog({
@@ -192,17 +188,24 @@ const result = await db.send(
 }
 
 export async function getRecurringEntriesByAccount(orgId: string, accountId: string): Promise<RecurringEntry[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      FilterExpression: "fromAccountId = :accountId OR toAccountId = :accountId",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#RECURRING`,
-        ":skPrefix": "REC#",
-        ":accountId": accountId,
-      },
-    })
-  );
-  return (result.Items as RecurringEntry[]) || [];
+  const items = await prisma.recurringEntry.findMany({
+    where: {
+      orgId,
+      OR: [
+        { fromAccountId: accountId },
+        { toAccountId: accountId },
+      ],
+    },
+  });
+  return items.map(item => ({
+    ...item,
+    amount: (item.amount as any).toNumber(),
+    startDate: item.startDate.toISOString().slice(0, 10),
+    lastProcessedDate: item.lastProcessedDate?.toISOString(),
+    nextProcessDate: item.nextProcessDate.toISOString(),
+    createdAt: item.createdAt.toISOString(),
+    frequency: item.frequency as RecurringFrequency,
+    dayOfWeek: item.dayOfWeek ?? undefined,
+    dayOfMonth: item.dayOfMonth ?? undefined,
+  }));
 }

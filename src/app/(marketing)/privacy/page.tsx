@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
                       Financial Data
                     </h4>
                     <p className="text-sm text-neutral-400 leading-relaxed">
-                      Any journal entries, account names, and financial transactions you input are stored in our secure <span className="text-white font-medium">AWS DynamoDB</span> infrastructure. We do not access this data unless required for technical support.
+                      Any journal entries, account names, and financial transactions you input are stored in our secure <span className="text-white font-medium">PostgreSQL</span> infrastructure. We do not access this data unless required for technical support.
                     </p>
                   </div>
                 </div>

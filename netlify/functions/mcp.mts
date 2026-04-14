@@ -1,3 +1,4 @@
+// BUILD_TOKEN: 2026-04-14-T03:43:00
 import type { Context } from "@netlify/functions";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -152,6 +153,8 @@ export default async (req: Request, _context: Context) => {
           isOwner,
           localTime: new Date().toLocaleString(),
           fullBaseUrl: deriveBaseUrl(req),
+          requestId: `mcp_${randomUUID()}`,
+          processMode: "SYNC",
           ipAddress,
           userAgent,
         });

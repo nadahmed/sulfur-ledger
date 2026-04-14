@@ -55,7 +55,7 @@ export function JournalForm({
   });
 
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedReceipt, setUploadedReceipt] = useState<any>(initialValues.receipt || null);
+  const [uploadedReceipt, setUploadedReceipt] = useState<any>(initialValues.receipt || undefined);
 
   const fromAccountId = watch("fromAccountId");
   const toAccountId = watch("toAccountId");
@@ -72,7 +72,7 @@ export function JournalForm({
         ...initialValues,
         date: values.date,
       });
-      setUploadedReceipt(null);
+      setUploadedReceipt(undefined);
       if (onSuccess) onSuccess();
     } catch (err) {
       // Error handled by parent
@@ -281,7 +281,7 @@ export function JournalForm({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setUploadedReceipt(null)}
+                  onClick={() => setUploadedReceipt(undefined)}
                 >
                   <X className="w-4 h-4" />
                 </Button>

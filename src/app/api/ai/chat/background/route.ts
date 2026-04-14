@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     // This route serves as a fallback for local development or simple environments
     await processChatTurn({
       ...chatOptions,
+      processMode: "BACKGROUND",
       skipUserSave: chatOptions.skipUserSave ?? true // Default to true for background if not specified
     });
     

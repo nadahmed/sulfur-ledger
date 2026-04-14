@@ -351,7 +351,7 @@ export default function AiChatbot() {
 
                 return (
                   <motion.div
-                    key={m.id}
+                    key={`${m.id}-${idx}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
@@ -476,6 +476,7 @@ export default function AiChatbot() {
               <AnimatePresence>
                 {isLoading && (
                   <motion.div
+                    key="typing-indicator"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}

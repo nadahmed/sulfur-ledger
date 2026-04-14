@@ -1,52 +1,16 @@
-import { QueryCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { db, TABLE_NAME } from "../dynamodb";
+import { prisma } from "../prisma";
 
 export async function clearOrganizationData(orgId: string) {
-  const accountPk = `ORG#${orgId}#ACCOUNT`;
-  const journalPk = `ORG#${orgId}#JOURNAL`;
-  const activityPk = `ORG#${orgId}#ACTIVITY`;
-
-  const pks = [accountPk, journalPk, activityPk];
-
-  for (const pk of pks) {
-    let lastEvaluatedKey: Record<string, any> | undefined = undefined;
-
-    do {
-      const queryResult: any = await db.send(
-        new QueryCommand({
-          TableName: TABLE_NAME,
-          KeyConditionExpression: "PK = :pk",
-          ExpressionAttributeValues: {
-            ":pk": pk,
-          },
-          ExclusiveStartKey: lastEvaluatedKey,
-          ProjectionExpression: "PK, SK", // Only need keys for deletion
-        })
-      );
-
-      const items = (queryResult.Items as { PK: string; SK: string }[]) || [];
-      if (items.length > 0) {
-        // Batch delete items in chunks of 25
-        for (let i = 0; i < items.length; i += 25) {
-          const chunk = items.slice(i, i + 25);
-          await db.send(
-            new BatchWriteCommand({
-              RequestItems: {
-                [TABLE_NAME]: chunk.map((item) => ({
-                  DeleteRequest: {
-                    Key: {
-                      PK: item.PK,
-                      SK: item.SK,
-                    },
-                  },
-                })),
-              },
-            })
-          );
-        }
-      }
-
-      lastEvaluatedKey = queryResult.LastEvaluatedKey;
-    } while (lastEvaluatedKey);
-  }
+  // We use $transaction to ensure all deletions happen or none do
+  await prisma.$transaction([
+    prisma.account.deleteMany({ where: { orgId } }),
+    prisma.journalEntry.deleteMany({ where: { orgId } }),
+    prisma.auditLog.deleteMany({ where: { orgId } }),
+    prisma.mcpActivityLog.deleteMany({ where: { orgId } }),
+    prisma.recurringEntry.deleteMany({ where: { orgId } }),
+    prisma.apiKey.deleteMany({ where: { orgId } }),
+    prisma.invitation.deleteMany({ where: { orgId } }),
+    prisma.chatMessage.deleteMany({ where: { orgId } }),
+    // Note: We keep OrgUser and the Organization itself
+  ]);
 }

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           memoryAccountNames.add(accountData.name.toLowerCase());
           accountsImported++;
         } catch (e: any) {
-          if (e.name === 'ConditionalCheckFailedException' || e.__type === 'com.amazonaws.dynamodb.v20120810#ConditionalCheckFailedException') {
+          if (e.code === 'P2002') {
              console.warn(`Account ${acc.id} intra-json duplicate detected.`);
              memoryAccountIds.add(acc.id);
              memoryAccountNames.add(acc.name.toLowerCase());

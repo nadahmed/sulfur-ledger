@@ -1,28 +1,20 @@
 import { addDays, addWeeks, addMonths, addYears, format, parseISO } from "date-fns";
 import { uuidv7 } from "uuidv7";
-import { db, TABLE_NAME } from "./dynamodb";
-import { TransactWriteItemsCommand } from "@aws-sdk/client-dynamodb";
-import { marshall } from "@aws-sdk/util-dynamodb";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { prisma } from "./prisma";
 import { createAuditLog } from "./db/audit";
 
 export async function processDueRecurringEntries() {
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = new Date();
 
-  const result = await db.send(
-    new ScanCommand({
-      TableName: TABLE_NAME,
-      FilterExpression: "#type = :type AND isActive = :active AND nextProcessDate <= :today",
-      ExpressionAttributeNames: { "#type": "Type" },
-      ExpressionAttributeValues: {
-        ":type": "RecurringEntry",
-        ":active": true,
-        ":today": today,
+  const dueEntries = await prisma.recurringEntry.findMany({
+    where: {
+      isActive: true,
+      nextProcessDate: {
+        lte: today,
       },
-    })
-  );
+    },
+  });
 
-  const dueEntries = (result.Items as any[]) || [];
   const results = { processed: 0, errors: 0 };
 
   for (const entry of dueEntries) {
@@ -40,89 +32,57 @@ export async function processDueRecurringEntries() {
 
 async function processSingleRecurringEntry(entry: any) {
   const journalId = uuidv7();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const todayDate = new Date();
   
-  const amountPaisa = entry.amount;
-  const journalEntry = {
-    orgId: entry.orgId,
-    id: journalId,
-    date: today,
-    description: `[Recurring] ${entry.description}`,
-    tags: entry.tags,
-    createdAt: new Date().toISOString(),
-  };
-
-  const journalLines = [
-    { orgId: entry.orgId, journalId, accountId: entry.toAccountId, amount: amountPaisa, date: today },
-    { orgId: entry.orgId, journalId, accountId: entry.fromAccountId, amount: -amountPaisa, date: today },
-  ];
-
+  const amount = (entry.amount as any).toNumber();
+  
   // Calculate next process date
   const nextDate = calculateNextOccurrence(entry.nextProcessDate, entry.frequency, entry.interval);
 
-  // Use a transaction to create journal and update recurring entry
-  
-  const transactItems: any[] = [
+  // Use a Prisma transaction to ensure atomicity
+  await prisma.$transaction(async (tx) => {
     // 1. Create Journal Entry
-    {
-      Put: {
-        TableName: TABLE_NAME,
-        Item: marshall({
-          PK: `ORG#${entry.orgId}#JOURNAL`,
-          SK: `JNL#${today}#${journalId}`,
-          Type: "JournalEntry",
-          ...journalEntry,
-        }, { removeUndefinedValues: true }),
+    const journal = await tx.journalEntry.create({
+      data: {
+        id: journalId,
+        orgId: entry.orgId,
+        date: todayDate,
+        description: `[Recurring] ${entry.description}`,
+        notes: `Source: recurring, ID: ${entry.id}`,
       },
-    },
-    // 2. Create Journal Line (Debit)
-    {
-      Put: {
-        TableName: TABLE_NAME,
-        Item: marshall({
-          PK: `ORG#${entry.orgId}#JOURNAL`,
-          SK: `LINE#${journalId}#${entry.toAccountId}`,
-          Type: "JournalLine",
-          GSI1PK: `ORG#${entry.orgId}#ACC#${entry.toAccountId}`,
-          GSI1SK: `JNL#${today}#${journalId}`,
-          tags: entry.tags,
-          ...journalLines[0],
-        }, { removeUndefinedValues: true }),
-      },
-    },
-    // 3. Create Journal Line (Credit)
-    {
-      Put: {
-        TableName: TABLE_NAME,
-        Item: marshall({
-          PK: `ORG#${entry.orgId}#JOURNAL`,
-          SK: `LINE#${journalId}#${entry.fromAccountId}`,
-          Type: "JournalLine",
-          GSI1PK: `ORG#${entry.orgId}#ACC#${entry.fromAccountId}`,
-          GSI1SK: `JNL#${today}#${journalId}`,
-          tags: entry.tags,
-          ...journalLines[1],
-        }, { removeUndefinedValues: true }),
-      },
-    },
-    // 4. Update Recurring Entry
-    {
-      Update: {
-        TableName: TABLE_NAME,
-        Key: marshall({
-          PK: `ORG#${entry.orgId}#RECURRING`,
-          SK: `REC#${entry.id}`,
-        }),
-        UpdateExpression: "SET lastProcessedDate = :today, nextProcessDate = :nextDate",
-        ExpressionAttributeValues: marshall({
-          ":today": today,
-          ":nextDate": nextDate,
-        }),
-      },
-    },
-  ];
+    });
 
-  await db.send(new TransactWriteItemsCommand({ TransactItems: transactItems }));
+    // 2. Create Journal Lines
+    await tx.journalLine.createMany({
+      data: [
+        {
+          id: uuidv7(),
+          orgId: entry.orgId,
+          journalId,
+          accountId: entry.toAccountId,
+          amount: amount,
+          date: todayDate,
+        },
+        {
+          id: uuidv7(),
+          orgId: entry.orgId,
+          journalId,
+          accountId: entry.fromAccountId,
+          amount: -amount,
+          date: todayDate,
+        },
+      ],
+    });
+
+    // 3. Update Recurring Entry
+    await tx.recurringEntry.update({
+      where: { id: entry.id },
+      data: {
+        lastProcessedDate: todayDate,
+        nextProcessDate: nextDate,
+      },
+    });
+  });
 
   // Audit Log
   await createAuditLog({
@@ -133,13 +93,13 @@ async function processSingleRecurringEntry(entry: any) {
     action: "create",
     entityType: "JournalEntry",
     entityId: journalId,
-    details: JSON.stringify({ description: journalEntry.description, source: "recurring", recurringId: entry.id }),
+    details: JSON.stringify({ description: `[Recurring] ${entry.description}`, source: "recurring", recurringId: entry.id }),
     timestamp: new Date().toISOString(),
   });
 }
 
-function calculateNextOccurrence(currentDate: string, frequency: string, interval: number): string {
-  const date = parseISO(currentDate);
+function calculateNextOccurrence(currentDate: Date, frequency: string, interval: number): Date {
+  const date = currentDate;
   let nextDate: Date;
 
   switch (frequency) {
@@ -159,5 +119,5 @@ function calculateNextOccurrence(currentDate: string, frequency: string, interva
       nextDate = addMonths(date, interval);
   }
 
-  return format(nextDate, "yyyy-MM-dd");
+  return nextDate;
 }

@@ -1,5 +1,4 @@
-import { PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
-import { db, TABLE_NAME } from "../dynamodb";
+import { prisma } from "../prisma";
 import { createAuditLog } from "./audit";
 import { uuidv7 } from "uuidv7";
 
@@ -20,19 +19,16 @@ export async function createAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  await db.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        PK: `ORG#${account.orgId}#ACCOUNT`,
-        SK: `ACC#${account.id}`,
-        Type: "Account",
-        ...account,
-      },
-      // Prevent overwriting an existing account
-      ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-    })
-  );
+  await prisma.account.create({
+    data: {
+      id: account.id,
+      orgId: account.orgId,
+      name: account.name,
+      category: account.category,
+      status: account.status || "active",
+      createdAt: account.createdAt ? new Date(account.createdAt) : new Date(),
+    },
+  });
 
   if (userId) {
     await createAuditLog({
@@ -54,30 +50,36 @@ export async function createAccount(
 }
 
 export async function getAccounts(orgId: string): Promise<Account[]> {
-  const result = await db.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-      ExpressionAttributeValues: {
-        ":pk": `ORG#${orgId}#ACCOUNT`,
-        ":skPrefix": "ACC#",
-      },
-    })
-  );
-  return (result.Items as Account[]) || [];
+  const accounts = await prisma.account.findMany({
+    where: { orgId },
+    orderBy: { name: "asc" },
+  });
+
+  return accounts.map((a) => ({
+    orgId: a.orgId,
+    id: a.id,
+    name: a.name,
+    category: a.category as AccountCategory,
+    status: a.status as any,
+    createdAt: a.createdAt.toISOString(),
+  }));
 }
 
 export async function getAccount(orgId: string, accountId: string): Promise<Account | null> {
-  const result = await db.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#ACCOUNT`,
-        SK: `ACC#${accountId}`,
-      },
-    })
-  );
-  return (result.Item as Account) || null;
+  const a = await prisma.account.findUnique({
+    where: { id: accountId },
+  });
+
+  if (!a || a.orgId !== orgId) return null;
+
+  return {
+    orgId: a.orgId,
+    id: a.id,
+    name: a.name,
+    category: a.category as AccountCategory,
+    status: a.status as any,
+    createdAt: a.createdAt.toISOString(),
+  };
 }
 
 export async function deleteAccount(
@@ -87,20 +89,13 @@ export async function deleteAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const result = await db.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#ACCOUNT`,
-        SK: `ACC#${accountId}`,
-      },
-      ReturnValues: "ALL_OLD",
-    })
-  );
+  const oldAccount = await prisma.account.findUnique({ where: { id: accountId } });
 
-  const oldAccount = result.Attributes;
+  await prisma.account.delete({
+    where: { id: accountId },
+  });
 
-  if (userId) {
+  if (userId && oldAccount) {
     await createAuditLog({
       orgId,
       id: uuidv7(),
@@ -109,7 +104,7 @@ export async function deleteAccount(
       action: "delete",
       entityType: "Account",
       entityId: accountId,
-      details: `Deleted account: ${oldAccount?.name || accountId}`,
+      details: `Deleted account: ${oldAccount.name || accountId}`,
       data: oldAccount,
       timestamp: new Date().toISOString(),
       ...metadata,
@@ -125,25 +120,10 @@ export async function archiveAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const result = await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#ACCOUNT`,
-        SK: `ACC#${accountId}`,
-      },
-      UpdateExpression: "SET #status = :archived",
-      ExpressionAttributeNames: {
-        "#status": "status",
-      },
-      ExpressionAttributeValues: {
-        ":archived": "archived",
-      },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  const oldAccount = result.Attributes;
+  const oldAccount = await prisma.account.update({
+    where: { id: accountId },
+    data: { status: "archived" },
+  });
 
   if (userId && oldAccount?.status !== "archived") {
     await createAuditLog({
@@ -171,25 +151,10 @@ export async function unarchiveAccount(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const result = await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#ACCOUNT`,
-        SK: `ACC#${accountId}`,
-      },
-      UpdateExpression: "SET #status = :active",
-      ExpressionAttributeNames: {
-        "#status": "status",
-      },
-      ExpressionAttributeValues: {
-        ":active": "active",
-      },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  const oldAccount = result.Attributes;
+  const oldAccount = await prisma.account.update({
+    where: { id: accountId },
+    data: { status: "active" },
+  });
 
   if (userId && oldAccount?.status !== "active") {
     await createAuditLog({
@@ -218,25 +183,10 @@ export async function updateAccountName(
   userName?: string,
   metadata?: { ipAddress?: string; userAgent?: string }
 ) {
-  const result = await db.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `ORG#${orgId}#ACCOUNT`,
-        SK: `ACC#${accountId}`,
-      },
-      UpdateExpression: "SET #name = :name",
-      ExpressionAttributeNames: {
-        "#name": "name",
-      },
-      ExpressionAttributeValues: {
-        ":name": name,
-      },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  const oldAccount = result.Attributes;
+  const oldAccount = await prisma.account.update({
+    where: { id: accountId },
+    data: { name },
+  });
 
   if (userId && oldAccount?.name !== name) {
     await createAuditLog({

@@ -63,7 +63,7 @@ export default function AboutPage() {
                 <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-neutral-500">The Actual Stack</h4>
                 <div className="space-y-3">
                     <StackBadge label="Next.js 15+" />
-                    <StackBadge label="DynamoDB" />
+                    <StackBadge label="PostgreSQL" />
                     <StackBadge label="Netlify Functions" />
                     <StackBadge label="Auth0 + Google OAuth" />
                     <StackBadge label="Google Antigravity" />

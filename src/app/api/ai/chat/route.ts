@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       isOwner,
       localTime,
       fullBaseUrl,
+      requestId: lastMessage.id,
       ipAddress,
       userAgent
     };
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
     try {
       await processChatTurn({
         ...chatOptions,
+        processMode: "SYNC",
         abortSignal: controller.signal
       });
 
