@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -40,6 +40,8 @@ interface TagSelectorProps {
   value: string[]; // Tag IDs
   onChange: (value: string[]) => void;
   activeOrganizationId?: string | null;
+  className?: string;
+  buttonClassName?: string;
 }
 
 const PREDEFINED_COLORS = [
@@ -48,7 +50,7 @@ const PREDEFINED_COLORS = [
   "#a855f7", "#d946ef", "#ec4899", "#f43f5e", "#71717a", "#4b5563"
 ];
 
-export function TagSelector({ value = [], onChange, activeOrganizationId }: TagSelectorProps) {
+export function TagSelector({ value = [], onChange, activeOrganizationId, className, buttonClassName }: TagSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -106,96 +108,94 @@ export function TagSelector({ value = [], onChange, activeOrganizationId }: TagS
     createTagMutation.mutate({ name: newTagName, color: newTagColor });
   };
 
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-        {selectedTags.length > 0 ? (
-          selectedTags.map((tag) => (
-            <Badge
-              key={tag.id}
-              style={{ backgroundColor: tag.color, color: "#fff", border: "none" }}
-              className="flex items-center gap-1 pr-1"
-            >
-              {tag.name}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelect(tag.id);
-                }}
-                className="hover:bg-white/20 text-white rounded-full p-0.5 size-4"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
-          ))
-        ) : (
-          <span className="text-sm text-muted-foreground italic">No tags selected</span>
-        )}
-      </div>
+  const exactMatch = tags.some(t => t.name.toLowerCase() === searchTerm.toLowerCase());
+  const showCreate = searchTerm.trim().length >= 2 && searchTerm.trim().length <= 100 && !exactMatch;
 
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          render={
-            <Button
-              variant="outline"
-              size="default"
-              className="w-full justify-start text-muted-foreground font-normal border-border h-10"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add tag...
-            </Button>
-          }
-        />
+          className={cn(
+            buttonVariants({ variant: "outline", size: "default" }),
+            "w-full justify-start text-muted-foreground font-normal border-border h-9 text-xs py-0 px-2",
+            buttonClassName
+          )}
+        >
+          <div className="flex items-center gap-1 overflow-hidden">
+            <Plus className="mr-1 h-3 w-3 shrink-0" />
+            {selectedTags.length > 0 ? (
+              <div className="flex items-center gap-1 overflow-hidden">
+                {selectedTags.slice(0, 2).map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    style={{ backgroundColor: tag.color, color: "#fff", border: "none" }}
+                    className="h-5 px-1.5 text-[10px] whitespace-nowrap"
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+                {selectedTags.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground">
+                    +{selectedTags.length - 2}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span>Add tags...</span>
+            )}
+          </div>
+        </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0" align="start">
-          <Command>
+          <Command shouldFilter={false}>
             <CommandInput 
               placeholder="Search or create tag..." 
               value={searchTerm}
               onValueChange={setSearchTerm}
             />
             <CommandList>
-              <CommandEmpty>
-                {searchTerm.trim().length > 0 ? (
-                  <div className="p-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start gap-2 text-primary"
-                      onClick={() => {
-                        setNewTagName(searchTerm);
-                        setIsCreating(true);
-                        setOpen(false);
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create "{searchTerm}"
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="p-4 text-center text-sm text-muted-foreground italic">
-                    Type to find or create tags...
-                  </div>
-                )}
-              </CommandEmpty>
-              <CommandGroup>
-                {tags.map((tag) => (
+              {searchTerm && !tags.some(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())) && (
+                <CommandEmpty>No tags found.</CommandEmpty>
+              )}
+              
+              {showCreate && (
+                <CommandGroup heading="New Tag">
                   <CommandItem
-                    key={tag.id}
-                    value={tag.name}
-                    onSelect={() => handleSelect(tag.id)}
+                    onSelect={() => {
+                      setNewTagName(searchTerm);
+                      setIsCreating(true);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2 text-primary font-medium cursor-pointer"
                   >
-                    <div
-                      className="w-3 h-3 rounded-full mr-2"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span className="flex-1">{tag.name}</span>
-                    {value.includes(tag.id) && <Check className="h-4 w-4" />}
+                    <Plus className="h-4 w-4" />
+                    <span>Create "{searchTerm}"</span>
                   </CommandItem>
-                ))}
-              </CommandGroup>
+                </CommandGroup>
+              )}
+
+              {tags.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).length > 0 && (
+                <CommandGroup heading="Existing Tags">
+                  {tags
+                    .filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map((tag) => (
+                      <CommandItem
+                        key={tag.id}
+                        value={tag.id}
+                        onSelect={() => handleSelect(tag.id)}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="flex-1 truncate">{tag.name}</span>
+                        {value.includes(tag.id) && (
+                          <Check className="h-4 w-4 text-primary shrink-0" />
+                        )}
+                      </CommandItem>
+                    ))}
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>

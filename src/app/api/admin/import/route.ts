@@ -3,6 +3,7 @@ import { checkPermission } from "@/lib/auth";
 import { getAccounts, createAccount, Account } from "@/lib/db/accounts";
 import { createJournalEntry, JournalEntry, JournalLine, getJournalEntries } from "@/lib/db/journals";
 import { clearOrganizationData } from "@/lib/db/admin";
+import { normalizeDate } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
         const entry: JournalEntry = {
           orgId,
           id: j.id,
-          date: j.date,
+          date: normalizeDate(j.date),
           description: j.description,
           tags: j.tags,
           createdAt: j.createdAt || new Date().toISOString(),
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
           id: l.id,
           accountId: l.accountId,
           amount: l.amount,
-          date: l.date || j.date,
+          date: normalizeDate(l.date || j.date),
           description: l.description || "",
         }));
         

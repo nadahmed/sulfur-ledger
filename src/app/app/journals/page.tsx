@@ -173,6 +173,10 @@ export default function JournalsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-trend"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Journal entry recorded successfully");
     },
     onError: (error) => {
@@ -197,6 +201,10 @@ export default function JournalsPage() {
       setEditingEntry(null);
       setIsEditDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["journals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-trend"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Journal entry updated successfully");
     },
     onError: (error) => {
@@ -216,6 +224,10 @@ export default function JournalsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-trend"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Journal entry deleted successfully");
     },
     onError: (error) => {

@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import { randomUUID } from "crypto";
 import { getAccounts } from "@/lib/db/accounts";
-import { createJournalEntry, JournalEntry, JournalLine } from "@/lib/db/journals";
-
-function parseAmount(amtStr: string): number {
-  if (!amtStr) return 0;
-  const cleaned = String(amtStr).replace(/[৳,]/g, "").trim();
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : Math.round(parsed * 100);
-}
-
-function parseDateStr(dateStr: string): string {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) {
-    throw new Error(`Invalid date format: ${dateStr}`);
-  }
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Dhaka',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  return formatter.format(d);
-}
+import * as LedgerService from "@/lib/ledger";
+import { normalizeDate, normalizeAmount } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   const session = await auth0.getSession();
@@ -43,34 +22,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const accounts = await getAccounts(orgId);
-    const fromAccount = accounts.find(a => a.name === from);
-    const toAccount = accounts.find(a => a.name === to);
+    const allAccounts = await getAccounts(orgId);
+    const fromAccount = allAccounts.find((a) => a.name === from);
+    const toAccount   = allAccounts.find((a) => a.name === to);
 
     if (!fromAccount || !toAccount) {
-      return NextResponse.json({ error: `Account not found: ${!fromAccount ? from : to}` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Account not found: ${!fromAccount ? from : to}` },
+        { status: 400 }
+      );
     }
 
-    const amount = parseAmount(amountStr);
-    const entryDate = parseDateStr(date);
-    const journalId = randomUUID();
+    const ctx: LedgerService.UserContext = { userId: session.user.sub! };
 
-    const entry: JournalEntry = {
-      orgId,
-      id: journalId,
-      date: entryDate,
+    const result = await LedgerService.recordImportEntry(orgId, {
+      date: normalizeDate(date),
       description: description || "Imported Entry",
-      createdAt: new Date().toISOString(),
-    };
+      toAccountId: toAccount.id,
+      fromAccountId: fromAccount.id,
+      amountPaisa: normalizeAmount(String(amountStr).replace(/[৳,]/g, "").trim()),
+    }, ctx);
 
-    const lines: JournalLine[] = [
-      { orgId, journalId, accountId: toAccount.id, amount, date: entryDate },
-      { orgId, journalId, accountId: fromAccount.id, amount: -amount, date: entryDate }
-    ];
-
-    await createJournalEntry(entry, lines, session.user.sub!);
-
-    return NextResponse.json({ success: true, journalId });
+    return NextResponse.json({ success: true, journalId: result });
   } catch (err: any) {
     console.error("Import entry error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

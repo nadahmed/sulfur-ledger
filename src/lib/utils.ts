@@ -59,6 +59,23 @@ export function formatCurrency(
   return `${sign}${result}${space}${symbol}`;
 }
 
+/**
+ * Coerce any date string to a plain YYYY-MM-DD (10 chars, no time component).
+ * This ensures journals are grouped by calendar date, not by timestamp.
+ */
+export function normalizeDate(date: string): string {
+  return date.slice(0, 10);
+}
+
+/**
+ * Convert a decimal currency value (e.g. 12.50) to an integer minor-unit
+ * (e.g. 1250 paisa/cents). Accepts both numbers and numeric strings.
+ * Always returns a positive integer; callers set the sign for debit/credit.
+ */
+export function normalizeAmount(amount: number | string): number {
+  return Math.round(parseFloat(String(amount)) * 100);
+}
+
 export function slugify(text: string): string {
   return text
     .toString()

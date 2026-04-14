@@ -1,26 +1,26 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { useMemo, useEffect, Suspense } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
-import { Download, RotateCcw, Calendar as CalendarIcon } from "lucide-react";
+import {
+  Download, RotateCcw, FileBarChart2, Landmark, TrendingUp,
+  CheckCircle2, AlertTriangle, ArrowUpRight, ArrowDownRight, Tag
+} from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { parseISO, format as formatISO } from "date-fns";
+import { parseISO, format as formatISO, startOfMonth, endOfMonth, startOfYear, subMonths } from "date-fns";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { TagSelector } from "@/components/journals/TagSelector";
-import { Suspense } from "react";
-
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { cn, formatCurrency } from "@/lib/utils";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountBalance {
   id: string;
@@ -40,54 +40,84 @@ interface ReportData {
   expenses?: AccountBalance[];
 }
 
+// ─── Report type definitions ─────────────────────────────────────────────────
+
+const REPORT_TYPES = [
+  { id: "trial-balance",    label: "Trial Balance",     icon: FileBarChart2 },
+  { id: "balance-sheet",    label: "Balance Sheet",     icon: Landmark },
+  { id: "income-statement", label: "Income Statement",  icon: TrendingUp },
+];
+
+// ─── Quick date presets ───────────────────────────────────────────────────────
+
+const DATE_PRESETS = [
+  {
+    label: "This Month",
+    fn: () => ({
+      start: formatISO(startOfMonth(new Date()), "yyyy-MM-dd"),
+      end:   formatISO(endOfMonth(new Date()),   "yyyy-MM-dd"),
+    }),
+  },
+  {
+    label: "Last Month",
+    fn: () => {
+      const last = subMonths(new Date(), 1);
+      return { start: formatISO(startOfMonth(last), "yyyy-MM-dd"), end: formatISO(endOfMonth(last), "yyyy-MM-dd") };
+    },
+  },
+  {
+    label: "This Year",
+    fn: () => ({
+      start: formatISO(startOfYear(new Date()), "yyyy-MM-dd"),
+      end:   formatISO(new Date(), "yyyy-MM-dd"),
+    }),
+  },
+];
+
+// ─── Root export (Suspense boundary required for useSearchParams) ─────────────
+
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Loading reports...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading reports…</div>}>
       <ReportsInner />
     </Suspense>
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 function ReportsInner() {
   const { activeOrganizationId, organizations, permissions, isOwner, isLoading: orgLoading } = useOrganization();
-  const activeOrg = organizations.find(o => o.id === activeOrganizationId);
-  const router = useRouter();
+  const activeOrg = organizations.find((o) => o.id === activeOrganizationId);
+  const router     = useRouter();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
+  const pathname   = usePathname();
 
   const urlType = searchParams.get("type");
 
   const [reportType, setReportType] = useLocalStorage(
-    activeOrganizationId ? `reports-filters-type-${activeOrganizationId}` : "reports-filters-type-default", 
+    activeOrganizationId ? `reports-type-${activeOrganizationId}` : "reports-type",
     "trial-balance"
   );
   const [startDate, setStartDate] = useLocalStorage(
-    activeOrganizationId ? `reports-filters-start-${activeOrganizationId}` : "reports-filters-start-default", 
+    activeOrganizationId ? `reports-start-${activeOrganizationId}` : "reports-start",
     ""
   );
   const [endDate, setEndDate] = useLocalStorage(
-    activeOrganizationId ? `reports-filters-end-${activeOrganizationId}` : "reports-filters-end-default", 
+    activeOrganizationId ? `reports-end-${activeOrganizationId}` : "reports-end",
     ""
   );
   const [selectedTagIds, setSelectedTagIds] = useLocalStorage<string[]>(
-    activeOrganizationId ? `reports-filters-tags-${activeOrganizationId}` : "reports-filters-tags-default",
+    activeOrganizationId ? `reports-tags-${activeOrganizationId}` : "reports-tags",
     []
   );
 
-  const isLoading = orgLoading;
   const canRead = isOwner || permissions.includes("read:reports");
 
+  // Sync URL type → local storage type
   useEffect(() => {
-    if (!isLoading && activeOrganizationId === null && organizations.length === 0) {
-      router.push("/app/onboarding");
-    }
-  }, [activeOrganizationId, organizations.length, isLoading, router]);
-
-  useEffect(() => {
-    if (urlType && ["trial-balance", "balance-sheet", "income-statement"].includes(urlType)) {
-      if (reportType !== urlType) {
-        setReportType(urlType);
-      }
+    if (urlType && REPORT_TYPES.find((t) => t.id === urlType)) {
+      if (reportType !== urlType) setReportType(urlType);
     } else if (reportType && !urlType) {
       const params = new URLSearchParams(searchParams.toString());
       params.set("type", reportType);
@@ -95,290 +125,475 @@ function ReportsInner() {
     }
   }, [urlType, reportType, searchParams, pathname, router, setReportType]);
 
-  const handleTabChange = (value: string | null) => {
-    if (!value) return;
-    setReportType(value);
+  const handleTabChange = (id: string) => {
+    setReportType(id);
     const params = new URLSearchParams(searchParams.toString());
-    params.set("type", value);
+    params.set("type", id);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
+
+  const handlePreset = (preset: (typeof DATE_PRESETS)[number]) => {
+    const { start, end } = preset.fn();
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const handleReset = () => { setStartDate(""); setEndDate(""); setSelectedTagIds([]); };
 
   const handlePdfDownload = () => {
     let url = `/api/reports/pdf?type=${reportType}`;
     if (startDate) url += `&start=${startDate}`;
-    if (endDate) url += `&end=${endDate}`;
+    if (endDate)   url += `&end=${endDate}`;
     if (selectedTagIds.length > 0) url += `&tags=${selectedTagIds.join(",")}`;
-    window.open(url, '_blank');
+    window.open(url, "_blank");
   };
 
-  const { data, isLoading: isFetchingReport, isError, error } = useQuery<ReportData>({
+  const { data, isLoading: isFetching, isError, error } = useQuery<ReportData>({
     queryKey: ["reports", activeOrganizationId, reportType, startDate, endDate, selectedTagIds],
     queryFn: async () => {
       let url = `/api/reports?type=${reportType}`;
       if (startDate) url += `&start=${startDate}`;
-      if (endDate) url += `&end=${endDate}`;
+      if (endDate)   url += `&end=${endDate}`;
       if (selectedTagIds.length > 0) url += `&tags=${selectedTagIds.join(",")}`;
-
-      const res = await fetch(url, {
-        headers: { "x-org-id": activeOrganizationId! }
-      });
+      const res = await fetch(url, { headers: { "x-org-id": activeOrganizationId! } });
       if (!res.ok) throw new Error("Failed to fetch report");
       return res.json();
     },
     enabled: !!activeOrganizationId && canRead,
   });
 
-  const formatCurrencyValue = (amount: number) => {
-    return formatCurrency(
-      amount / 100, 
-      activeOrg?.currencySymbol, 
-      activeOrg?.currencyPosition, 
+  // Currency formatter
+  const fmt = (amount: number) =>
+    formatCurrency(
+      amount / 100,
+      activeOrg?.currencySymbol,
+      activeOrg?.currencyPosition,
       activeOrg?.currencyHasSpace,
       activeOrg?.thousandSeparator,
       activeOrg?.decimalSeparator,
       activeOrg?.grouping as any,
       activeOrg?.decimalPlaces
     );
-  };
 
+  // Chart data
   const chartData = useMemo(() => {
     if (!data) return [];
     if (reportType === "income-statement") {
-      const totalIncome = (data.income || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
-      const totalExpenses = (data.expenses || []).reduce((sum, item) => sum + Math.abs(item.balance), 0) / 100;
+      const totalIncome   = (data.income   || []).reduce((s, i) => s + Math.abs(i.balance), 0) / 100;
+      const totalExpenses = (data.expenses || []).reduce((s, i) => s + Math.abs(i.balance), 0) / 100;
       return [
-        { name: "Income", amount: totalIncome, fill: "var(--primary)" },
-        { name: "Expenses", amount: totalExpenses, fill: "var(--destructive)" },
+        { name: "Income",   amount: totalIncome,   fill: "hsl(142,70%,45%)" },
+        { name: "Expenses", amount: totalExpenses, fill: "hsl(0,70%,55%)" },
       ];
     }
     if (reportType === "balance-sheet") {
-      const totalAssets = (data.assets || []).reduce((sum, item) => sum + item.balance, 0) / 100;
-      const totalLia = (data.liabilities || []).reduce((sum, item) => sum + item.balance, 0) / 100;
-      const totalEq = (data.equity || []).reduce((sum, item) => sum + item.balance, 0) / 100;
+      const totalAssets = (data.assets      || []).reduce((s, i) => s + i.balance, 0) / 100;
+      const totalLia    = (data.liabilities || []).reduce((s, i) => s + i.balance, 0) / 100;
+      const totalEq     = (data.equity      || []).reduce((s, i) => s + i.balance, 0) / 100;
       return [
-        { name: "Assets", amount: totalAssets, fill: "var(--chart-1)" },
-        { name: "Liabilities", amount: Math.abs(totalLia), fill: "var(--chart-2)" },
-        { name: "Equity", amount: Math.abs(totalEq), fill: "var(--chart-3)" },
+        { name: "Assets",      amount: totalAssets,        fill: "hsl(217,91%,60%)" },
+        { name: "Liabilities", amount: Math.abs(totalLia), fill: "hsl(0,70%,55%)"   },
+        { name: "Equity",      amount: Math.abs(totalEq),  fill: "hsl(271,81%,56%)" },
       ];
     }
     return [];
   }, [data, reportType]);
 
-  if (isLoading) return <div className="p-8 text-center">Loading...</div>;
+  // Summary metrics per report type
+  const metrics = useMemo(() => {
+    if (!data) return [];
+    if (reportType === "income-statement") {
+      const totalIncome   = (data.income   || []).reduce((s, a) => s + a.balance, 0);
+      const totalExpenses = (data.expenses || []).reduce((s, a) => s + a.balance, 0);
+      const netIncome     = (totalIncome + totalExpenses) * -1;
+      return [
+        { label: "Total Income",   value: fmt(Math.abs(totalIncome)),   icon: ArrowUpRight,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
+        { label: "Total Expenses", value: fmt(Math.abs(totalExpenses)), icon: ArrowDownRight, color: "text-rose-500",    bg: "bg-rose-500/10"    },
+        { label: "Net Income",     value: fmt(netIncome), icon: TrendingUp,
+          color: netIncome >= 0 ? "text-emerald-500" : "text-rose-500",
+          bg:    netIncome >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10" },
+      ];
+    }
+    return [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, reportType]);
 
-  if (!activeOrganizationId && !orgLoading) {
-    return <div className="p-8 text-center">No organization selected. Please go to <Link href="/app/onboarding" className="underline">Onboarding</Link></div>;
+  if (orgLoading) return <div className="p-8 text-center text-muted-foreground">Loading…</div>;
+
+  if (!activeOrganizationId) {
+    return (
+      <div className="p-8 text-center">
+        No organization selected. Please go to <Link href="/app/onboarding" className="underline text-primary">Onboarding</Link>.
+      </div>
+    );
   }
 
+  const activeType = REPORT_TYPES.find((t) => t.id === reportType)!;
+  const hasActiveFilters = startDate || endDate || selectedTagIds.length > 0;
+
   return (
-    <div className="max-w-screen-2xl p-4 md:p-6 space-y-4 min-h-screen">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">Financial Reports</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 w-full sm:w-auto">
-          <div className="grid gap-0.5 w-full sm:w-auto">
-            <Label htmlFor="start" className="text-[10px] uppercase font-bold text-muted-foreground/70">From</Label>
-            <DatePicker 
-              date={startDate ? parseISO(startDate) : undefined} 
-              setDate={(d: Date | undefined) => setStartDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
-              className="h-8 w-full sm:w-36 text-xs" 
-              placeholder="From Date" 
-            />
-          </div>
-          <div className="grid gap-0.5 w-full sm:w-auto">
-            <Label htmlFor="end" className="text-[10px] uppercase font-bold text-muted-foreground/70">To</Label>
-            <DatePicker 
-              date={endDate ? parseISO(endDate) : undefined} 
-              setDate={(d: Date | undefined) => setEndDate(d ? formatISO(d, "yyyy-MM-dd") : "")} 
-              className="h-8 w-full sm:w-36 text-xs" 
-              placeholder="To Date" 
-            />
-          </div>
-          <div className="grid gap-0.5 w-full sm:w-[180px]">
-            <Label htmlFor="tags-filter" className="text-[10px] uppercase font-bold text-muted-foreground/70">Tags</Label>
-            <TagSelector 
-              value={selectedTagIds}
-              onChange={setSelectedTagIds}
-            />
-          </div>
-          <Button variant="ghost" size="sm" className="h-8 w-full sm:w-auto text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSelectedTagIds([]); }}>
-             <RotateCcw className="mr-1 h-3 w-3" /> Reset
-          </Button>
+    <div className="w-full max-w-screen-2xl p-4 md:p-6 space-y-5 min-h-screen">
+
+      {/* ── Page Header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Financial Reports</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {activeOrg?.name} · {activeType?.label}
+          </p>
         </div>
+
+        <Button variant="outline" size="sm" className="h-9 w-full sm:w-auto text-xs shrink-0" onClick={handlePdfDownload}>
+          <Download className="h-3.5 w-3.5 mr-1.5" /> Export PDF
+        </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {[
-          { id: "trial-balance", label: "Trial Balance" },
-          { id: "balance-sheet", label: "Balance Sheet" },
-          { id: "income-statement", label: "Income Statement" }
-        ].map((type) => (
-          <Button
-            key={type.id}
-            variant={reportType === type.id ? "default" : "outline"}
-            className="rounded-full shadow-none h-8 text-xs px-4"
-            onClick={() => handleTabChange(type.id)}
+      {/* ── Report Type Tabs ─────────────────────────────────────────────── */}
+      <div className="flex bg-muted/40 border border-border rounded-lg p-1 w-full sm:w-fit gap-1">
+        {REPORT_TYPES.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => handleTabChange(id)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 sm:flex-initial justify-center",
+              reportType === id
+                ? "bg-card text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            {type.label}
-          </Button>
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="inline sm:hidden">{label.split(" ")[0]}</span>
+          </button>
         ))}
       </div>
 
-      <div className="mt-4">
-        <Card>
-            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-4 pb-2">
-              <CardTitle className="capitalize text-lg">{reportType.replace("-", " ")}</CardTitle>
-              <Button variant="outline" size="sm" className="h-8 text-xs w-full sm:w-auto" onClick={handlePdfDownload}>
-                <Download className="h-3 w-3 mr-2" /> Print PDF
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {!canRead ? (
-                <div className="py-20 text-center text-red-500">
-                  You do not have permission to view financial reports.
-                </div>
-              ) : isFetchingReport ? (
-                <div className="py-20 text-center text-muted-foreground">Generating report...</div>
-              ) : isError ? (
-                <div className="py-20 text-center text-destructive">Error: {(error as Error).message}</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  {reportType === "trial-balance" && data && (
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30">
-                          <TableHead className="h-8 text-xs">Account Name</TableHead>
-                          <TableHead className="h-8 text-xs">Category</TableHead>
-                          <TableHead className="h-8 text-xs text-right">Debit</TableHead>
-                          <TableHead className="h-8 text-xs text-right">Credit</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.accounts?.map((acc) => (
-                          <TableRow key={acc.id} className="hover:bg-muted/10">
-                            <TableCell className="py-1.5 text-xs">{acc.name}</TableCell>
-                            <TableCell className="py-1.5 capitalize text-[10px] text-muted-foreground">{acc.category}</TableCell>
-                            <TableCell className="py-1.5 text-right text-xs">{acc.balance > 0 ? formatCurrencyValue(acc.balance) : "-"}</TableCell>
-                            <TableCell className="py-1.5 text-right text-xs">{acc.balance < 0 ? formatCurrencyValue(Math.abs(acc.balance)) : "-"}</TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="font-bold border-t-2">
-                          <TableCell colSpan={2}>Total</TableCell>
-                          <TableCell className="text-right">{formatCurrencyValue(data.totalDebits || 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrencyValue(Math.abs(data.totalCredits || 0))}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  )}
+      {/* ── Filter Bar ───────────────────────────────────────────────────── */}
+      <Card className="border-border shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3">
 
-                  {reportType === "balance-sheet" && data && (
-                    <div className="space-y-6">
-                      <ReportSection title="Assets" accounts={data.assets || []} format={formatCurrencyValue} normal="debit" />
-                      <ReportSection title="Liabilities" accounts={data.liabilities || []} format={formatCurrencyValue} normal="credit" />
-                      <ReportSection title="Equity" accounts={data.equity || []} format={formatCurrencyValue} normal="credit" />
-                      
-                      <div className="pt-6 border-t-2 space-y-4">
-                        <div className="flex flex-col sm:flex-row justify-between gap-4">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Assets</p>
-                            <p className="text-xl font-bold">{formatCurrencyValue((data.assets || []).reduce((s, a) => s + a.balance, 0))}</p>
-                          </div>
-                          <div className="space-y-1 sm:text-right">
-                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Liabilities & Equity</p>
-                            <p className="text-xl font-bold">
-                              {formatCurrencyValue(
-                                ((data.liabilities || []).reduce((s, a) => s + a.balance, 0) + 
-                                (data.equity || []).reduce((s, a) => s + a.balance, 0)) * -1
-                              )}
-                            </p>
-                          </div>
-                        </div>
+            {/* Row 1: Date + Tags + Reset */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
 
-                        {(() => {
-                          const totalAssets = (data.assets || []).reduce((s, a) => s + a.balance, 0);
-                          const totalLiaEqBalances = (data.liabilities || []).reduce((s, a) => s + a.balance, 0) + (data.equity || []).reduce((s, a) => s + a.balance, 0);
-                          
-                          const diff = Math.round(totalAssets + totalLiaEqBalances);
-                          const isBalanced = Math.abs(diff) < 1; // within 1 cent/unit for rounding
+              {/* From date */}
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wide">From</Label>
+                <DatePicker
+                  date={startDate ? parseISO(startDate) : undefined}
+                  setDate={(d) => setStartDate(d ? formatISO(d, "yyyy-MM-dd") : "")}
+                  className="h-9 w-full"
+                  placeholder="Start date"
+                />
+              </div>
 
-                          return (
-                            <div className={`p-4 rounded-lg flex items-center justify-between ${isBalanced ? "bg-primary/10 border border-primary/20" : "bg-destructive/10 border border-destructive/20"}`}>
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${isBalanced ? "bg-primary" : "bg-destructive animate-pulse"}`} />
-                                <span className={`font-semibold ${isBalanced ? "text-primary" : "text-destructive"}`}>
-                                  {isBalanced ? "Balance Sheet is Balanced" : "Balance Sheet is Out of Balance"}
-                                </span>
-                              </div>
-                              {!isBalanced && (
-                                <span className="text-destructive font-mono font-bold">
-                                  Diff: {formatCurrencyValue(diff)}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
+              {/* To date */}
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wide">To</Label>
+                <DatePicker
+                  date={endDate ? parseISO(endDate) : undefined}
+                  setDate={(d) => setEndDate(d ? formatISO(d, "yyyy-MM-dd") : "")}
+                  className="h-9 w-full"
+                  placeholder="End date"
+                />
+              </div>
 
-                  {reportType === "income-statement" && data && (
-                    <div className="space-y-6">
-                      <ReportSection title="Income" accounts={data.income || []} format={formatCurrencyValue} normal="credit" />
-                      <ReportSection title="Expenses" accounts={data.expenses || []} format={formatCurrencyValue} normal="debit" />
-                      
-                      <div className="pt-4 border-t-2 flex justify-between font-bold text-lg">
-                        <span>Net Income</span>
-                        {(() => {
-                          const totalIncome = (data.income || []).reduce((s, a) => s + a.balance, 0);
-                          const totalExpenses = (data.expenses || []).reduce((s, a) => s + a.balance, 0);
-                          // Net Income = Income (credit) - Expenses (debit). 
-                          // In our DB, income is negative, expenses positive.
-                          // So Net Income (Credit) = (Sum(Income) + Sum(Expenses))
-                          // We want to show positive for Profit (Net Credit)
-                          const netIncome = (totalIncome + totalExpenses) * -1;
-                          
-                          return (
-                            <span className={netIncome >= 0 ? "text-primary" : "text-destructive"}>
-                              {formatCurrencyValue(netIncome)}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {/* Tags */}
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wide flex items-center gap-1">
+                  <Tag className="h-3 w-3" /> Tags
+                </Label>
+                <TagSelector
+                  value={selectedTagIds}
+                  onChange={setSelectedTagIds}
+                  activeOrganizationId={activeOrganizationId}
+                />
+              </div>
+
+              {/* Reset */}
+              <div className="flex items-end">
+                <Button
+                  variant={hasActiveFilters ? "default" : "outline"}
+                  size="sm"
+                  className="h-9 w-full text-xs"
+                  onClick={handleReset}
+                  disabled={!hasActiveFilters}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  {hasActiveFilters ? "Clear Filters" : "No Filters"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Row 2: Quick presets */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wide">Quick:</span>
+              {DATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => handlePreset(preset)}
+                  className="text-xs px-2.5 py-1 rounded-md border border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {(startDate || endDate) && (
+                <span className="text-xs text-muted-foreground">
+                  {startDate || "—"} → {endDate || "—"}
+                </span>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Permission guard ─────────────────────────────────────────────── */}
+      {!canRead ? (
+        <Card>
+          <CardContent className="py-20 text-center text-destructive">You do not have permission to view financial reports.</CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* ── Summary Metrics ──────────────────────────────────────────── */}
+          {(isFetching || metrics.length > 0) && (
+            <div className={cn("grid gap-4", metrics.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+              {isFetching
+                ? Array.from({ length: reportType === "income-statement" ? 3 : 2 }).map((_, i) => (
+                    <Card key={i} className="border-border animate-pulse">
+                      <CardContent className="p-4">
+                        <div className="h-4 w-24 bg-muted rounded mb-3" />
+                        <div className="h-7 w-32 bg-muted rounded" />
+                      </CardContent>
+                    </Card>
+                  ))
+                : metrics.map(({ label, value, icon: Icon, color, bg }) => (
+                    <Card key={label} className="border-border shadow-sm">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <div className={cn("p-2.5 rounded-lg shrink-0", bg)}>
+                          <Icon className={cn("h-5 w-5", color)} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                          <p className="text-xl font-bold tracking-tight mt-0.5">{value}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+            </div>
+          )}
+
+          {/* ── Report Table + Chart ─────────────────────────────────────── */}
+          <div className={cn("grid grid-cols-1 gap-5", reportType !== "trial-balance" && "lg:grid-cols-3")}>
+
+            {/* Table */}
+            <Card className={cn("border-border shadow-sm", reportType !== "trial-balance" ? "lg:col-span-2" : "w-full")}>
+              <CardHeader className="px-4 py-3 border-b border-border/60">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  {activeType?.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {isFetching ? (
+                  <div className="py-20 flex flex-col items-center gap-3">
+                    <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    <span className="text-sm text-muted-foreground">Generating report…</span>
+                  </div>
+                ) : isError ? (
+                  <div className="py-20 text-center text-destructive text-sm">{(error as Error).message}</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    {reportType === "trial-balance" && data && (
+                      <TrialBalanceTable data={data} fmt={fmt} />
+                    )}
+                    {reportType === "balance-sheet" && data && (
+                      <BalanceSheetTable data={data} fmt={fmt} />
+                    )}
+                    {reportType === "income-statement" && data && (
+                      <IncomeStatementTable data={data} fmt={fmt} />
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Chart */}
+            {chartData.length > 0 && !isFetching && reportType !== "trial-balance" && (
+              <Card className="border-border shadow-sm h-fit">
+                <CardHeader className="px-4 py-3 border-b border-border/60">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Visual Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={reportType === "balance-sheet" ? 320 : 260}>
+                    <BarChart data={chartData} margin={{ top: 8, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.4} />
+                      <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: "var(--foreground)" }} />
+                      <YAxis fontSize={11} tickLine={false} axisLine={false} tick={{ fill: "var(--foreground)" }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--popover)",
+                          color: "var(--popover-foreground)",
+                          borderRadius: "var(--radius)",
+                          border: "1px solid var(--border)",
+                          fontSize: 12,
+                        }}
+                        itemStyle={{ color: "var(--popover-foreground)" }}
+                        labelStyle={{ color: "var(--popover-foreground)" }}
+                        cursor={{ fill: "var(--muted)", fillOpacity: 0.3 }}
+                        formatter={(v: any) => [fmt(v * 100), ""]}
+                      />
+                      <Bar dataKey="amount" radius={[4, 4, 0, 0]} barSize={36} animationDuration={800}>
+                        {chartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function ReportSection({ title, accounts, format, normal = "debit" }: { title: string, accounts: AccountBalance[], format: (v: number) => string, normal?: "debit" | "credit" }) {
-  const total = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+// ─── Sub-tables ───────────────────────────────────────────────────────────────
+
+function TrialBalanceTable({ data, fmt }: { data: ReportData; fmt: (n: number) => string }) {
   return (
-    <div className="space-y-2">
-      <h3 className="font-semibold text-lg border-b pb-1">{title}</h3>
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-muted/30 border-b border-border">
+          <TableHead className="h-9 text-xs font-semibold">Account</TableHead>
+          <TableHead className="h-9 text-xs font-semibold">Category</TableHead>
+          <TableHead className="h-9 text-xs font-semibold text-right">Debit</TableHead>
+          <TableHead className="h-9 text-xs font-semibold text-right">Credit</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {(data.accounts?.length ?? 0) === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="py-10 text-center text-muted-foreground italic text-sm">No account data for this period.</TableCell>
+          </TableRow>
+        ) : (
+          data.accounts?.map((acc) => (
+            <TableRow key={acc.id} className="hover:bg-muted/20 border-b border-border/40">
+              <TableCell className="py-2 text-sm font-medium">{acc.name}</TableCell>
+              <TableCell className="py-2 text-xs capitalize text-muted-foreground">{acc.category}</TableCell>
+              <TableCell className="py-2 text-right text-sm font-mono">{acc.balance > 0 ? fmt(acc.balance) : <span className="text-muted-foreground/40">—</span>}</TableCell>
+              <TableCell className="py-2 text-right text-sm font-mono">{acc.balance < 0 ? fmt(Math.abs(acc.balance)) : <span className="text-muted-foreground/40">—</span>}</TableCell>
+            </TableRow>
+          ))
+        )}
+        <TableRow className="bg-muted/20 font-bold border-t-2 border-border">
+          <TableCell colSpan={2} className="py-2.5 text-sm">Total</TableCell>
+          <TableCell className="py-2.5 text-right text-sm font-mono">{fmt(data.totalDebits ?? 0)}</TableCell>
+          <TableCell className="py-2.5 text-right text-sm font-mono">{fmt(Math.abs(data.totalCredits ?? 0))}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  );
+}
+
+function BalanceSheetTable({ data, fmt }: { data: ReportData; fmt: (n: number) => string }) {
+  const totalAssets  = (data.assets      || []).reduce((s, a) => s + a.balance, 0);
+  const totalLiaEq   = (data.liabilities || []).reduce((s, a) => s + a.balance, 0)
+                     + (data.equity      || []).reduce((s, a) => s + a.balance, 0);
+  const diff         = Math.round(totalAssets + totalLiaEq);
+  const isBalanced   = Math.abs(diff) < 1;
+
+  return (
+    <div className="divide-y divide-border/60">
+      <ReportSection title="Assets"      accounts={data.assets      ?? []} fmt={fmt} normal="debit"  />
+      <ReportSection title="Liabilities" accounts={data.liabilities ?? []} fmt={fmt} normal="credit" />
+      <ReportSection title="Equity"      accounts={data.equity      ?? []} fmt={fmt} normal="credit" />
+
+      {/* Balance indicator */}
+      <div className="p-4">
+        <div className={cn(
+          "flex items-center justify-between p-3 rounded-lg border text-sm font-medium",
+          isBalanced
+            ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600"
+            : "bg-destructive/5 border-destructive/20 text-destructive"
+        )}>
+          <div className="flex items-center gap-2">
+            {isBalanced
+              ? <CheckCircle2 className="h-4 w-4" />
+              : <AlertTriangle className="h-4 w-4" />}
+            {isBalanced ? "Balance Sheet is Balanced" : "Balance Sheet is Out of Balance"}
+          </div>
+          {!isBalanced && (
+            <span className="font-mono font-bold">Diff: {fmt(diff)}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IncomeStatementTable({ data, fmt }: { data: ReportData; fmt: (n: number) => string }) {
+  const totalIncome   = (data.income   || []).reduce((s, a) => s + a.balance, 0);
+  const totalExpenses = (data.expenses || []).reduce((s, a) => s + a.balance, 0);
+  const netIncome     = (totalIncome + totalExpenses) * -1;
+
+  return (
+    <div className="divide-y divide-border/60">
+      <ReportSection title="Income"   accounts={data.income   ?? []} fmt={fmt} normal="credit" />
+      <ReportSection title="Expenses" accounts={data.expenses ?? []} fmt={fmt} normal="debit"  />
+
+      {/* Net income footer */}
+      <div className="flex items-center justify-between px-4 py-3 font-bold text-base">
+        <span>Net Income</span>
+        <span className={netIncome >= 0 ? "text-emerald-600" : "text-destructive"}>{fmt(netIncome)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared section component ─────────────────────────────────────────────────
+
+function ReportSection({
+  title, accounts, fmt, normal = "debit",
+}: {
+  title: string;
+  accounts: AccountBalance[];
+  fmt: (n: number) => string;
+  normal?: "debit" | "credit";
+}) {
+  const total = useMemo(() => accounts.reduce((s, a) => s + a.balance, 0), [accounts]);
+
+  return (
+    <div>
+      <div className="px-4 py-2 bg-muted/20">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      </div>
       <Table>
         <TableBody>
-          {accounts.map(acc => (
-            <TableRow key={acc.id} className="border-none hover:bg-transparent">
-              <TableCell className="py-1">{acc.name}</TableCell>
-              <TableCell className={`text-right py-1 font-mono ${acc.balance < 0 && normal === "debit" ? "text-red-600" : ""}`}>
-                {format(normal === "credit" ? (acc.balance === 0 ? 0 : acc.balance * -1) : acc.balance)}
-              </TableCell>
+          {accounts.length === 0 ? (
+            <TableRow>
+              <TableCell className="py-3 italic text-muted-foreground text-sm px-4">No {title.toLowerCase()} accounts.</TableCell>
+              <TableCell className="py-3 text-right text-muted-foreground text-sm px-4">{fmt(0)}</TableCell>
             </TableRow>
-          ))}
-          {accounts.length === 0 && (
-            <TableRow className="border-none">
-              <TableCell className="text-muted-foreground italic py-1">No items found</TableCell>
-              <TableCell className="text-right py-1">{format(0)}</TableCell>
-            </TableRow>
+          ) : (
+            accounts.map((acc) => (
+              <TableRow key={acc.id} className="hover:bg-muted/20 border-b border-border/30">
+                <TableCell className="py-2 text-sm px-4">{acc.name}</TableCell>
+                <TableCell className={cn(
+                  "py-2 text-right text-sm font-mono px-4",
+                  acc.balance < 0 && normal === "debit" ? "text-destructive" : ""
+                )}>
+                  {fmt(normal === "credit" ? acc.balance * -1 : acc.balance)}
+                </TableCell>
+              </TableRow>
+            ))
           )}
-          <TableRow className="font-bold">
-            <TableCell>Total {title}</TableCell>
-            <TableCell className="text-right border-t">
-              {format(normal === "credit" ? (total === 0 ? 0 : total * -1) : total)}
+          <TableRow className="bg-muted/10 font-semibold">
+            <TableCell className="py-2 text-sm px-4">Total {title}</TableCell>
+            <TableCell className="py-2 text-right text-sm font-mono border-t border-border px-4">
+              {fmt(normal === "credit" ? total * -1 : total)}
             </TableCell>
           </TableRow>
         </TableBody>
